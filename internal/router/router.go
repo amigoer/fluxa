@@ -187,17 +187,40 @@ func (s *state) providersServing(model string) []string {
 
 // openaiCompatibleDefaults lists every provider kind that speaks the OpenAI
 // REST dialect. Adding support for another Chinese or Western vendor that
-// exposes an OpenAI-compatible endpoint is a one-line edit here.
+// exposes an OpenAI-compatible endpoint is a one-line edit here — every
+// entry below reuses the single internal/adapter/openai implementation.
 var openaiCompatibleDefaults = map[string]string{
+	// v1.0 — core providers
 	"openai":   "https://api.openai.com/v1",
 	"deepseek": "https://api.deepseek.com/v1",
 	"qwen":     "https://dashscope.aliyuncs.com/compatible-mode/v1",
 	"ollama":   "http://localhost:11434/v1",
+
 	// v4.0 — additional providers that ship an OpenAI-compatible surface.
-	"moonshot": "https://api.moonshot.cn/v1",              // Kimi
-	"zhipu":    "https://open.bigmodel.cn/api/paas/v4",    // GLM
-	"doubao":   "https://ark.cn-beijing.volces.com/api/v3", // Volcengine Ark
-	"ernie":    "https://qianfan.baidubce.com/v2",         // Baidu Qianfan v2
+	"moonshot": "https://api.moonshot.cn/v1",               // Kimi
+	"zhipu":    "https://open.bigmodel.cn/api/paas/v4",     // 智谱 GLM
+	"doubao":   "https://ark.cn-beijing.volces.com/api/v3", // 豆包 / Volcengine Ark
+	"ernie":    "https://qianfan.baidubce.com/v2",          // 文心一言 / Baidu Qianfan v2
+
+	// Western OpenAI-compatible vendors.
+	"mistral":    "https://api.mistral.ai/v1",
+	"groq":       "https://api.groq.com/openai/v1",
+	"xai":        "https://api.x.ai/v1",                  // Grok
+	"perplexity": "https://api.perplexity.ai",
+	"together":   "https://api.together.xyz/v1",
+	"fireworks":  "https://api.fireworks.ai/inference/v1",
+	"openrouter": "https://openrouter.ai/api/v1",
+	"cohere":     "https://api.cohere.ai/compatibility/v1",
+	"nvidia":     "https://integrate.api.nvidia.com/v1",
+
+	// Chinese OpenAI-compatible vendors beyond the v4.0 batch.
+	"siliconflow": "https://api.siliconflow.cn/v1",        // 硅基流动
+	"minimax":     "https://api.minimax.chat/v1",          // MiniMax
+	"baichuan":    "https://api.baichuan-ai.com/v1",       // 百川智能
+	"stepfun":     "https://api.stepfun.com/v1",           // 阶跃星辰
+	"spark":       "https://spark-api-open.xf-yun.com/v1", // 讯飞星火
+	"zero-one":    "https://api.lingyiwanwu.com/v1",       // 零一万物 (Yi)
+	"tencent":     "https://api.hunyuan.cloud.tencent.com/v1", // 腾讯混元
 }
 
 // newProvider is the factory from config.ProviderConfig to a concrete

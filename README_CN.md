@@ -76,20 +76,39 @@ Fluxa 用一个自托管网关解决上面所有问题。
 
 ## 支持的模型 Provider
 
-| Provider | 模型 | 状态 |
-|----------|------|------|
-| OpenAI | GPT-4o, GPT-4o-mini, o1, o3 | ✅ v1.0 |
-| Anthropic | Claude 3.5, Claude 3.7 | ✅ v1.0 |
-| DeepSeek | deepseek-chat, deepseek-reasoner | ✅ v1.0 |
-| 通义千问 | qwen-max, qwen-plus, qwen-turbo | ✅ v1.0 |
-| Ollama | 任意本地模型 | ✅ v1.0 |
-| Kimi | moonshot-v1 系列 | 🔄 v4.0 |
-| 智谱 GLM | glm-4, glm-4-flash | 🔄 v4.0 |
-| 文心一言 | ernie-4.0 系列 | 🔄 v4.0 |
-| 豆包 | doubao-pro 系列 | 🔄 v4.0 |
-| Azure OpenAI | 所有 Azure 托管模型 | 🔄 v4.0 |
-| Google Gemini | gemini-1.5-pro, gemini-2.0 | 🔄 v4.0 |
-| AWS Bedrock | Claude, Llama, Titan | 🔄 v4.0 |
+| Provider | 代表模型 | kind | 状态 |
+|----------|---------|------|------|
+| OpenAI | GPT-4o, GPT-4o-mini, o1, o3 | `openai` | ✅ |
+| Anthropic | Claude 3.5, Claude 3.7 | `anthropic` | ✅ |
+| DeepSeek | deepseek-chat, deepseek-reasoner | `deepseek` | ✅ |
+| 通义千问 | qwen-max, qwen-plus, qwen-turbo | `qwen` | ✅ |
+| Ollama | 任意本地模型 | `ollama` | ✅ |
+| Kimi / Moonshot | moonshot-v1, kimi-k2 | `moonshot` | ✅ |
+| 智谱 GLM | glm-4, glm-4-flash | `zhipu` | ✅ |
+| 文心一言 | ernie-4.0, ernie-3.5 | `ernie` | ✅ |
+| 豆包 (火山方舟) | doubao-pro | `doubao` | ✅ |
+| Google Gemini | gemini-1.5-pro, gemini-2.0 | `gemini` | ✅ |
+| AWS Bedrock | Claude / Llama / Titan（Converse API，内置 SigV4） | `bedrock` | ✅ |
+| Azure OpenAI | 基于 deployment 映射的 GPT 系列 | `azure` | ✅ |
+| Mistral | mistral-large, codestral | `mistral` | ✅ |
+| Groq | Llama 3.3、Mixtral（超低延迟） | `groq` | ✅ |
+| xAI | grok-2, grok-2-mini | `xai` | ✅ |
+| Perplexity | sonar 在线/聊天 | `perplexity` | ✅ |
+| Together AI | Llama / Qwen / Mixtral 聚合 | `together` | ✅ |
+| Fireworks | Llama / Mixtral / DeepSeek | `fireworks` | ✅ |
+| OpenRouter | 300+ 聚合模型 | `openrouter` | ✅ |
+| Cohere | command-r-plus, command-r | `cohere` | ✅ |
+| NVIDIA NIM | build.nvidia.com 上的 Llama / Mixtral | `nvidia` | ✅ |
+| 硅基流动 (SiliconFlow) | Qwen / DeepSeek / Llama 镜像 | `siliconflow` | ✅ |
+| MiniMax | abab6.5s-chat | `minimax` | ✅ |
+| 百川智能 | Baichuan4 | `baichuan` | ✅ |
+| 阶跃星辰 | step-1, step-2 | `stepfun` | ✅ |
+| 讯飞星火 | Spark v3.5 | `spark` | ✅ |
+| 零一万物 (Yi) | yi-large, yi-medium | `zero-one` | ✅ |
+| 腾讯混元 | hunyuan-pro, hunyuan-standard | `tencent` | ✅ |
+
+> 未列出的任何 OpenAI 兼容厂商同样开箱可用：设 `kind: openai`，把
+> `base_url` 指向厂商的 `/v1` 端点即可。
 
 ---
 

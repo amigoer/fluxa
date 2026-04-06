@@ -105,6 +105,74 @@ providers:
       gpt-4o: prod-gpt4o
       gpt-4o-mini: prod-gpt4o-mini
 
+  # --- Western OpenAI-compatible vendors (optional) ---
+
+  - name: mistral
+    kind: mistral
+    api_key: ${MISTRAL_API_KEY}
+
+  - name: groq
+    kind: groq
+    api_key: ${GROQ_API_KEY}
+
+  - name: xai
+    kind: xai                                 # Grok
+    api_key: ${XAI_API_KEY}
+
+  - name: perplexity
+    kind: perplexity
+    api_key: ${PERPLEXITY_API_KEY}
+
+  - name: together
+    kind: together
+    api_key: ${TOGETHER_API_KEY}
+
+  - name: fireworks
+    kind: fireworks
+    api_key: ${FIREWORKS_API_KEY}
+
+  - name: openrouter
+    kind: openrouter
+    api_key: ${OPENROUTER_API_KEY}
+
+  - name: cohere
+    kind: cohere                              # via /compatibility/v1
+    api_key: ${COHERE_API_KEY}
+
+  - name: nvidia
+    kind: nvidia                              # NVIDIA NIM / build.nvidia.com
+    api_key: ${NVIDIA_API_KEY}
+
+  # --- More Chinese OpenAI-compatible vendors (optional) ---
+
+  - name: siliconflow
+    kind: siliconflow                         # 硅基流动
+    api_key: ${SILICONFLOW_API_KEY}
+
+  - name: minimax
+    kind: minimax                             # MiniMax
+    api_key: ${MINIMAX_API_KEY}
+
+  - name: baichuan
+    kind: baichuan                            # 百川智能
+    api_key: ${BAICHUAN_API_KEY}
+
+  - name: stepfun
+    kind: stepfun                             # 阶跃星辰
+    api_key: ${STEPFUN_API_KEY}
+
+  - name: spark
+    kind: spark                               # 讯飞星火
+    api_key: ${SPARK_API_KEY}
+
+  - name: zero-one
+    kind: zero-one                            # 零一万物 Yi
+    api_key: ${YI_API_KEY}
+
+  - name: tencent
+    kind: tencent                             # 腾讯混元
+    api_key: ${HUNYUAN_API_KEY}
+
 routes:
   - model: gpt-4o
     provider: openai
@@ -151,3 +219,37 @@ routes:
     provider: bedrock
   - model: meta.llama3-1-70b-instruct-v1:0
     provider: bedrock
+
+  # Extra OpenAI-compatible vendors — add the ones you actually use.
+  - model: mistral-large-latest
+    provider: mistral
+  - model: llama-3.3-70b-versatile
+    provider: groq
+  - model: grok-2-latest
+    provider: xai
+  - model: llama-3.1-sonar-large-128k-online
+    provider: perplexity
+  - model: meta-llama/Llama-3.3-70B-Instruct-Turbo
+    provider: together
+  - model: accounts/fireworks/models/llama-v3p3-70b-instruct
+    provider: fireworks
+  - model: anthropic/claude-3.5-sonnet
+    provider: openrouter
+  - model: command-r-plus
+    provider: cohere
+  - model: meta/llama-3.3-70b-instruct
+    provider: nvidia
+  - model: Qwen/Qwen2.5-72B-Instruct
+    provider: siliconflow
+  - model: abab6.5s-chat
+    provider: minimax
+  - model: Baichuan4
+    provider: baichuan
+  - model: step-1-8k
+    provider: stepfun
+  - model: generalv3.5
+    provider: spark
+  - model: yi-large
+    provider: zero-one
+  - model: hunyuan-pro
+    provider: tencent

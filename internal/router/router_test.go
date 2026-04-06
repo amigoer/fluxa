@@ -38,7 +38,12 @@ func TestBuildAndResolve(t *testing.T) {
 }
 
 func TestBuild_OpenAICompatibleKinds(t *testing.T) {
-	kinds := []string{"openai", "deepseek", "qwen", "ollama", "moonshot", "zhipu", "doubao", "ernie"}
+	// Every entry in openaiCompatibleDefaults must round-trip through the
+	// factory without error so operators discover typos at boot.
+	kinds := make([]string, 0, len(openaiCompatibleDefaults))
+	for k := range openaiCompatibleDefaults {
+		kinds = append(kinds, k)
+	}
 	for _, kind := range kinds {
 		kind := kind
 		t.Run(kind, func(t *testing.T) {

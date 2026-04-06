@@ -75,20 +75,39 @@ Fluxa fixes all of this with one self-hosted binary.
 
 ## Supported Providers
 
-| Provider | Models | Status |
-|----------|--------|--------|
-| OpenAI | GPT-4o, GPT-4o-mini, o1, o3 | ✅ v1.0 |
-| Anthropic | Claude 3.5, Claude 3.7 | ✅ v1.0 |
-| DeepSeek | deepseek-chat, deepseek-reasoner | ✅ v1.0 |
-| 通义千问 (Qwen) | qwen-max, qwen-plus, qwen-turbo | ✅ v1.0 |
-| Ollama | Any local model | ✅ v1.0 |
-| Kimi | moonshot-v1 | 🔄 v4.0 |
-| 智谱 GLM | glm-4, glm-4-flash | 🔄 v4.0 |
-| 文心一言 | ernie-4.0 | 🔄 v4.0 |
-| 豆包 | doubao-pro | 🔄 v4.0 |
-| Azure OpenAI | All Azure-hosted models | 🔄 v4.0 |
-| Google Gemini | gemini-1.5-pro, gemini-2.0 | 🔄 v4.0 |
-| AWS Bedrock | Claude, Llama, Titan | 🔄 v4.0 |
+| Provider | Models | Kind | Status |
+|----------|--------|------|--------|
+| OpenAI | GPT-4o, GPT-4o-mini, o1, o3 | `openai` | ✅ |
+| Anthropic | Claude 3.5, Claude 3.7 | `anthropic` | ✅ |
+| DeepSeek | deepseek-chat, deepseek-reasoner | `deepseek` | ✅ |
+| 通义千问 (Qwen) | qwen-max, qwen-plus, qwen-turbo | `qwen` | ✅ |
+| Ollama | Any local model | `ollama` | ✅ |
+| Kimi / Moonshot | moonshot-v1, kimi-k2 | `moonshot` | ✅ |
+| 智谱 GLM | glm-4, glm-4-flash | `zhipu` | ✅ |
+| 文心一言 | ernie-4.0, ernie-3.5 | `ernie` | ✅ |
+| 豆包 (Volcengine Ark) | doubao-pro | `doubao` | ✅ |
+| Google Gemini | gemini-1.5-pro, gemini-2.0 | `gemini` | ✅ |
+| AWS Bedrock | Claude, Llama, Titan (Converse API, in-tree SigV4) | `bedrock` | ✅ |
+| Azure OpenAI | Deployment-mapped GPT-4o, GPT-4o-mini | `azure` | ✅ |
+| Mistral | mistral-large, codestral | `mistral` | ✅ |
+| Groq | Llama 3.3, Mixtral (ultra-fast) | `groq` | ✅ |
+| xAI | grok-2, grok-2-mini | `xai` | ✅ |
+| Perplexity | sonar online & chat | `perplexity` | ✅ |
+| Together AI | Llama, Qwen, Mixtral | `together` | ✅ |
+| Fireworks | Llama, Mixtral, DeepSeek | `fireworks` | ✅ |
+| OpenRouter | 300+ aggregated models | `openrouter` | ✅ |
+| Cohere | command-r-plus, command-r | `cohere` | ✅ |
+| NVIDIA NIM | Llama, Mixtral on build.nvidia.com | `nvidia` | ✅ |
+| 硅基流动 (SiliconFlow) | Qwen, DeepSeek, Llama mirrors | `siliconflow` | ✅ |
+| MiniMax | abab6.5s-chat | `minimax` | ✅ |
+| 百川智能 (Baichuan) | Baichuan4 | `baichuan` | ✅ |
+| 阶跃星辰 (StepFun) | step-1, step-2 | `stepfun` | ✅ |
+| 讯飞星火 (Spark) | Spark v3.5 | `spark` | ✅ |
+| 零一万物 (01.AI / Yi) | yi-large, yi-medium | `zero-one` | ✅ |
+| 腾讯混元 (Hunyuan) | hunyuan-pro, hunyuan-standard | `tencent` | ✅ |
+
+> Any OpenAI-compatible vendor not listed above still works out of the box:
+> set `kind: openai` and point `base_url` at the vendor's `/v1` endpoint.
 
 ---
 
