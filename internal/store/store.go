@@ -116,6 +116,38 @@ func (s *Store) migrate(ctx context.Context) error {
 			FOREIGN KEY (provider) REFERENCES providers(name) ON UPDATE CASCADE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_routes_provider ON routes(provider)`,
+		`CREATE TABLE IF NOT EXISTS virtual_keys (
+			id                    TEXT PRIMARY KEY,
+			name                  TEXT NOT NULL,
+			description           TEXT NOT NULL DEFAULT '',
+			models                TEXT NOT NULL DEFAULT '[]',
+			ip_allowlist          TEXT NOT NULL DEFAULT '[]',
+			budget_tokens_daily   INTEGER NOT NULL DEFAULT 0,
+			budget_tokens_monthly INTEGER NOT NULL DEFAULT 0,
+			budget_usd_daily      REAL NOT NULL DEFAULT 0,
+			budget_usd_monthly    REAL NOT NULL DEFAULT 0,
+			rpm_limit             INTEGER NOT NULL DEFAULT 0,
+			enabled               INTEGER NOT NULL DEFAULT 1,
+			expires_at            DATETIME,
+			created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS usage_records (
+			id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+			virtual_key_id     TEXT NOT NULL,
+			ts                 DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			model              TEXT NOT NULL,
+			provider           TEXT NOT NULL,
+			prompt_tokens      INTEGER NOT NULL DEFAULT 0,
+			completion_tokens  INTEGER NOT NULL DEFAULT 0,
+			total_tokens       INTEGER NOT NULL DEFAULT 0,
+			cost_usd           REAL NOT NULL DEFAULT 0,
+			latency_ms         INTEGER NOT NULL DEFAULT 0,
+			status             INTEGER NOT NULL DEFAULT 0,
+			FOREIGN KEY (virtual_key_id) REFERENCES virtual_keys(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_usage_vk_ts ON usage_records(virtual_key_id, ts)`,
+		`CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_records(ts)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
