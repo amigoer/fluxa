@@ -156,9 +156,9 @@ func (c *Config) Validate() error {
 	if c.Server.Port <= 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("server.port %d out of range", c.Server.Port)
 	}
-	if len(c.Providers) == 0 {
-		return errors.New("at least one provider must be configured")
-	}
+	// providers and routes may be empty when they are sourced from the
+	// database instead of the YAML file. The router layer enforces the
+	// "at least one provider" invariant at reload time.
 	seen := make(map[string]struct{}, len(c.Providers))
 	for _, p := range c.Providers {
 		if p.Name == "" {

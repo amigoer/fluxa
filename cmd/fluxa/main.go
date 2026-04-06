@@ -23,6 +23,7 @@ import (
 	"github.com/amigoer/fluxa/internal/api"
 	"github.com/amigoer/fluxa/internal/config"
 	"github.com/amigoer/fluxa/internal/router"
+	"github.com/amigoer/fluxa/internal/store"
 )
 
 // Version is the gateway release version. It is overridden at build time
@@ -48,14 +49,45 @@ func main() {
 		os.Exit(1)
 	}
 
-	r, err := router.Build(cfg)
+	// Open the SQLite-backed config store. Providers and routes live here
+	// so operators can mutate them through the admin API without editing
+	// YAML and bouncing the process.
+	st, err := store.Open(cfg.Database.Path)
 	if err != nil {
+		logger.Error("open store", "path", cfg.Database.Path, "err", err)
+		os.Exit(1)
+	}
+	defer st.Close()
+
+	// First-run ergonomics: if the store is empty, seed it from the
+	// providers/routes sections of the YAML file. Subsequent starts never
+	// touch the rows again so admin edits are preserved.
+	if seeded, err := st.SeedIfEmpty(context.Background(), cfg); err != nil {
+		logger.Error("seed store", "err", err)
+		os.Exit(1)
+	} else if seeded {
+		logger.Info("seeded store from yaml", "providers", len(cfg.Providers), "routes", len(cfg.Routes))
+	}
+
+	provs, routes, err := st.LoadRouterInputs(context.Background())
+	if err != nil {
+		logger.Error("load router inputs", "err", err)
+		os.Exit(1)
+	}
+	if len(provs) == 0 {
+		logger.Error("no providers configured", "hint", "seed providers via YAML or the admin API")
+		os.Exit(1)
+	}
+
+	r := router.New()
+	if err := r.Reload(provs, routes); err != nil {
 		logger.Error("build router", "err", err)
 		os.Exit(1)
 	}
 
 	mux := http.NewServeMux()
 	api.New(r, logger).Routes(mux)
+	api.NewAdmin(r, st, cfg.Server.MasterKey, logger).Routes(mux)
 
 	addr := net.JoinHostPort(cfg.Server.Host, strconv.Itoa(cfg.Server.Port))
 	server := &http.Server{
