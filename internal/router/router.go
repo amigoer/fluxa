@@ -2,6 +2,10 @@
 // of providers that can serve them. It also instantiates concrete adapters
 // from the declarative configuration so the rest of the codebase never has to
 // know which provider kind is in play.
+//
+// As of v1.1 the router is hot-reloadable: its provider and route tables
+// live behind an RWMutex and can be swapped at runtime by the admin API
+// whenever the underlying store changes.
 package router
 
 import (
@@ -20,8 +24,17 @@ import (
 )
 
 // Router resolves a model to an ordered slice of Providers (primary then
-// fallbacks). It is immutable once built and safe for concurrent reads.
+// fallbacks). The internal state is protected by an RWMutex so Reload can
+// swap the provider and route tables while requests are in flight.
 type Router struct {
+	mu    sync.RWMutex
+	state *state
+}
+
+// state is the immutable snapshot swapped in on every Reload. Reads grab a
+// pointer under RLock and can then access the maps without further
+// synchronisation for the duration of the request.
+type state struct {
 	providers map[string]provider.Provider
 	routes    map[string][]string // model -> ordered provider names
 	// catchAll is the default provider name used when a request arrives for
@@ -30,38 +43,75 @@ type Router struct {
 	catchAll []string
 }
 
-// Build constructs a Router from a validated Config. It instantiates one
-// Provider per entry in cfg.Providers and wires the route table.
+// Build constructs a Router from a validated Config. It is retained as a
+// convenience for tests and for the YAML-only legacy path.
 func Build(cfg config.Config) (*Router, error) {
-	providers := make(map[string]provider.Provider, len(cfg.Providers))
-	for _, pc := range cfg.Providers {
-		p, err := newProvider(pc)
-		if err != nil {
-			return nil, fmt.Errorf("provider %q: %w", pc.Name, err)
-		}
-		providers[pc.Name] = p
-	}
-
-	r := &Router{
-		providers: providers,
-		routes:    make(map[string][]string, len(cfg.Routes)),
-	}
-	for _, route := range cfg.Routes {
-		chain := append([]string{route.Provider}, route.Fallback...)
-		if route.Model == "*" {
-			r.catchAll = chain
-			continue
-		}
-		r.routes[route.Model] = chain
+	r := &Router{}
+	if err := r.Reload(cfg.Providers, cfg.Routes); err != nil {
+		return nil, err
 	}
 	return r, nil
+}
+
+// New returns an empty Router. Callers must invoke Reload before handling
+// requests.
+func New() *Router { return &Router{state: &state{providers: map[string]provider.Provider{}, routes: map[string][]string{}}} }
+
+// Reload rebuilds the internal provider map and route table from the given
+// configuration slices and atomically swaps them in. It is safe to call
+// from any goroutine. If construction fails the current state is left
+// untouched so a bad admin edit cannot take the gateway down.
+func (r *Router) Reload(providers []config.ProviderConfig, routes []config.RouteConfig) error {
+	providerMap := make(map[string]provider.Provider, len(providers))
+	for _, pc := range providers {
+		p, err := newProvider(pc)
+		if err != nil {
+			return fmt.Errorf("provider %q: %w", pc.Name, err)
+		}
+		providerMap[pc.Name] = p
+	}
+
+	next := &state{
+		providers: providerMap,
+		routes:    make(map[string][]string, len(routes)),
+	}
+	for _, route := range routes {
+		if _, ok := providerMap[route.Provider]; !ok {
+			return fmt.Errorf("route %q references unknown provider %q", route.Model, route.Provider)
+		}
+		for _, fb := range route.Fallback {
+			if _, ok := providerMap[fb]; !ok {
+				return fmt.Errorf("route %q fallback references unknown provider %q", route.Model, fb)
+			}
+		}
+		chain := append([]string{route.Provider}, route.Fallback...)
+		if route.Model == "*" {
+			next.catchAll = chain
+			continue
+		}
+		next.routes[route.Model] = chain
+	}
+
+	r.mu.Lock()
+	r.state = next
+	r.mu.Unlock()
+	return nil
+}
+
+// snapshot returns the current immutable state. Callers must treat the
+// returned value as read-only.
+func (r *Router) snapshot() *state {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.state
 }
 
 // Providers returns a deterministic snapshot of all configured providers. It
 // is used by the /health handler to probe connectivity in parallel.
 func (r *Router) Providers() map[string]provider.Provider {
-	out := make(map[string]provider.Provider, len(r.providers))
-	for k, v := range r.providers {
+	s := r.snapshot()
+	out := make(map[string]provider.Provider, len(s.providers))
+	for k, v := range s.providers {
 		out[k] = v
 	}
 	return out
@@ -70,11 +120,12 @@ func (r *Router) Providers() map[string]provider.Provider {
 // Models returns the aggregated set of model identifiers served by the
 // gateway. It is used to implement GET /v1/models.
 func (r *Router) Models() []string {
+	s := r.snapshot()
 	seen := make(map[string]struct{})
-	for model := range r.routes {
+	for model := range s.routes {
 		seen[model] = struct{}{}
 	}
-	for _, p := range r.providers {
+	for _, p := range s.providers {
 		for _, m := range p.Models() {
 			seen[m] = struct{}{}
 		}
@@ -93,22 +144,23 @@ var ErrUnknownModel = errors.New("unknown model")
 // Resolve returns the ordered list of providers that can serve the given
 // model. The first entry is the primary; subsequent entries are fallbacks.
 func (r *Router) Resolve(model string) ([]provider.Provider, error) {
-	chain, ok := r.routes[model]
+	s := r.snapshot()
+	chain, ok := s.routes[model]
 	if !ok {
 		// Fall back to any provider that advertises the model through its
 		// static Models() list. This keeps small single-provider configs
 		// working without requiring an explicit routes section.
-		if chain = r.providersServing(model); len(chain) > 0 {
-			// no-op, chain is ready below
-		} else if len(r.catchAll) > 0 {
-			chain = r.catchAll
+		if c := s.providersServing(model); len(c) > 0 {
+			chain = c
+		} else if len(s.catchAll) > 0 {
+			chain = s.catchAll
 		} else {
 			return nil, fmt.Errorf("%w: %s", ErrUnknownModel, model)
 		}
 	}
 	out := make([]provider.Provider, 0, len(chain))
 	for _, name := range chain {
-		p, ok := r.providers[name]
+		p, ok := s.providers[name]
 		if !ok {
 			return nil, fmt.Errorf("router: provider %q not registered", name)
 		}
@@ -120,9 +172,9 @@ func (r *Router) Resolve(model string) ([]provider.Provider, error) {
 // providersServing returns the names of providers whose static model list
 // contains the given model. Order is non-deterministic so callers that need
 // stability should declare an explicit route.
-func (r *Router) providersServing(model string) []string {
+func (s *state) providersServing(model string) []string {
 	var out []string
-	for name, p := range r.providers {
+	for name, p := range s.providers {
 		for _, m := range p.Models() {
 			if m == model {
 				out = append(out, name)
@@ -142,10 +194,10 @@ var openaiCompatibleDefaults = map[string]string{
 	"qwen":     "https://dashscope.aliyuncs.com/compatible-mode/v1",
 	"ollama":   "http://localhost:11434/v1",
 	// v4.0 — additional providers that ship an OpenAI-compatible surface.
-	"moonshot": "https://api.moonshot.cn/v1",        // Kimi
-	"zhipu":    "https://open.bigmodel.cn/api/paas/v4", // GLM
+	"moonshot": "https://api.moonshot.cn/v1",              // Kimi
+	"zhipu":    "https://open.bigmodel.cn/api/paas/v4",    // GLM
 	"doubao":   "https://ark.cn-beijing.volces.com/api/v3", // Volcengine Ark
-	"ernie":    "https://qianfan.baidubce.com/v2",   // Baidu Qianfan v2
+	"ernie":    "https://qianfan.baidubce.com/v2",         // Baidu Qianfan v2
 }
 
 // newProvider is the factory from config.ProviderConfig to a concrete
@@ -221,10 +273,11 @@ type HealthReport struct {
 // CheckHealth probes every provider in parallel and returns a slice of
 // HealthReport entries in provider name order.
 func (r *Router) CheckHealth(ctx context.Context) []HealthReport {
-	reports := make([]HealthReport, 0, len(r.providers))
+	providers := r.Providers()
+	reports := make([]HealthReport, 0, len(providers))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	for name, p := range r.providers {
+	for name, p := range providers {
 		wg.Add(1)
 		go func(name string, p provider.Provider) {
 			defer wg.Done()
