@@ -25,6 +25,7 @@ import (
 	"github.com/amigoer/fluxa/internal/keys"
 	"github.com/amigoer/fluxa/internal/router"
 	"github.com/amigoer/fluxa/internal/store"
+	fluxaweb "github.com/amigoer/fluxa/web"
 )
 
 // Version is the gateway release version. It is overridden at build time
@@ -98,6 +99,13 @@ func main() {
 	mux := http.NewServeMux()
 	api.New(r, logger, kr, st).Routes(mux)
 	api.NewAdmin(r, st, kr, cfg.Server.MasterKey, logger).Routes(mux)
+
+	// Mount the embedded admin dashboard at /ui/. A bare /ui (no
+	// trailing slash) redirects so relative asset paths resolve.
+	mux.Handle("GET /ui/", fluxaweb.Handler("/ui/"))
+	mux.HandleFunc("GET /ui", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/ui/", http.StatusMovedPermanently)
+	})
 
 	addr := net.JoinHostPort(cfg.Server.Host, strconv.Itoa(cfg.Server.Port))
 	server := &http.Server{
