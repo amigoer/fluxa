@@ -168,48 +168,53 @@ curl http://localhost:8080/v1/chat/completions \
 
 ## 配置文件
 
+从 v1.1 起，`providers` 和 `routes` 已迁移至 SQLite 数据库（位置由
+`database.path` 指定）。YAML 文件只保留服务端、日志和数据库路径等启动配置。
+首次启动且数据库为空时，网关会把 YAML 中的 `providers` / `routes` 作为
+种子数据写入数据库；此后数据库即为唯一事实来源，所有增删改通过 `/admin`
+REST API 完成，无需重启。完整示例见 [`configs/fluxa.example.yaml`](configs/fluxa.example.yaml)。
+
 ```yaml
 # fluxa.yaml
 
 server:
+  host: 0.0.0.0
   port: 8080
-  master_key: ${FLUXA_MASTER_KEY}   # 管理 API 的认证 Key
+  master_key: ${FLUXA_MASTER_KEY}   # 启用 /admin 管理 API 必填
 
 database:
-  path: ./fluxa.db                  # SQLite 数据库路径
-
-providers:
-  - name: openai
-    api_key: ${OPENAI_API_KEY}
-    base_url: https://api.openai.com/v1
-
-  - name: anthropic
-    api_key: ${ANTHROPIC_API_KEY}
-    base_url: https://api.anthropic.com
-
-  - name: deepseek
-    api_key: ${DEEPSEEK_API_KEY}
-    base_url: https://api.deepseek.com/v1
-
-  - name: qwen
-    api_key: ${QWEN_API_KEY}
-    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
-
-routes:
-  - model: gpt-4o
-    provider: openai
-    fallback: [deepseek]       # openai 故障时自动切换到 deepseek
-  - model: claude-3-5-sonnet
-    provider: anthropic
-  - model: deepseek-chat
-    provider: deepseek
-  - model: qwen-max
-    provider: qwen
+  path: ./fluxa.db                  # providers + routes 存储于此
 
 logging:
   level: info
   format: json
-  store_content: false          # 是否存储 Prompt 内容（隐私敏感场景建议关闭）
+  store_content: false              # 是否存储 Prompt 内容（隐私敏感场景建议关闭）
+```
+
+### 运行时管理 Provider 与 Route
+
+每次修改都会写入数据库并热加载路由器，不丢请求、不停机：
+
+```bash
+# 新增一个 Provider
+curl -X POST http://localhost:8080/admin/providers \
+  -H "Authorization: Bearer $FLUXA_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"deepseek","kind":"deepseek","api_key":"sk-xxx"}'
+
+# 绑定模型路由及 fallback 链
+curl -X PUT http://localhost:8080/admin/routes/gpt-4o \
+  -H "Authorization: Bearer $FLUXA_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"openai","fallback":["deepseek"]}'
+
+# 删除一条路由
+curl -X DELETE http://localhost:8080/admin/routes/gpt-4o \
+  -H "Authorization: Bearer $FLUXA_MASTER_KEY"
+
+# 强制从数据库重新加载
+curl -X POST http://localhost:8080/admin/reload \
+  -H "Authorization: Bearer $FLUXA_MASTER_KEY"
 ```
 
 ---

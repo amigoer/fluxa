@@ -1,17 +1,36 @@
 # Fluxa example configuration.
 #
-# Copy this file to fluxa.yaml and fill in the provider credentials. Every
-# ${VAR} placeholder is expanded from the process environment at load time,
-# so secrets can stay outside the YAML file and the same file works for dev,
-# staging, and production.
+# Starting with v1.1 the providers and routes sections live in the SQLite
+# database referenced by `database.path`. This YAML file is only used for:
+#
+#   * Server / logging / database path bootstrap (always).
+#   * First-run seed: if the providers table is empty the gateway will
+#     copy the providers and routes declared here into the database on
+#     startup. On subsequent starts the file is ignored for those two
+#     sections — use the /admin REST API to mutate them live.
+#
+# ${VAR} and ${VAR:-default} placeholders are expanded from the process
+# environment at load time so secrets can stay outside the file.
 
 server:
   host: 0.0.0.0
   port: 8080
-  master_key: ${FLUXA_MASTER_KEY}   # Required once the Admin API ships in v2.0
+  master_key: ${FLUXA_MASTER_KEY}   # Required to enable the /admin endpoints
 
 database:
-  path: ./fluxa.db                  # SQLite database used for key management (v2.0+)
+  path: ./fluxa.db                  # SQLite database that stores providers and routes
+
+logging:
+  level: info
+  format: json
+  store_content: false              # Set true to persist prompt bodies in the request log
+
+# ---------------------------------------------------------------------------
+# Everything below this line is optional and only consumed the very first
+# time the gateway boots against an empty database. Delete the file (or this
+# section) once you have seeded the store — the admin API is the source of
+# truth from that point on.
+# ---------------------------------------------------------------------------
 
 providers:
   - name: openai
@@ -132,8 +151,3 @@ routes:
     provider: bedrock
   - model: meta.llama3-1-70b-instruct-v1:0
     provider: bedrock
-
-logging:
-  level: info
-  format: json
-  store_content: false              # Set true to persist prompt bodies in the request log

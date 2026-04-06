@@ -166,42 +166,55 @@ curl http://localhost:8080/v1/chat/completions \
 
 ## Configuration
 
+Providers and routes live in the SQLite database referenced by
+`database.path`. The YAML file only carries server, logging and database
+bootstrap settings — on first run the gateway will seed the database from
+the `providers` / `routes` sections of the file, and thereafter the
+`/admin` REST API is the source of truth. See [`configs/fluxa.example.yaml`](configs/fluxa.example.yaml)
+for a complete seed.
+
 ```yaml
 # fluxa.yaml
 
 server:
+  host: 0.0.0.0
   port: 8080
-  master_key: ${FLUXA_MASTER_KEY}
+  master_key: ${FLUXA_MASTER_KEY}   # required to enable /admin
 
 database:
-  path: ./fluxa.db
-
-providers:
-  - name: openai
-    api_key: ${OPENAI_API_KEY}
-    base_url: https://api.openai.com/v1
-
-  - name: anthropic
-    api_key: ${ANTHROPIC_API_KEY}
-    base_url: https://api.anthropic.com
-
-  - name: deepseek
-    api_key: ${DEEPSEEK_API_KEY}
-    base_url: https://api.deepseek.com/v1
-
-routes:
-  - model: gpt-4o
-    provider: openai
-    fallback: [deepseek]
-  - model: claude-3-5-sonnet
-    provider: anthropic
-  - model: deepseek-chat
-    provider: deepseek
+  path: ./fluxa.db                  # providers + routes live here
 
 logging:
   level: info
   format: json
   store_content: false
+```
+
+### Managing providers and routes at runtime
+
+Every mutation writes to the database and hot-reloads the router with
+zero downtime:
+
+```bash
+# Add a new provider
+curl -X POST http://localhost:8080/admin/providers \
+  -H "Authorization: Bearer $FLUXA_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"deepseek","kind":"deepseek","api_key":"sk-xxx"}'
+
+# Attach a route with a fallback chain
+curl -X PUT http://localhost:8080/admin/routes/gpt-4o \
+  -H "Authorization: Bearer $FLUXA_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"openai","fallback":["deepseek"]}'
+
+# Remove a route
+curl -X DELETE http://localhost:8080/admin/routes/gpt-4o \
+  -H "Authorization: Bearer $FLUXA_MASTER_KEY"
+
+# Force a reload from the database
+curl -X POST http://localhost:8080/admin/reload \
+  -H "Authorization: Bearer $FLUXA_MASTER_KEY"
 ```
 
 ---
