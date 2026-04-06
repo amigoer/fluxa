@@ -109,6 +109,26 @@ Fluxa fixes all of this with one self-hosted binary.
 > Any OpenAI-compatible vendor not listed above still works out of the box:
 > set `kind: openai` and point `base_url` at the vendor's `/v1` endpoint.
 
+### Adapter architecture: 5 protocols, 29+ vendors
+
+Fluxa splits adapters by **wire protocol**, not by vendor. One well-tested
+code path serves every vendor that speaks the same dialect, so a fix to
+SSE parsing or retry logic benefits all of them at once and the binary
+stays under 15 MiB.
+
+| Adapter package | Handles | Why it is separate |
+|-----------------|---------|--------------------|
+| `internal/adapter/openai` | 22 vendors including OpenAI, DeepSeek, Qwen, Ollama, Moonshot, GLM, Doubao, ERNIE, Mistral, Groq, xAI, Perplexity, Together, Fireworks, OpenRouter, Cohere, NVIDIA, SiliconFlow, MiniMax, Baichuan, StepFun, Spark, Yi, Hunyuan | Shared OpenAI `/v1/chat/completions` dialect — only BaseURL and API key differ, registered as a one-liner in `router.openaiCompatibleDefaults` |
+| `internal/adapter/anthropic` | Anthropic Claude | Native `/v1/messages` format with `thinking` / `tool_use` blocks — byte-level passthrough preserves original fields |
+| `internal/adapter/gemini` | Google Gemini | `contents[].parts[].text`, `systemInstruction`, `generationConfig` — full bidirectional OpenAI ↔ Gemini translation |
+| `internal/adapter/bedrock` | AWS Bedrock | Unified Converse API + in-tree SigV4 signer + binary EventStream parser, zero AWS SDK dependency |
+| `internal/adapter/azure` | Azure OpenAI | URL embeds deployment name, `api-key` header instead of Bearer, `model` field stripped from request body |
+
+**Adding a new vendor is a one-line change** when it speaks an OpenAI-compatible
+API: append `"vendor": "https://api.vendor.com/v1"` to `openaiCompatibleDefaults`
+in `internal/router/router.go`. Only write a new adapter package when the
+protocol itself is incompatible.
+
 ---
 
 ## Quick Start

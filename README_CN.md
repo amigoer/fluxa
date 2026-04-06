@@ -110,6 +110,25 @@ Fluxa 用一个自托管网关解决上面所有问题。
 > 未列出的任何 OpenAI 兼容厂商同样开箱可用：设 `kind: openai`，把
 > `base_url` 指向厂商的 `/v1` 端点即可。
 
+### Adapter 架构：5 个协议，29+ 厂商
+
+Fluxa 的 adapter **按协议方言划分，而不是按厂商名划分**。同一种协议的
+所有厂商共用一份经过充分测试的代码路径，SSE 解析、重试、错误映射改一次
+所有兼容厂商同时受益；二进制体积始终控制在 15 MiB 以内。
+
+| Adapter 包 | 覆盖的厂商 | 为何独立 |
+|-----------|-----------|---------|
+| `internal/adapter/openai` | 22 个厂商：OpenAI、DeepSeek、通义千问、Ollama、Kimi、GLM、豆包、文心、Mistral、Groq、xAI、Perplexity、Together、Fireworks、OpenRouter、Cohere、NVIDIA、硅基流动、MiniMax、百川、阶跃、星火、Yi、腾讯混元 | 共用 OpenAI `/v1/chat/completions` 方言，只有 BaseURL 和 Key 不同，在 `router.openaiCompatibleDefaults` 里一行注册即可 |
+| `internal/adapter/anthropic` | Anthropic Claude | 原生 `/v1/messages` 格式带 `thinking` / `tool_use` 块——对 `/v1/messages` 做字节级透传以保留原始字段 |
+| `internal/adapter/gemini` | Google Gemini | `contents[].parts[].text`、`systemInstruction`、`generationConfig`——整个请求/响应形状不同，做双向 OpenAI ↔ Gemini 翻译 |
+| `internal/adapter/bedrock` | AWS Bedrock | 统一 Converse API + **内置 SigV4 签名** + **二进制 EventStream 帧**解析，零 AWS SDK 依赖 |
+| `internal/adapter/azure` | Azure OpenAI | URL 里嵌 deployment 名，鉴权走 `api-key` 头（非 Bearer），请求体需剥离 `model` 字段 |
+
+**新增一个兼容 OpenAI 的厂商只需一行修改**：在
+`internal/router/router.go` 的 `openaiCompatibleDefaults` 里追加
+`"vendor": "https://api.vendor.com/v1"` 即可。只有协议本身不兼容
+OpenAI 时才需要新建 adapter 包。
+
 ---
 
 ## 快速开始
