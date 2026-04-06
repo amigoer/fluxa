@@ -12,6 +12,7 @@ import (
 
 	"github.com/amigoer/fluxa/internal/adapter/anthropic"
 	"github.com/amigoer/fluxa/internal/adapter/azure"
+	"github.com/amigoer/fluxa/internal/adapter/gemini"
 	"github.com/amigoer/fluxa/internal/adapter/openai"
 	"github.com/amigoer/fluxa/internal/config"
 	"github.com/amigoer/fluxa/internal/provider"
@@ -165,6 +166,15 @@ func newProvider(pc config.ProviderConfig) (provider.Provider, error) {
 		return anthropic.New(anthropic.Options{
 			Name: pc.Name, BaseURL: defaultBaseURL(pc, "https://api.anthropic.com"),
 			APIKey: pc.APIKey, Models: pc.Models, Headers: pc.Headers, Timeout: pc.Timeout,
+		}), nil
+	case "gemini":
+		return gemini.New(gemini.Options{
+			Name:    pc.Name,
+			BaseURL: defaultBaseURL(pc, "https://generativelanguage.googleapis.com/v1beta"),
+			APIKey:  pc.APIKey,
+			Models:  pc.Models,
+			Headers: pc.Headers,
+			Timeout: pc.Timeout,
 		}), nil
 	case "azure":
 		return azure.New(azure.Options{

@@ -60,6 +60,12 @@ providers:
     api_key: ${ERNIE_API_KEY}
     base_url: https://qianfan.baidubce.com/v2
 
+  # Google Gemini — native translation to/from OpenAI wire format.
+  - name: gemini
+    kind: gemini
+    api_key: ${GEMINI_API_KEY}
+    base_url: https://generativelanguage.googleapis.com/v1beta
+
   # Azure OpenAI — deployments map canonical model IDs to Azure deployments.
   - name: azure
     kind: azure
@@ -108,6 +114,10 @@ routes:
     provider: ernie
   - model: ernie-3.5-8k
     provider: ernie
+  - model: gemini-1.5-pro
+    provider: gemini
+  - model: gemini-2.0-flash
+    provider: gemini
 
 logging:
   level: info
