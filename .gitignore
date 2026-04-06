@@ -14,3 +14,8 @@ fluxa.yaml
 .vscode/
 .idea/
 .DS_Store
+
+# local go caches
+.gocache/
+.gomodcache/
+.gopath/

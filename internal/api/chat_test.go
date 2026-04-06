@@ -26,7 +26,7 @@ func newTestServer(t *testing.T, upstream *httptest.Server) *Server {
 	if err != nil {
 		t.Fatalf("router.Build: %v", err)
 	}
-	return New(r, nil)
+	return New(r, nil, nil, nil)
 }
 
 func TestHandleChatCompletions_NonStream(t *testing.T) {

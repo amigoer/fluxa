@@ -22,6 +22,7 @@ import (
 
 	"github.com/amigoer/fluxa/internal/api"
 	"github.com/amigoer/fluxa/internal/config"
+	"github.com/amigoer/fluxa/internal/keys"
 	"github.com/amigoer/fluxa/internal/router"
 	"github.com/amigoer/fluxa/internal/store"
 )
@@ -85,8 +86,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Build the virtual-key runtime. An empty ring is the "legacy / no
+	// virtual keys" mode, so failure to reload from the store is fatal —
+	// silently running without auth would be surprising.
+	kr := keys.NewKeyring(st)
+	if err := kr.Reload(context.Background()); err != nil {
+		logger.Error("load virtual keys", "err", err)
+		os.Exit(1)
+	}
+
 	mux := http.NewServeMux()
-	api.New(r, logger).Routes(mux)
+	api.New(r, logger, kr, st).Routes(mux)
 	api.NewAdmin(r, st, cfg.Server.MasterKey, logger).Routes(mux)
 
 	addr := net.JoinHostPort(cfg.Server.Host, strconv.Itoa(cfg.Server.Port))

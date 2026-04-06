@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/amigoer/fluxa/internal/provider"
 )
@@ -35,6 +36,12 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	keyID, err := s.authorize(r, peek.Model)
+	if err != nil {
+		s.writeError(w, err)
+		return
+	}
+
 	chain, err := s.router.Resolve(peek.Model)
 	if err != nil {
 		s.writeError(w, err)
@@ -48,14 +55,15 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if peek.Stream {
-		s.streamChat(w, r, chain, req)
+		s.streamChat(w, r, chain, req, keyID)
 		return
 	}
-	s.nonStreamChat(w, r, chain, req)
+	s.nonStreamChat(w, r, chain, req, keyID)
 }
 
 // nonStreamChat walks the fallback chain for a buffered chat completion.
-func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.ChatRequest) {
+func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.ChatRequest, keyID string) {
+	started := time.Now()
 	var lastErr error
 	for _, p := range chain {
 		resp, err := p.Chat(r.Context(), req)
@@ -63,6 +71,7 @@ func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []p
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Fluxa-Provider", p.Name())
 			_, _ = w.Write(resp.Raw)
+			s.recordUsage(r.Context(), keyID, req.Model, p.Name(), resp.Raw, started, http.StatusOK, usageFromOpenAI)
 			return
 		}
 		lastErr = err
@@ -82,7 +91,8 @@ func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []p
 // streamChat walks the fallback chain for a streaming chat completion. Once
 // the first byte is flushed to the client we can no longer fall back, so
 // retries only happen before ChatStream returns successfully.
-func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.ChatRequest) {
+func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.ChatRequest, keyID string) {
+	_ = keyID // streaming usage accounting is handled at the final chunk via TODO; see nonStreamChat for the buffered path.
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		s.writeError(w, &provider.Error{Status: http.StatusInternalServerError, Message: "streaming unsupported by server"})

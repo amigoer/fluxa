@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/amigoer/fluxa/internal/provider"
 )
@@ -35,6 +36,12 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	keyID, err := s.authorize(r, peek.Model)
+	if err != nil {
+		s.writeError(w, err)
+		return
+	}
+
 	chain, err := s.router.Resolve(peek.Model)
 	if err != nil {
 		s.writeError(w, err)
@@ -43,10 +50,10 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 
 	req := &provider.MessagesRequest{Model: peek.Model, Raw: body}
 	if peek.Stream {
-		s.streamMessages(w, r, chain, req)
+		s.streamMessages(w, r, chain, req, keyID)
 		return
 	}
-	s.nonStreamMessages(w, r, chain, req)
+	s.nonStreamMessages(w, r, chain, req, keyID)
 }
 
 // firstMessagesProvider walks the resolved chain and returns the first
@@ -70,13 +77,14 @@ func firstMessagesProvider(chain []provider.Provider) (provider.MessagesProvider
 	return primary, fallbacks
 }
 
-func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.MessagesRequest) {
+func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.MessagesRequest, keyID string) {
 	primary, fallbacks := firstMessagesProvider(chain)
 	if primary == nil {
 		s.writeError(w, &provider.Error{Status: http.StatusNotImplemented, Message: "no Anthropic-compatible provider configured for this model"})
 		return
 	}
 
+	started := time.Now()
 	attempts := append([]provider.MessagesProvider{primary}, fallbacks...)
 	var lastErr error
 	for _, p := range attempts {
@@ -85,6 +93,7 @@ func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Fluxa-Provider", p.Name())
 			_, _ = w.Write(resp.Raw)
+			s.recordUsage(r.Context(), keyID, req.Model, p.Name(), resp.Raw, started, http.StatusOK, usageFromAnthropic)
 			return
 		}
 		lastErr = err
@@ -100,7 +109,8 @@ func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain
 	s.writeError(w, lastErr)
 }
 
-func (s *Server) streamMessages(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.MessagesRequest) {
+func (s *Server) streamMessages(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.MessagesRequest, keyID string) {
+	_ = keyID // streaming usage accounting is deferred; rate limits still apply.
 	primary, fallbacks := firstMessagesProvider(chain)
 	if primary == nil {
 		s.writeError(w, &provider.Error{Status: http.StatusNotImplemented, Message: "no Anthropic-compatible provider configured for this model"})

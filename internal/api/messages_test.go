@@ -25,7 +25,7 @@ func newAnthropicTestServer(t *testing.T, upstream *httptest.Server) *Server {
 	if err != nil {
 		t.Fatalf("router.Build: %v", err)
 	}
-	return New(r, nil)
+	return New(r, nil, nil, nil)
 }
 
 func TestHandleMessages_NonStream(t *testing.T) {
@@ -76,7 +76,7 @@ func TestHandleMessages_RejectsNonAnthropicProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("router.Build: %v", err)
 	}
-	s := New(r, nil)
+	s := New(r, nil, nil, nil)
 	mux := http.NewServeMux()
 	s.Routes(mux)
 

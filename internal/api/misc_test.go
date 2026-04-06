@@ -28,7 +28,7 @@ func TestListModels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("router.Build: %v", err)
 	}
-	s := New(r, nil)
+	s := New(r, nil, nil, nil)
 	mux := http.NewServeMux()
 	s.Routes(mux)
 
