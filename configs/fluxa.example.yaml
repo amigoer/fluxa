@@ -60,6 +60,16 @@ providers:
     api_key: ${ERNIE_API_KEY}
     base_url: https://qianfan.baidubce.com/v2
 
+  # Azure OpenAI — deployments map canonical model IDs to Azure deployments.
+  - name: azure
+    kind: azure
+    api_key: ${AZURE_OPENAI_API_KEY}
+    base_url: https://my-resource.openai.azure.com
+    api_version: "2024-06-01"
+    deployments:
+      gpt-4o: prod-gpt4o
+      gpt-4o-mini: prod-gpt4o-mini
+
 routes:
   - model: gpt-4o
     provider: openai
