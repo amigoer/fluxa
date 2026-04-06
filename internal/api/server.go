@@ -36,6 +36,8 @@ func New(r *router.Router, logger *slog.Logger) *Server {
 func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/chat/completions", s.handleChatCompletions)
 	mux.HandleFunc("POST /v1/messages", s.handleMessages)
+	mux.HandleFunc("GET /v1/models", s.handleListModels)
+	mux.HandleFunc("GET /health", s.handleHealth)
 }
 
 // errorEnvelope matches the OpenAI error shape so existing SDKs can surface
