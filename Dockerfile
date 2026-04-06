@@ -4,7 +4,7 @@
 # the static binary and a minimal root filesystem, keeping the published
 # image under 15 MiB.
 
-FROM golang:1.22-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 
 # Cache module downloads separately from the source tree for fast rebuilds.
