@@ -71,6 +71,13 @@ type ProviderConfig struct {
 	// deployment names. Azure OpenAI requires a per-deployment URL, so this
 	// is how operators bridge e.g. "gpt-4o" to their Azure deployment name.
 	Deployments map[string]string `yaml:"deployments"`
+
+	// AccessKey / SecretKey / SessionToken carry AWS credentials for the
+	// Bedrock adapter. They are plain strings instead of a nested struct so
+	// that ${VAR} interpolation works on each field.
+	AccessKey    string `yaml:"access_key"`
+	SecretKey    string `yaml:"secret_key"`
+	SessionToken string `yaml:"session_token"`
 }
 
 // RouteConfig maps a model identifier to a primary provider plus an ordered
@@ -161,8 +168,17 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("duplicate provider name %q", p.Name)
 		}
 		seen[p.Name] = struct{}{}
-		if p.APIKey == "" && p.Kind != "ollama" {
-			return fmt.Errorf("provider %q: api_key is required", p.Name)
+		switch p.Kind {
+		case "ollama":
+			// No credentials required.
+		case "bedrock":
+			if p.AccessKey == "" || p.SecretKey == "" || p.Region == "" {
+				return fmt.Errorf("provider %q: access_key, secret_key and region are required", p.Name)
+			}
+		default:
+			if p.APIKey == "" {
+				return fmt.Errorf("provider %q: api_key is required", p.Name)
+			}
 		}
 	}
 	for _, r := range c.Routes {

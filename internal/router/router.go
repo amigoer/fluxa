@@ -12,6 +12,7 @@ import (
 
 	"github.com/amigoer/fluxa/internal/adapter/anthropic"
 	"github.com/amigoer/fluxa/internal/adapter/azure"
+	"github.com/amigoer/fluxa/internal/adapter/bedrock"
 	"github.com/amigoer/fluxa/internal/adapter/gemini"
 	"github.com/amigoer/fluxa/internal/adapter/openai"
 	"github.com/amigoer/fluxa/internal/config"
@@ -176,6 +177,17 @@ func newProvider(pc config.ProviderConfig) (provider.Provider, error) {
 			Headers: pc.Headers,
 			Timeout: pc.Timeout,
 		}), nil
+	case "bedrock":
+		return bedrock.New(bedrock.Options{
+			Name:         pc.Name,
+			Region:       pc.Region,
+			AccessKey:    pc.AccessKey,
+			SecretKey:    pc.SecretKey,
+			SessionToken: pc.SessionToken,
+			Models:       pc.Models,
+			Timeout:      pc.Timeout,
+			BaseURL:      pc.BaseURL,
+		})
 	case "azure":
 		return azure.New(azure.Options{
 			Name:        pc.Name,

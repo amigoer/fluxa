@@ -66,6 +66,16 @@ providers:
     api_key: ${GEMINI_API_KEY}
     base_url: https://generativelanguage.googleapis.com/v1beta
 
+  # AWS Bedrock — signs requests with in-tree SigV4, uses the unified
+  # Converse API so a single provider entry works across Claude, Llama,
+  # Mistral, Titan, and any future Bedrock-hosted family.
+  - name: bedrock
+    kind: bedrock
+    region: us-east-1
+    access_key: ${AWS_ACCESS_KEY_ID}
+    secret_key: ${AWS_SECRET_ACCESS_KEY}
+    session_token: ${AWS_SESSION_TOKEN:-}
+
   # Azure OpenAI — deployments map canonical model IDs to Azure deployments.
   - name: azure
     kind: azure
@@ -118,6 +128,10 @@ routes:
     provider: gemini
   - model: gemini-2.0-flash
     provider: gemini
+  - model: anthropic.claude-3-5-sonnet-20241022-v2:0
+    provider: bedrock
+  - model: meta.llama3-1-70b-instruct-v1:0
+    provider: bedrock
 
 logging:
   level: info
