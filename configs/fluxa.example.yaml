@@ -38,6 +38,28 @@ providers:
     kind: ollama
     base_url: http://localhost:11434/v1   # Ollama runs without an API key
 
+  # --- v4.0 additional OpenAI-compatible providers ---
+
+  - name: moonshot
+    kind: moonshot                        # Kimi / Moonshot
+    api_key: ${MOONSHOT_API_KEY}
+    base_url: https://api.moonshot.cn/v1
+
+  - name: zhipu
+    kind: zhipu                           # 智谱 GLM
+    api_key: ${ZHIPU_API_KEY}
+    base_url: https://open.bigmodel.cn/api/paas/v4
+
+  - name: doubao
+    kind: doubao                          # 豆包 / Volcengine Ark
+    api_key: ${DOUBAO_API_KEY}
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+
+  - name: ernie
+    kind: ernie                           # 文心一言 / Baidu Qianfan v2
+    api_key: ${ERNIE_API_KEY}
+    base_url: https://qianfan.baidubce.com/v2
+
 routes:
   - model: gpt-4o
     provider: openai
@@ -58,6 +80,24 @@ routes:
     provider: qwen
   - model: llama3.1
     provider: ollama
+
+  # v4.0 additional providers
+  - model: moonshot-v1-8k
+    provider: moonshot
+  - model: moonshot-v1-32k
+    provider: moonshot
+  - model: kimi-k2-0711-preview
+    provider: moonshot
+  - model: glm-4
+    provider: zhipu
+  - model: glm-4-flash
+    provider: zhipu
+  - model: doubao-pro-32k
+    provider: doubao
+  - model: ernie-4.0-8k
+    provider: ernie
+  - model: ernie-3.5-8k
+    provider: ernie
 
 logging:
   level: info

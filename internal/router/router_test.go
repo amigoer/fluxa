@@ -37,6 +37,25 @@ func TestBuildAndResolve(t *testing.T) {
 	}
 }
 
+func TestBuild_OpenAICompatibleKinds(t *testing.T) {
+	kinds := []string{"openai", "deepseek", "qwen", "ollama", "moonshot", "zhipu", "doubao", "ernie"}
+	for _, kind := range kinds {
+		kind := kind
+		t.Run(kind, func(t *testing.T) {
+			cfg := config.Config{
+				Server: config.ServerConfig{Port: 8080},
+				Providers: []config.ProviderConfig{
+					{Name: kind, Kind: kind, APIKey: "sk-test"},
+				},
+				Routes: []config.RouteConfig{{Model: "*", Provider: kind}},
+			}
+			if _, err := Build(cfg); err != nil {
+				t.Fatalf("Build(%s): %v", kind, err)
+			}
+		})
+	}
+}
+
 func TestBuild_CatchAllRoute(t *testing.T) {
 	cfg := config.Config{
 		Server: config.ServerConfig{Port: 8080},

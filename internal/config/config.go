@@ -52,6 +52,25 @@ type ProviderConfig struct {
 	BaseURL string            `yaml:"base_url"`
 	Timeout time.Duration     `yaml:"timeout"`
 	Headers map[string]string `yaml:"headers"`
+
+	// Models is the list of model identifiers this provider advertises via
+	// GET /v1/models. When empty the provider serves only the models named
+	// in the routes section.
+	Models []string `yaml:"models"`
+
+	// Region is consumed by cloud providers that require a regional
+	// endpoint (AWS Bedrock, Azure). Ignored by the OpenAI-compatible kinds.
+	Region string `yaml:"region"`
+
+	// APIVersion is consumed by adapters that pin a specific API revision
+	// (Azure OpenAI uses e.g. "2024-02-15-preview", Anthropic uses
+	// "2023-06-01"). Ignored when empty.
+	APIVersion string `yaml:"api_version"`
+
+	// Deployments maps canonical model identifiers to provider-specific
+	// deployment names. Azure OpenAI requires a per-deployment URL, so this
+	// is how operators bridge e.g. "gpt-4o" to their Azure deployment name.
+	Deployments map[string]string `yaml:"deployments"`
 }
 
 // RouteConfig maps a model identifier to a primary provider plus an ordered

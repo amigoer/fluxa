@@ -130,35 +130,40 @@ func (r *Router) providersServing(model string) []string {
 	return out
 }
 
+// openaiCompatibleDefaults lists every provider kind that speaks the OpenAI
+// REST dialect. Adding support for another Chinese or Western vendor that
+// exposes an OpenAI-compatible endpoint is a one-line edit here.
+var openaiCompatibleDefaults = map[string]string{
+	"openai":   "https://api.openai.com/v1",
+	"deepseek": "https://api.deepseek.com/v1",
+	"qwen":     "https://dashscope.aliyuncs.com/compatible-mode/v1",
+	"ollama":   "http://localhost:11434/v1",
+	// v4.0 — additional providers that ship an OpenAI-compatible surface.
+	"moonshot": "https://api.moonshot.cn/v1",        // Kimi
+	"zhipu":    "https://open.bigmodel.cn/api/paas/v4", // GLM
+	"doubao":   "https://ark.cn-beijing.volces.com/api/v3", // Volcengine Ark
+	"ernie":    "https://qianfan.baidubce.com/v2",   // Baidu Qianfan v2
+}
+
 // newProvider is the factory from config.ProviderConfig to a concrete
 // Provider instance. Unknown kinds return an error so operators find typos
 // at startup instead of runtime.
 func newProvider(pc config.ProviderConfig) (provider.Provider, error) {
+	if base, ok := openaiCompatibleDefaults[pc.Kind]; ok {
+		return openai.New(openai.Options{
+			Name:    pc.Name,
+			BaseURL: defaultBaseURL(pc, base),
+			APIKey:  pc.APIKey,
+			Models:  pc.Models,
+			Headers: pc.Headers,
+			Timeout: pc.Timeout,
+		}), nil
+	}
 	switch pc.Kind {
-	case "openai":
-		return openai.New(openai.Options{
-			Name: pc.Name, BaseURL: defaultBaseURL(pc, "https://api.openai.com/v1"),
-			APIKey: pc.APIKey, Headers: pc.Headers, Timeout: pc.Timeout,
-		}), nil
-	case "deepseek":
-		return openai.New(openai.Options{
-			Name: pc.Name, BaseURL: defaultBaseURL(pc, "https://api.deepseek.com/v1"),
-			APIKey: pc.APIKey, Headers: pc.Headers, Timeout: pc.Timeout,
-		}), nil
-	case "qwen":
-		return openai.New(openai.Options{
-			Name: pc.Name, BaseURL: defaultBaseURL(pc, "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-			APIKey: pc.APIKey, Headers: pc.Headers, Timeout: pc.Timeout,
-		}), nil
-	case "ollama":
-		return openai.New(openai.Options{
-			Name: pc.Name, BaseURL: defaultBaseURL(pc, "http://localhost:11434/v1"),
-			APIKey: pc.APIKey, Headers: pc.Headers, Timeout: pc.Timeout,
-		}), nil
 	case "anthropic":
 		return anthropic.New(anthropic.Options{
 			Name: pc.Name, BaseURL: defaultBaseURL(pc, "https://api.anthropic.com"),
-			APIKey: pc.APIKey, Headers: pc.Headers, Timeout: pc.Timeout,
+			APIKey: pc.APIKey, Models: pc.Models, Headers: pc.Headers, Timeout: pc.Timeout,
 		}), nil
 	default:
 		return nil, fmt.Errorf("unknown provider kind %q", pc.Kind)
