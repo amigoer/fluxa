@@ -1,0 +1,65 @@
+# Fluxa example configuration.
+#
+# Copy this file to fluxa.yaml and fill in the provider credentials. Every
+# ${VAR} placeholder is expanded from the process environment at load time,
+# so secrets can stay outside the YAML file and the same file works for dev,
+# staging, and production.
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  master_key: ${FLUXA_MASTER_KEY}   # Required once the Admin API ships in v2.0
+
+database:
+  path: ./fluxa.db                  # SQLite database used for key management (v2.0+)
+
+providers:
+  - name: openai
+    kind: openai
+    api_key: ${OPENAI_API_KEY}
+    base_url: https://api.openai.com/v1
+
+  - name: anthropic
+    kind: anthropic
+    api_key: ${ANTHROPIC_API_KEY}
+    base_url: https://api.anthropic.com
+
+  - name: deepseek
+    kind: deepseek
+    api_key: ${DEEPSEEK_API_KEY}
+    base_url: https://api.deepseek.com/v1
+
+  - name: qwen
+    kind: qwen
+    api_key: ${QWEN_API_KEY}
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+
+  - name: ollama
+    kind: ollama
+    base_url: http://localhost:11434/v1   # Ollama runs without an API key
+
+routes:
+  - model: gpt-4o
+    provider: openai
+    fallback: [deepseek]
+  - model: gpt-4o-mini
+    provider: openai
+  - model: claude-3-5-sonnet
+    provider: anthropic
+  - model: claude-3-5-sonnet-20241022
+    provider: anthropic
+  - model: deepseek-chat
+    provider: deepseek
+  - model: deepseek-reasoner
+    provider: deepseek
+  - model: qwen-max
+    provider: qwen
+  - model: qwen-plus
+    provider: qwen
+  - model: llama3.1
+    provider: ollama
+
+logging:
+  level: info
+  format: json
+  store_content: false              # Set true to persist prompt bodies in the request log

@@ -1,0 +1,25 @@
+services:
+  fluxa:
+    image: fluxa/fluxa:latest
+    build: .
+    container_name: fluxa
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      FLUXA_MASTER_KEY: ${FLUXA_MASTER_KEY:-changeme}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+    volumes:
+      - ./fluxa.yaml:/app/fluxa.yaml:ro
+      - fluxa-data:/app/data
+    healthcheck:
+      test: ["CMD", "/app/fluxa", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  fluxa-data:
