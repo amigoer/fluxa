@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/amigoer/fluxa/internal/keys"
 	"github.com/amigoer/fluxa/internal/router"
 	"github.com/amigoer/fluxa/internal/store"
 )
@@ -28,18 +29,21 @@ import (
 type AdminServer struct {
 	router    *router.Router
 	store     *store.Store
+	keyring   *keys.Keyring // optional: nil disables virtual-key admin reloads
 	masterKey string
 	logger    *slog.Logger
 }
 
 // NewAdmin returns a ready-to-wire AdminServer. A blank masterKey disables
 // the admin surface: every request will be rejected with 404 so the
-// endpoint shape is not discoverable.
-func NewAdmin(r *router.Router, s *store.Store, masterKey string, logger *slog.Logger) *AdminServer {
+// endpoint shape is not discoverable. Keyring is optional — when nil the
+// virtual-key endpoints still work, but no in-memory cache is invalidated
+// so the data-plane will lag the store by at most one process lifetime.
+func NewAdmin(r *router.Router, s *store.Store, kr *keys.Keyring, masterKey string, logger *slog.Logger) *AdminServer {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &AdminServer{router: r, store: s, masterKey: masterKey, logger: logger}
+	return &AdminServer{router: r, store: s, keyring: kr, masterKey: masterKey, logger: logger}
 }
 
 // Routes installs the admin handlers onto mux. They share the mux with the
@@ -56,6 +60,15 @@ func (a *AdminServer) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/routes/{model...}", a.requireAuth(a.getRoute))
 	mux.HandleFunc("PUT /admin/routes/{model...}", a.requireAuth(a.upsertRoute))
 	mux.HandleFunc("DELETE /admin/routes/{model...}", a.requireAuth(a.deleteRoute))
+
+	mux.HandleFunc("GET /admin/keys", a.requireAuth(a.listKeys))
+	mux.HandleFunc("POST /admin/keys", a.requireAuth(a.createKey))
+	mux.HandleFunc("GET /admin/keys/{id}", a.requireAuth(a.getKey))
+	mux.HandleFunc("PUT /admin/keys/{id}", a.requireAuth(a.updateKey))
+	mux.HandleFunc("DELETE /admin/keys/{id}", a.requireAuth(a.deleteKey))
+
+	mux.HandleFunc("GET /admin/usage", a.requireAuth(a.listUsage))
+	mux.HandleFunc("GET /admin/usage/summary", a.requireAuth(a.usageSummary))
 
 	mux.HandleFunc("POST /admin/reload", a.requireAuth(a.reload))
 }

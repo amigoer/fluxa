@@ -97,7 +97,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	api.New(r, logger, kr, st).Routes(mux)
-	api.NewAdmin(r, st, cfg.Server.MasterKey, logger).Routes(mux)
+	api.NewAdmin(r, st, kr, cfg.Server.MasterKey, logger).Routes(mux)
 
 	addr := net.JoinHostPort(cfg.Server.Host, strconv.Itoa(cfg.Server.Port))
 	server := &http.Server{

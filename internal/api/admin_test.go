@@ -38,7 +38,7 @@ func newAdminFixture(t *testing.T) (*http.ServeMux, *store.Store, string) {
 	}
 
 	mux := http.NewServeMux()
-	NewAdmin(r, st, "test-master-key", nil).Routes(mux)
+	NewAdmin(r, st, nil, "test-master-key", nil).Routes(mux)
 	return mux, st, "test-master-key"
 }
 
@@ -155,7 +155,7 @@ func TestAdmin_DisabledWhenMasterKeyEmpty(t *testing.T) {
 	st, _ := store.Open(dbPath)
 	defer st.Close()
 	mux := http.NewServeMux()
-	NewAdmin(router.New(), st, "", nil).Routes(mux)
+	NewAdmin(router.New(), st, nil, "", nil).Routes(mux)
 	rec := doAdmin(t, mux, "GET", "/admin/providers", "anything", nil)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404 when admin disabled, got %d", rec.Code)
