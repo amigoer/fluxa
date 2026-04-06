@@ -130,6 +130,7 @@ func Parse(raw []byte) (Config, error) {
 		return Config{}, fmt.Errorf("parse yaml: %w", err)
 	}
 	cfg.applyDefaults()
+	cfg.dropUncredentialed()
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -147,6 +148,69 @@ func (c *Config) applyDefaults() {
 			p.Timeout = 5 * time.Minute
 		}
 	}
+}
+
+// dropUncredentialed removes providers whose required secrets were not
+// supplied by the environment, and then removes routes that pointed at
+// them. This lets the shipped example YAML list every supported vendor
+// without forcing the operator to invent placeholder API keys for the
+// ones they do not use on first run — only the providers actually
+// configured via env vars end up seeded into the store.
+func (c *Config) dropUncredentialed() {
+	// Record every name the author declared so we can distinguish
+	// "provider dropped because secrets missing" (skip the route) from
+	// "provider never declared" (let Validate raise the typo).
+	declared := make(map[string]struct{}, len(c.Providers))
+	for _, p := range c.Providers {
+		declared[p.Name] = struct{}{}
+	}
+
+	keptProviders := c.Providers[:0]
+	live := make(map[string]struct{}, len(c.Providers))
+	for _, p := range c.Providers {
+		ok := true
+		switch p.Kind {
+		case "ollama":
+			// No credentials required.
+		case "bedrock":
+			if p.AccessKey == "" || p.SecretKey == "" || p.Region == "" {
+				ok = false
+			}
+		default:
+			if p.APIKey == "" {
+				ok = false
+			}
+		}
+		if !ok {
+			continue
+		}
+		keptProviders = append(keptProviders, p)
+		live[p.Name] = struct{}{}
+	}
+	c.Providers = keptProviders
+
+	keptRoutes := c.Routes[:0]
+	for _, r := range c.Routes {
+		if _, ok := live[r.Provider]; !ok {
+			// Only silently drop routes whose provider was declared
+			// but later pruned for missing credentials. Unknown-name
+			// references still flow through to Validate.
+			if _, wasDeclared := declared[r.Provider]; wasDeclared {
+				continue
+			}
+		}
+		// Prune any fallback entries that reference a dropped provider
+		// so the router never sees a dangling name.
+		fb := r.Fallback[:0]
+		for _, f := range r.Fallback {
+			if _, ok := live[f]; ok {
+				fb = append(fb, f)
+			}
+		}
+		r.Fallback = fb
+		keptRoutes = append(keptRoutes, r)
+	}
+	c.Routes = keptRoutes
 }
 
 // Validate ensures the configuration has the minimum fields required to start

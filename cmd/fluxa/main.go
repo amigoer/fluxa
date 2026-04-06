@@ -76,13 +76,17 @@ func main() {
 		logger.Error("load router inputs", "err", err)
 		os.Exit(1)
 	}
+	// Zero providers is non-fatal: the admin dashboard at /ui/ still
+	// boots so operators can configure their first provider live.
+	// The data-plane /v1/* endpoints will return errors until a
+	// provider exists, which is the expected behaviour on a brand
+	// new install.
 	if len(provs) == 0 {
-		logger.Error("no providers configured", "hint", "seed providers via YAML or the admin API")
-		os.Exit(1)
+		logger.Warn("no providers configured — data plane is idle; open /ui/ or use the admin API to add one")
 	}
 
 	r := router.New()
-	if err := r.Reload(provs, routes); err != nil {
+	if err := r.Reload(provs, routes); err != nil && len(provs) > 0 {
 		logger.Error("build router", "err", err)
 		os.Exit(1)
 	}

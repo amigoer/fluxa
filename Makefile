@@ -14,8 +14,14 @@ build: ## build the fluxa binary into ./bin
 	@mkdir -p bin
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
 
-run: ## run fluxa against a local fluxa.yaml
+run: fluxa.yaml ## run fluxa against a local fluxa.yaml
 	go run $(PKG) -config fluxa.yaml
+
+# Auto-seed fluxa.yaml from the committed example on first run so
+# `make run` works out of the box on a fresh clone.
+fluxa.yaml:
+	@echo "fluxa.yaml not found — copying configs/fluxa.example.yaml"
+	@cp configs/fluxa.example.yaml fluxa.yaml
 
 test: ## run unit tests
 	go test ./...
