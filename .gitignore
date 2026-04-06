@@ -1,1 +1,16 @@
 plan/
+
+# Build artifacts
+/fluxa
+/bin/
+/dist/
+
+# Runtime data
+*.db
+*.db-journal
+fluxa.yaml
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
