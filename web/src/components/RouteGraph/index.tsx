@@ -24,6 +24,7 @@ import {
   applyEdgeChanges,
   type Node,
   type Edge,
+  type Connection,
   type NodeChange,
   type EdgeChange,
   type NodeTypes,
@@ -35,6 +36,11 @@ import { Providers, RegexRoutes, VirtualModels } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useRouteGraphStore, type EdgeStat } from "@/store/routeGraphStore";
 import { buildGraph } from "./utils/buildGraph";
+import type {
+  ProviderNodeData,
+  RegexNodeData,
+  VirtualModelNodeData,
+} from "./utils/buildGraph";
 import {
   applyStoredPositions,
   getLayoutedElements,
@@ -203,6 +209,122 @@ function RouteGraphInner() {
     [],
   );
 
+  // onConnect — wires the user's manual handle-to-handle drag to a
+  // backend mutation so the new connection actually persists. We
+  // interpret the drag as "rewire the source-side route's target":
+  //
+  //   VirtualModel handle "route-N" → Provider/VM
+  //     -> route N of the VM is reassigned to the new target.
+  //
+  //   RegexRoute handle → Provider/VM
+  //     -> the regex's target_model / provider is reassigned.
+  //
+  // Anything else (drags from source/fallback, drops on source/
+  // fallback) is rejected silently — those nodes are synthetic and
+  // do not correspond to mutable rows in the store.
+  //
+  // We read the store directly inside the callback (rather than from
+  // the closed-over `nodes`) so a stale render of nodes from the
+  // hook subscription cannot fool us into wiring against an old
+  // snapshot.
+  const onConnect = useCallback(
+    async (conn: Connection) => {
+      if (!conn.source || !conn.target || conn.source === conn.target) return;
+      const currentNodes = useRouteGraphStore.getState().nodes;
+      const sourceNode = currentNodes.find((n) => n.id === conn.source);
+      const targetNode = currentNodes.find((n) => n.id === conn.target);
+      if (!sourceNode || !targetNode) return;
+
+      // Compute the new target descriptor based on what the user
+      // dropped on. Both branches return the same shape so the
+      // upstream switch can stay flat.
+      let newTarget:
+        | { target_type: "real"; target_model: string; provider: string }
+        | { target_type: "virtual"; target_model: string; provider: "" }
+        | null = null;
+      if (targetNode.type === "provider") {
+        const p = targetNode.data as unknown as ProviderNodeData;
+        newTarget = {
+          target_type: "real",
+          target_model: p.model,
+          provider: p.provider,
+        };
+      } else if (targetNode.type === "virtualModel") {
+        const v = targetNode.data as unknown as VirtualModelNodeData;
+        newTarget = {
+          target_type: "virtual",
+          target_model: v.model.name,
+          provider: "",
+        };
+      } else {
+        return; // dropping on source / fallback / regex is meaningless
+      }
+
+      try {
+        if (sourceNode.type === "virtualModel") {
+          // Rewire route N of this VM. The handle id encodes the
+          // route index ("route-2" -> idx 2). If the user dragged
+          // from a non-route handle (defensive — there are no other
+          // source handles on a VM today) we bail.
+          const v = sourceNode.data as unknown as VirtualModelNodeData;
+          const idxStr = (conn.sourceHandle ?? "").replace(/^route-/, "");
+          const idx = parseInt(idxStr, 10);
+          if (Number.isNaN(idx) || idx < 0 || idx >= v.model.routes.length) {
+            return;
+          }
+          // Reject self-loops: a VM route pointing back at the same VM
+          // would create a runtime cycle the resolver caps at depth 5
+          // and confusing topology.
+          if (
+            newTarget.target_type === "virtual" &&
+            newTarget.target_model === v.model.name
+          ) {
+            return;
+          }
+          const updated = {
+            ...v.model,
+            routes: v.model.routes.map((r, i) =>
+              i === idx ? { ...r, ...newTarget } : r,
+            ),
+          };
+          await VirtualModels.upsert(updated);
+        } else if (sourceNode.type === "regexRoute") {
+          const r = (sourceNode.data as unknown as RegexNodeData).route;
+          if (!r.id) return;
+          await RegexRoutes.update(r.id, {
+            ...r,
+            target_type: newTarget.target_type,
+            target_model: newTarget.target_model,
+            provider: newTarget.provider,
+          });
+        } else {
+          return; // source / fallback can't originate edges in our model
+        }
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("graph.errors.save"));
+      }
+    },
+    [load, t],
+  );
+
+  // isValidConnection — runs while the operator is dragging, so
+  // ReactFlow can show a green / red drop affordance on each handle.
+  // The rules mirror what onConnect actually accepts: VM/regex
+  // sources, provider/VM targets, no self-loops.
+  const isValidConnection = useCallback((conn: Edge | Connection) => {
+    if (!conn.source || !conn.target || conn.source === conn.target) {
+      return false;
+    }
+    const currentNodes = useRouteGraphStore.getState().nodes;
+    const s = currentNodes.find((n) => n.id === conn.source);
+    const t = currentNodes.find((n) => n.id === conn.target);
+    if (!s || !t) return false;
+    const validSource = s.type === "virtualModel" || s.type === "regexRoute";
+    const validTarget = t.type === "provider" || t.type === "virtualModel";
+    return validSource && validTarget;
+  }, []);
+
   // Manual "Auto Layout" button — re-runs dagre over the current
   // (server-derived) graph and *clears* stored positions so the
   // operator can reset after dragging things into a mess.
@@ -233,9 +355,12 @@ function RouteGraphInner() {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        isValidConnection={isValidConnection}
         onNodeDragStop={onNodeDragStop}
         onPaneClick={() => useRouteGraphStore.getState().selectNode(null)}
         defaultEdgeOptions={defaultEdgeOptions}
+        connectionLineStyle={{ stroke: "#7F77DD", strokeWidth: 2 }}
         fitView
         proOptions={{ hideAttribution: true }}
       >
