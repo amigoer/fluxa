@@ -325,14 +325,81 @@ function RouteGraphInner() {
     return validSource && validTarget;
   }, []);
 
+  // layoutAnimRef holds the RAF handle of an in-flight relayout
+  // tween. Storing it on a ref (rather than React state) avoids a
+  // re-render on every frame and lets a second click of "Auto
+  // Layout" cancel the first cleanly instead of two RAF loops
+  // fighting each other for the node positions.
+  const layoutAnimRef = useRef<number | null>(null);
+
   // Manual "Auto Layout" button — re-runs dagre over the current
   // (server-derived) graph and *clears* stored positions so the
   // operator can reset after dragging things into a mess.
+  //
+  // The transition is animated rather than instantaneous: jumping
+  // nodes hundreds of pixels in one frame is jarring and makes it
+  // hard for the operator to mentally track which node went where.
+  // We capture each node's current position, compute its dagre
+  // target, then tween via requestAnimationFrame with an ease-out
+  // cubic so the motion decelerates into place. Edges follow
+  // automatically because React Flow re-derives edge paths from
+  // node positions on every render.
   const relayout = useCallback(() => {
+    if (layoutAnimRef.current !== null) {
+      cancelAnimationFrame(layoutAnimRef.current);
+      layoutAnimRef.current = null;
+    }
     const laid = getLayoutedElements(nodes, edges);
     saveStoredPositions({});
-    setGraph(laid.nodes, laid.edges);
-  }, [nodes, edges, setGraph]);
+    // Push the freshly-laid edges once up front; edges do not need
+    // to be tweened because their bezier paths are derived from the
+    // (animating) node positions on every React Flow render.
+    setEdges(laid.edges);
+
+    // Snapshot starting positions so we can interpolate against the
+    // *original* values for the whole tween, not the previous frame.
+    const startPositions = new Map<string, { x: number; y: number }>(
+      nodes.map((n) => [n.id, { ...n.position }]),
+    );
+
+    const duration = 500;
+    const easeOutCubic = (k: number) => 1 - Math.pow(1 - k, 3);
+    const startTime = performance.now();
+
+    function tick() {
+      const elapsed = performance.now() - startTime;
+      const k = Math.min(1, elapsed / duration);
+      const eased = easeOutCubic(k);
+      const animated = laid.nodes.map((n) => {
+        const start = startPositions.get(n.id);
+        if (!start) return n;
+        return {
+          ...n,
+          position: {
+            x: start.x + (n.position.x - start.x) * eased,
+            y: start.y + (n.position.y - start.y) * eased,
+          },
+        };
+      });
+      setNodes(animated);
+      if (k < 1) {
+        layoutAnimRef.current = requestAnimationFrame(tick);
+      } else {
+        layoutAnimRef.current = null;
+      }
+    }
+    layoutAnimRef.current = requestAnimationFrame(tick);
+  }, [nodes, edges, setNodes, setEdges]);
+
+  // Cancel any in-flight layout tween when the page unmounts so we
+  // never schedule a setNodes against a torn-down component.
+  useEffect(() => {
+    return () => {
+      if (layoutAnimRef.current !== null) {
+        cancelAnimationFrame(layoutAnimRef.current);
+      }
+    };
+  }, []);
 
   // Memoised default edge options keep the React Flow default styling
   // consistent with our custom edge components.
