@@ -14,6 +14,7 @@ import {
   GitBranch,
   Regex,
   TestTube2,
+  Network,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ import { RoutesPage } from "@/pages/Routes";
 import { VirtualModelsPage } from "@/pages/VirtualModels";
 import { RegexRoutesPage } from "@/pages/RegexRoutes";
 import { ResolveTesterPage } from "@/pages/ResolveTester";
+import { RouteGraphPage } from "@/components/RouteGraph";
 import { KeysPage } from "@/pages/Keys";
 import { UsagePage } from "@/pages/Usage";
 import { SettingsPage } from "@/pages/Settings";
@@ -49,6 +51,7 @@ type Tab =
   | "virtual-models"
   | "regex-routes"
   | "resolve-tester"
+  | "route-graph"
   | "keys"
   | "usage"
   | "settings";
@@ -66,6 +69,7 @@ const NAV: NavEntry[] = [
   { id: "virtual-models", labelKey: "nav.virtualModels", icon: GitBranch },
   { id: "regex-routes", labelKey: "nav.regexRoutes", icon: Regex },
   { id: "resolve-tester", labelKey: "nav.resolveTester", icon: TestTube2 },
+  { id: "route-graph", labelKey: "nav.routeGraph", icon: Network },
   { id: "keys", labelKey: "nav.keys", icon: KeyRound },
   { id: "usage", labelKey: "nav.usage", icon: BarChart3 },
   { id: "settings", labelKey: "nav.settings", icon: SettingsIcon },
@@ -353,18 +357,26 @@ function Shell() {
           )}
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto px-10 py-10">
-          {tab === "dashboard" && <DashboardPage />}
-          {tab === "providers" && <ProvidersPage />}
-          {tab === "routes" && <RoutesPage />}
-          {tab === "virtual-models" && <VirtualModelsPage />}
-          {tab === "regex-routes" && <RegexRoutesPage />}
-          {tab === "resolve-tester" && <ResolveTesterPage />}
-          {tab === "keys" && <KeysPage />}
-          {tab === "usage" && <UsagePage />}
-          {tab === "settings" && <SettingsPage onSignOut={signOut} />}
-        </div>
+      <main className="flex-1 overflow-auto relative">
+        {/* The route graph is full-bleed: it owns the entire main
+            area so React Flow can size its canvas to the viewport.
+            Every other page sits inside the centred max-width
+            container. */}
+        {tab === "route-graph" ? (
+          <RouteGraphPage />
+        ) : (
+          <div className="max-w-6xl mx-auto px-10 py-10">
+            {tab === "dashboard" && <DashboardPage />}
+            {tab === "providers" && <ProvidersPage />}
+            {tab === "routes" && <RoutesPage />}
+            {tab === "virtual-models" && <VirtualModelsPage />}
+            {tab === "regex-routes" && <RegexRoutesPage />}
+            {tab === "resolve-tester" && <ResolveTesterPage />}
+            {tab === "keys" && <KeysPage />}
+            {tab === "usage" && <UsagePage />}
+            {tab === "settings" && <SettingsPage onSignOut={signOut} />}
+          </div>
+        )}
       </main>
     </div>
   );
