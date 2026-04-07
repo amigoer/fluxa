@@ -25,10 +25,19 @@ export interface EdgeStat {
   errorRate: number;
 }
 
+// CreatingKind tags which create-flow the side panel is currently
+// hosting. The side panel renders an empty form for the matching
+// type when this is set, and the toolbar's "+" buttons set it.
+export type CreatingKind = "regexRoute" | "virtualModel" | null;
+
 interface RouteGraphState {
   nodes: Node[];
   edges: Edge[];
   selectedNodeId: string | null;
+  // creatingKind and selectedNodeId are mutually exclusive: opening
+  // one closes the other. The side panel checks both to decide
+  // whether to render and what to render.
+  creatingKind: CreatingKind;
   liveMode: boolean;
   // liveStats is keyed by edge id so the WeightedEdge / RouteEdge
   // components can do an O(1) lookup during render. Provider node
@@ -40,6 +49,7 @@ interface RouteGraphState {
   setEdges: (edges: Edge[]) => void;
   setGraph: (nodes: Node[], edges: Edge[]) => void;
   selectNode: (id: string | null) => void;
+  startCreate: (kind: CreatingKind) => void;
   toggleLiveMode: () => void;
   updateLiveStats: (stats: Record<string, EdgeStat>) => void;
 }
@@ -48,6 +58,7 @@ export const useRouteGraphStore = create<RouteGraphState>((set) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
+  creatingKind: null,
   // Live mode is on by default so the canvas immediately shows
   // animated traffic flow when an operator opens the page. Without
   // this the page would look static and the routing topology would
@@ -59,7 +70,11 @@ export const useRouteGraphStore = create<RouteGraphState>((set) => ({
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
   setGraph: (nodes, edges) => set({ nodes, edges }),
-  selectNode: (id) => set({ selectedNodeId: id }),
+  // selectNode and startCreate are mutually exclusive — opening one
+  // mode dismisses the other so the side panel never holds two open
+  // intents at once.
+  selectNode: (id) => set({ selectedNodeId: id, creatingKind: null }),
+  startCreate: (kind) => set({ creatingKind: kind, selectedNodeId: null }),
   toggleLiveMode: () => set((s) => ({ liveMode: !s.liveMode })),
   updateLiveStats: (stats) => set({ liveStats: stats }),
 }));

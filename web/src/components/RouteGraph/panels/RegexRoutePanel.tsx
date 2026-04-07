@@ -12,26 +12,39 @@ import { RegexRoutes, type RegexRoute } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 
 interface Props {
-  route: RegexRoute;
+  // Undefined = create mode: form starts empty and Save POSTs a new
+  // record. Defined = edit mode: form starts from the supplied row
+  // and Save PUTs by id. Same component, two intents.
+  route?: RegexRoute;
   onChange: () => void | Promise<void>;
   onClose: () => void;
 }
 
+const EMPTY_REGEX_ROUTE: RegexRoute = {
+  pattern: "",
+  priority: 100,
+  target_type: "virtual",
+  target_model: "",
+  provider: "",
+  description: "",
+  enabled: true,
+};
+
 export function RegexRoutePanel({ route, onChange, onClose }: Props) {
   const { t } = useT();
+  const isCreate = !route;
   // Local form state — copied from props on mount; we never reach back
   // into props during edits because the side panel is the source of
   // truth until the user saves.
-  const [form, setForm] = useState<RegexRoute>({ ...route });
+  const [form, setForm] = useState<RegexRoute>(route ?? EMPTY_REGEX_ROUTE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
-    if (!form.id) return;
     setSaving(true);
     setError(null);
     try {
-      await RegexRoutes.update(form.id, {
+      const payload: RegexRoute = {
         pattern: form.pattern,
         priority: Number(form.priority) || 100,
         target_type: form.target_type,
@@ -39,7 +52,14 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
         provider: form.target_type === "real" ? form.provider : "",
         description: form.description ?? "",
         enabled: form.enabled ?? true,
-      });
+      };
+      if (isCreate) {
+        await RegexRoutes.create(payload);
+      } else if (form.id) {
+        await RegexRoutes.update(form.id, payload);
+      } else {
+        return;
+      }
       await onChange();
       onClose();
     } catch (err) {
@@ -144,11 +164,22 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
 
       <div className="flex gap-2 pt-2">
         <Button onClick={save} disabled={saving} size="sm" className="flex-1">
-          {saving ? t("graph.action.saving") : t("graph.action.save")}
+          {saving
+            ? t("graph.action.saving")
+            : isCreate
+              ? t("graph.action.create")
+              : t("graph.action.save")}
         </Button>
-        <Button onClick={remove} disabled={saving} size="sm" variant="destructive">
-          {t("graph.action.delete")}
-        </Button>
+        {!isCreate && (
+          <Button
+            onClick={remove}
+            disabled={saving}
+            size="sm"
+            variant="destructive"
+          >
+            {t("graph.action.delete")}
+          </Button>
+        )}
       </div>
     </div>
   );

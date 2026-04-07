@@ -75,46 +75,68 @@ const CHIP_TONE: Record<
 export function NodeSidePanel({ onChange }: Props) {
   const { t } = useT();
   const selectedId = useRouteGraphStore((s) => s.selectedNodeId);
+  const creatingKind = useRouteGraphStore((s) => s.creatingKind);
   const nodes = useRouteGraphStore((s) => s.nodes);
   const selectNode = useRouteGraphStore((s) => s.selectNode);
+  const startCreate = useRouteGraphStore((s) => s.startCreate);
 
-  // displayed is the node we're *currently rendering*. It can lag the
-  // selectedId by one transition cycle on close so the body content
-  // does not vanish mid-slide. On open, we update it immediately.
-  const [displayed, setDisplayed] = useState<Node | null>(null);
+  // displayed mirrors the *currently rendered* intent. It lags the
+  // store by one transition cycle on close so the body content does
+  // not vanish mid-slide. We track the union of "edit a node" and
+  // "create a new X" so the same slide-out behaves the same for
+  // both flows.
+  const [displayed, setDisplayed] = useState<{
+    kind: "edit" | "create";
+    node?: Node;
+    creatingKind?: "regexRoute" | "virtualModel";
+  } | null>(null);
 
   useEffect(() => {
     if (selectedId) {
       const next = nodes.find((n) => n.id === selectedId);
-      if (next) setDisplayed(next);
+      if (next) setDisplayed({ kind: "edit", node: next });
       return;
     }
-    // Selection cleared — keep the current body for the slide-out
+    if (creatingKind) {
+      setDisplayed({ kind: "create", creatingKind });
+      return;
+    }
+    // Both intents cleared — keep the current body for the slide-out
     // duration, then drop it so the next open starts cleanly.
     const timer = window.setTimeout(() => setDisplayed(null), 300);
     return () => window.clearTimeout(timer);
-  }, [selectedId, nodes]);
+  }, [selectedId, creatingKind, nodes]);
 
-  const open = !!selectedId;
-  const node = displayed;
-  // Tone defaults to the source palette for the synthetic info card.
-  const tone = (node && CHIP_TONE[node.type as string]) || CHIP_TONE.source;
+  const open = !!selectedId || !!creatingKind;
+  // Resolve the type the panel should render. In edit mode it comes
+  // from the displayed node; in create mode from the creatingKind tag.
+  const resolvedType: string | undefined =
+    displayed?.kind === "edit"
+      ? displayed.node?.type
+      : displayed?.creatingKind;
+  const tone =
+    (resolvedType && CHIP_TONE[resolvedType]) || CHIP_TONE.source;
+  const node = displayed?.kind === "edit" ? displayed.node : undefined;
 
-  // Localized type label and one-line subtitle. Falls back to the
-  // raw type string for any node we have not registered above; today
-  // every node type is covered, but the fallback keeps the panel
-  // from breaking if a new node type ships before its label.
+  // Localized type label and one-line subtitle. The label switches
+  // to a "新建 X" form when in create mode so the operator immediately
+  // sees the panel is for inserting, not editing.
+  const isCreate = displayed?.kind === "create";
   const { typeLabel, subtitle } = (() => {
-    if (!node) return { typeLabel: "", subtitle: "" };
-    switch (node.type) {
+    if (!resolvedType) return { typeLabel: "", subtitle: "" };
+    switch (resolvedType) {
       case "regexRoute":
         return {
-          typeLabel: t("graph.panel.regexTitle"),
+          typeLabel: isCreate
+            ? t("graph.dialog.newRegex")
+            : t("graph.panel.regexTitle"),
           subtitle: t("graph.panel.regexSubtitle"),
         };
       case "virtualModel":
         return {
-          typeLabel: t("graph.panel.virtualTitle"),
+          typeLabel: isCreate
+            ? t("graph.dialog.newVirtual")
+            : t("graph.panel.virtualTitle"),
           subtitle: t("graph.panel.virtualSubtitle"),
         };
       case "provider":
@@ -133,11 +155,17 @@ export function NodeSidePanel({ onChange }: Props) {
           subtitle: t("graph.fallback.hint"),
         };
       default:
-        return { typeLabel: node.type ?? "", subtitle: "" };
+        return { typeLabel: resolvedType, subtitle: "" };
     }
   })();
 
-  const close = () => selectNode(null);
+  // close() clears whichever intent is currently open. Edit and
+  // create both pass through here so the close button always works
+  // regardless of which mode the panel is in.
+  const close = () => {
+    if (selectedId) selectNode(null);
+    if (creatingKind) startCreate(null);
+  };
 
   return (
     // Wrapper is always mounted so the slide-out can animate. When
@@ -187,33 +215,54 @@ export function NodeSidePanel({ onChange }: Props) {
         </div>
 
         {/* Body — scrollable so long virtual model edits don't push
-            the action buttons off-screen. */}
+            the action buttons off-screen. We key the inner panel by
+            (mode + node id) so opening a fresh create form resets
+            local state cleanly between opens; otherwise React would
+            hold onto a previous draft because the same component
+            instance is being reused. */}
         <div className="flex-1 overflow-auto px-4 py-4">
-          {node?.type === "regexRoute" && (
+          {isCreate && resolvedType === "regexRoute" && (
             <RegexRoutePanel
+              key="create-regex"
+              onChange={onChange}
+              onClose={close}
+            />
+          )}
+          {isCreate && resolvedType === "virtualModel" && (
+            <VirtualModelPanel
+              key="create-virtual"
+              onChange={onChange}
+              onClose={close}
+            />
+          )}
+          {!isCreate && node?.type === "regexRoute" && (
+            <RegexRoutePanel
+              key={`edit-${node.id}`}
               route={(node.data as unknown as RegexNodeData).route}
               onChange={onChange}
               onClose={close}
             />
           )}
-          {node?.type === "virtualModel" && (
+          {!isCreate && node?.type === "virtualModel" && (
             <VirtualModelPanel
+              key={`edit-${node.id}`}
               model={(node.data as unknown as VirtualModelNodeData).model}
               onChange={onChange}
               onClose={close}
             />
           )}
-          {node?.type === "provider" && (
+          {!isCreate && node?.type === "provider" && (
             <ProviderPanel
               data={node.data as unknown as ProviderNodeData}
               nodeId={node.id}
             />
           )}
-          {(node?.type === "source" || node?.type === "fallback") && (
-            <div className="text-xs text-muted-foreground">
-              {t("graph.synthetic")}
-            </div>
-          )}
+          {!isCreate &&
+            (node?.type === "source" || node?.type === "fallback") && (
+              <div className="text-xs text-muted-foreground">
+                {t("graph.synthetic")}
+              </div>
+            )}
         </div>
       </div>
     </div>

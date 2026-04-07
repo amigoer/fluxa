@@ -19,7 +19,10 @@ import {
 import { useT } from "@/lib/i18n";
 
 interface Props {
-  model: VirtualModel;
+  // Undefined = create mode: form starts blank with one default
+  // route, name field is editable, no Delete button. Defined = edit
+  // mode: form starts from the supplied row, name is read-only.
+  model?: VirtualModel;
   onChange: () => void | Promise<void>;
   onClose: () => void;
 }
@@ -38,12 +41,32 @@ const emptyRoute = (currentTotal = 0): VirtualModelRoute => ({
   enabled: true,
 });
 
+// EMPTY_VM seeds a brand-new virtual model with one route at 100%, so
+// the initial state is already valid (sum equals 100). The operator
+// just types a name and a target.
+const EMPTY_VM: VirtualModel = {
+  name: "",
+  description: "",
+  enabled: true,
+  routes: [
+    {
+      weight: 100,
+      target_type: "real",
+      target_model: "",
+      provider: "",
+      enabled: true,
+    },
+  ],
+};
+
 export function VirtualModelPanel({ model, onChange, onClose }: Props) {
   const { t } = useT();
-  const [form, setForm] = useState<VirtualModel>({
-    ...model,
-    routes: model.routes.map((r) => ({ ...r })),
-  });
+  const isCreate = !model;
+  const [form, setForm] = useState<VirtualModel>(
+    model
+      ? { ...model, routes: model.routes.map((r) => ({ ...r })) }
+      : { ...EMPTY_VM, routes: EMPTY_VM.routes.map((r) => ({ ...r })) },
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,7 +136,12 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
 
       <div className="space-y-2">
         <Label className="text-xs">{t("graph.field.name")}</Label>
-        <Input value={form.name} disabled />
+        <Input
+          value={form.name}
+          disabled={!isCreate}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          placeholder={isCreate ? "qwen-latest" : undefined}
+        />
       </div>
 
       <div className="space-y-2">
@@ -223,11 +251,22 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
 
       <div className="flex gap-2 pt-2">
         <Button onClick={save} disabled={saving} size="sm" className="flex-1">
-          {saving ? t("graph.action.saving") : t("graph.action.save")}
+          {saving
+            ? t("graph.action.saving")
+            : isCreate
+              ? t("graph.action.create")
+              : t("graph.action.save")}
         </Button>
-        <Button onClick={remove} disabled={saving} size="sm" variant="destructive">
-          {t("graph.action.delete")}
-        </Button>
+        {!isCreate && (
+          <Button
+            onClick={remove}
+            disabled={saving}
+            size="sm"
+            variant="destructive"
+          >
+            {t("graph.action.delete")}
+          </Button>
+        )}
       </div>
     </div>
   );
