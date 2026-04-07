@@ -12,6 +12,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"regexp"
+	"sort"
 	"sync"
 
 	"github.com/amigoer/fluxa/internal/adapter/anthropic"
@@ -21,14 +24,36 @@ import (
 	"github.com/amigoer/fluxa/internal/adapter/openai"
 	"github.com/amigoer/fluxa/internal/config"
 	"github.com/amigoer/fluxa/internal/provider"
+	"github.com/amigoer/fluxa/internal/store"
 )
 
 // Router resolves a model to an ordered slice of Providers (primary then
 // fallbacks). The internal state is protected by an RWMutex so Reload can
 // swap the provider and route tables while requests are in flight.
+//
+// The store + logger fields are optional. They are only used by the
+// v2.4 ReloadVirtualModels / ReloadRegexRoutes helpers; older callers
+// that just use Reload(providers, routes) work without ever wiring
+// them up.
 type Router struct {
-	mu    sync.RWMutex
-	state *state
+	mu     sync.RWMutex
+	state  *state
+	store  *store.Store
+	logger *slog.Logger
+}
+
+// SetStore wires the persistence layer the v2.4 reload helpers read
+// from. Production code calls this once at boot; tests that only
+// exercise Reload(providers, routes) can leave it unset.
+func (r *Router) SetStore(s *store.Store) { r.store = s }
+
+// SetLogger installs a slog handler for warning emissions during
+// reload (e.g. a regex pattern that fails to compile). Defaults to
+// the package slog default when unset.
+func (r *Router) SetLogger(l *slog.Logger) {
+	if l != nil {
+		r.logger = l
+	}
 }
 
 // state is the immutable snapshot swapped in on every Reload. Reads grab a
@@ -41,6 +66,49 @@ type state struct {
 	// a model that has no explicit route. When empty, unknown models are
 	// rejected. Configured via the first route with model "*".
 	catchAll []string
+
+	// virtualModels and regexRoutes are populated from a separate
+	// store reload (see ReloadVirtualModels / ReloadRegexRoutes). The
+	// model resolver in model_resolver.go consults them before falling
+	// through to the legacy lookup above. Both fields default to nil
+	// on a fresh router so the v2.4 features are strictly opt-in: a
+	// gateway with no virtual models and no regex routes behaves
+	// exactly like v2.3.
+	virtualModels map[string]*VirtualModel
+	regexRoutes   []*CompiledRegexRoute
+}
+
+// VirtualModel is the in-memory shape of a v2.4 virtual model after
+// store reload. It carries only the fields the resolver needs — no
+// timestamps, no description — to keep request-path allocations
+// minimal. The Routes slice already filters out disabled rows; the
+// resolver does not have to re-check Enabled per request.
+type VirtualModel struct {
+	ID     string
+	Name   string
+	Routes []VirtualModelRoute
+}
+
+// VirtualModelRoute is one weighted target inside a VirtualModel.
+type VirtualModelRoute struct {
+	Weight      int
+	TargetType  string // "real" | "virtual"
+	TargetModel string
+	Provider    string // populated when TargetType == "real"
+}
+
+// CompiledRegexRoute is one regex_routes row with its pattern
+// pre-compiled. The compile happens at reload time, not in the
+// request path, so request-side resolution is a tight loop of
+// MatchString calls and nothing else.
+type CompiledRegexRoute struct {
+	ID          string
+	Pattern     *regexp.Regexp
+	PatternRaw  string
+	Priority    int
+	TargetType  string
+	TargetModel string
+	Provider    string
 }
 
 // New returns an empty Router. Callers must invoke Reload before handling
@@ -82,10 +150,153 @@ func (r *Router) Reload(providers []config.ProviderConfig, routes []config.Route
 		next.routes[route.Model] = chain
 	}
 
+	// Preserve any v2.4 alias/regex tables that were loaded earlier:
+	// Reload only knows about the providers/routes config slice, but
+	// the virtual model and regex route tables live in their own
+	// store helpers and reload independently. Carrying the previous
+	// state forward keeps "operator edits a provider" from
+	// accidentally clearing the alias table.
 	r.mu.Lock()
+	if r.state != nil {
+		next.virtualModels = r.state.virtualModels
+		next.regexRoutes = r.state.regexRoutes
+	}
 	r.state = next
 	r.mu.Unlock()
 	return nil
+}
+
+// ReloadVirtualModels rebuilds the in-memory virtual model index from
+// the store. It is called once at startup and after every admin write
+// to the virtual_models / virtual_model_routes tables. The function
+// is a no-op if SetStore was never called, which keeps unit tests
+// that hand-build a Router happy.
+//
+// The function copies the previous snapshot's other fields verbatim
+// so a virtual-model edit cannot accidentally clear providers,
+// routes, or regex_routes loaded by the other reload paths.
+func (r *Router) ReloadVirtualModels(ctx context.Context) error {
+	if r.store == nil {
+		return nil
+	}
+	rows, err := r.store.ListVirtualModels(ctx)
+	if err != nil {
+		return fmt.Errorf("router: load virtual models: %w", err)
+	}
+	index := make(map[string]*VirtualModel, len(rows))
+	for _, row := range rows {
+		if !row.Enabled {
+			// A disabled parent is invisible to the resolver but
+			// still visible in the dashboard. Skip it here so the
+			// resolver does not need to re-check on every request.
+			continue
+		}
+		vm := &VirtualModel{ID: row.ID, Name: row.Name}
+		for _, rt := range row.Routes {
+			if !rt.Enabled {
+				continue
+			}
+			vm.Routes = append(vm.Routes, VirtualModelRoute{
+				Weight:      rt.Weight,
+				TargetType:  rt.TargetType,
+				TargetModel: rt.TargetModel,
+				Provider:    rt.Provider,
+			})
+		}
+		// A parent with zero enabled routes is unresolvable; surface
+		// it as missing rather than picking a random nil. The dashboard
+		// can render it as a warning.
+		if len(vm.Routes) == 0 {
+			continue
+		}
+		index[row.Name] = vm
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	next := r.copyStateLocked()
+	next.virtualModels = index
+	r.state = next
+	return nil
+}
+
+// ReloadRegexRoutes rebuilds the in-memory regex route slice from the
+// store, sorted by priority ASC. Patterns that fail to compile are
+// skipped with a warning so a single bad row cannot brick the whole
+// router; the dashboard's create endpoint already validates the
+// pattern at write time, so this is a defence-in-depth path for
+// imported / hand-edited rows.
+func (r *Router) ReloadRegexRoutes(ctx context.Context) error {
+	if r.store == nil {
+		return nil
+	}
+	rows, err := r.store.ListRegexRoutes(ctx)
+	if err != nil {
+		return fmt.Errorf("router: load regex routes: %w", err)
+	}
+	out := make([]*CompiledRegexRoute, 0, len(rows))
+	for _, row := range rows {
+		if !row.Enabled {
+			continue
+		}
+		re, cerr := regexp.Compile(row.Pattern)
+		if cerr != nil {
+			r.warn("regex route compile failed, skipping",
+				"id", row.ID, "pattern", row.Pattern, "err", cerr)
+			continue
+		}
+		out = append(out, &CompiledRegexRoute{
+			ID:          row.ID,
+			Pattern:     re,
+			PatternRaw:  row.Pattern,
+			Priority:    row.Priority,
+			TargetType:  row.TargetType,
+			TargetModel: row.TargetModel,
+			Provider:    row.Provider,
+		})
+	}
+	// Stable sort so equal-priority rows preserve insertion order
+	// from the store (which is created_at ASC).
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Priority < out[j].Priority
+	})
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	next := r.copyStateLocked()
+	next.regexRoutes = out
+	r.state = next
+	return nil
+}
+
+// copyStateLocked returns a shallow clone of the current state. The
+// caller must already hold r.mu (write lock). The clone is needed so
+// independent reload paths can swap their slice/map without racing
+// each other through r.state.
+func (r *Router) copyStateLocked() *state {
+	if r.state == nil {
+		return &state{
+			providers: map[string]provider.Provider{},
+			routes:    map[string][]string{},
+		}
+	}
+	return &state{
+		providers:     r.state.providers,
+		routes:        r.state.routes,
+		catchAll:      r.state.catchAll,
+		virtualModels: r.state.virtualModels,
+		regexRoutes:   r.state.regexRoutes,
+	}
+}
+
+// warn emits a slog warning, falling back to the package default if
+// no logger has been wired in. Pulled out so the reload paths stay
+// readable.
+func (r *Router) warn(msg string, args ...any) {
+	logger := r.logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Warn(msg, args...)
 }
 
 // snapshot returns the current immutable state. Callers must treat the
