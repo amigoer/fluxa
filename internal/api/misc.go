@@ -64,3 +64,25 @@ func boolToStatus(ok bool) string {
 	}
 	return "degraded"
 }
+
+// rewriteModelField returns a copy of body with the top-level "model"
+// field replaced. The pre-resolver may have rewritten the requested
+// model name (virtual model fan-out, regex interception), and we need
+// the upstream provider to see the resolved name rather than the
+// original alias. Round-tripping through json.Unmarshal/Marshal would
+// destroy field ordering and re-serialise nested structures, so we use
+// a typed shim with json.RawMessage everywhere except the model field.
+// This keeps the rewrite a single string swap and leaves the rest of
+// the payload byte-identical to what the client sent.
+func rewriteModelField(body []byte, newModel string) ([]byte, error) {
+	var generic map[string]json.RawMessage
+	if err := json.Unmarshal(body, &generic); err != nil {
+		return nil, err
+	}
+	encoded, err := json.Marshal(newModel)
+	if err != nil {
+		return nil, err
+	}
+	generic["model"] = encoded
+	return json.Marshal(generic)
+}

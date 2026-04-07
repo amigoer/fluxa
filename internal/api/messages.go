@@ -42,13 +42,37 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chain, err := s.router.Resolve(peek.Model)
+	// v2.4 pre-resolver: same pipeline as /v1/chat/completions. See
+	// chat.go for the full reasoning; in short the resolver may rewrite
+	// the requested model name and pin a provider before the legacy
+	// chain lookup runs.
+	target, _, err := s.router.ResolveModel(peek.Model)
+	if err != nil {
+		s.writeError(w, err)
+		return
+	}
+	effectiveModel := peek.Model
+	var chain []provider.Provider
+	if target != nil {
+		effectiveModel = target.Model
+		chain, err = s.router.ResolveTargetChain(target)
+	} else {
+		chain, err = s.router.Resolve(peek.Model)
+	}
 	if err != nil {
 		s.writeError(w, err)
 		return
 	}
 
-	req := &provider.MessagesRequest{Model: peek.Model, Raw: body}
+	if effectiveModel != peek.Model {
+		body, err = rewriteModelField(body, effectiveModel)
+		if err != nil {
+			s.writeError(w, &provider.Error{Status: http.StatusInternalServerError, Message: "rewrite model: " + err.Error()})
+			return
+		}
+	}
+
+	req := &provider.MessagesRequest{Model: effectiveModel, Raw: body}
 	if peek.Stream {
 		s.streamMessages(w, r, chain, req, keyID)
 		return

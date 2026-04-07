@@ -42,14 +42,42 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chain, err := s.router.Resolve(peek.Model)
+	// v2.4 pre-resolver: virtual_models / regex_routes can rewrite the
+	// incoming model name (and optionally pin a provider) before the
+	// legacy provider chain lookup runs. A nil target means the resolver
+	// declined to intervene and we should use peek.Model verbatim.
+	target, _, err := s.router.ResolveModel(peek.Model)
+	if err != nil {
+		s.writeError(w, err)
+		return
+	}
+	effectiveModel := peek.Model
+	var chain []provider.Provider
+	if target != nil {
+		effectiveModel = target.Model
+		chain, err = s.router.ResolveTargetChain(target)
+	} else {
+		chain, err = s.router.Resolve(peek.Model)
+	}
 	if err != nil {
 		s.writeError(w, err)
 		return
 	}
 
+	// Rewrite the request body so the upstream sees the resolved model
+	// name. We only touch the "model" field — every other field stays
+	// byte-for-byte identical so streaming/tool-call payloads are not
+	// disturbed.
+	if effectiveModel != peek.Model {
+		body, err = rewriteModelField(body, effectiveModel)
+		if err != nil {
+			s.writeError(w, &provider.Error{Status: http.StatusInternalServerError, Message: "rewrite model: " + err.Error()})
+			return
+		}
+	}
+
 	req := &provider.ChatRequest{
-		Model:  peek.Model,
+		Model:  effectiveModel,
 		Stream: peek.Stream,
 		Raw:    body,
 	}

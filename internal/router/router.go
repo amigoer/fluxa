@@ -370,6 +370,28 @@ func (r *Router) Resolve(model string) ([]provider.Provider, error) {
 	return out, nil
 }
 
+// ResolveTargetChain converts a *ResolvedTarget produced by ResolveModel
+// into a provider chain. If the target carries an explicit Provider, the
+// chain has exactly that provider with no fallbacks (operators who want
+// the resolver to override the legacy fallback chain are choosing
+// determinism over redundancy). If Provider is empty, the resolver only
+// rewrote the model name, and we fall through to the legacy Resolve()
+// chain for that model so any fallback list still applies.
+func (r *Router) ResolveTargetChain(target *ResolvedTarget) ([]provider.Provider, error) {
+	if target == nil {
+		return nil, fmt.Errorf("router: nil target")
+	}
+	if target.Provider == "" {
+		return r.Resolve(target.Model)
+	}
+	s := r.snapshot()
+	p, ok := s.providers[target.Provider]
+	if !ok {
+		return nil, fmt.Errorf("router: resolver target references unknown provider %q", target.Provider)
+	}
+	return []provider.Provider{p}, nil
+}
+
 // providersServing returns the names of providers whose static model list
 // contains the given model. Order is non-deterministic so callers that need
 // stability should declare an explicit route.
