@@ -76,7 +76,9 @@ type ProviderConfig struct {
 
 // RouteConfig maps a model identifier to a primary provider plus
 // an ordered list of fallback providers used when the primary
-// fails.
+// fails. The "stable alias" use case (one caller-facing name that
+// rolls across multiple real model versions) is owned by
+// virtual_models, not by RouteConfig.
 type RouteConfig struct {
 	Model    string   `yaml:"model"`
 	Provider string   `yaml:"provider"`

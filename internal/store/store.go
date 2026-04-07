@@ -49,7 +49,10 @@ type Provider struct {
 	UpdatedAt    time.Time
 }
 
-// Route mirrors the routes table row.
+// Route mirrors the routes table row. It is the persistent form of a
+// "this user-facing model name → that provider, with these fallbacks"
+// rule. The richer "alias under multiple real models with weighted
+// traffic split" use case is served by virtual_models, not by Route.
 type Route struct {
 	Model     string
 	Provider  string
@@ -108,11 +111,11 @@ func (s *Store) migrate(ctx context.Context) error {
 			updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS routes (
-			model       TEXT PRIMARY KEY,
-			provider    TEXT NOT NULL,
-			fallback    TEXT NOT NULL DEFAULT '[]',
-			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			model           TEXT PRIMARY KEY,
+			provider        TEXT NOT NULL,
+			fallback        TEXT NOT NULL DEFAULT '[]',
+			created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (provider) REFERENCES providers(name) ON UPDATE CASCADE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_routes_provider ON routes(provider)`,

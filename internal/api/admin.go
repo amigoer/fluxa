@@ -207,7 +207,11 @@ func toRouteDTO(r store.Route) routeDTO {
 }
 
 func fromRouteDTO(dto routeDTO) store.Route {
-	return store.Route{Model: dto.Model, Provider: dto.Provider, Fallback: dto.Fallback}
+	return store.Route{
+		Model:    dto.Model,
+		Provider: dto.Provider,
+		Fallback: dto.Fallback,
+	}
 }
 
 // -- provider handlers --------------------------------------------------

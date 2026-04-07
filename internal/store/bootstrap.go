@@ -81,7 +81,11 @@ func FromConfigProvider(pc config.ProviderConfig) Provider {
 
 // FromConfigRoute is the inverse of ToConfigRoutes for a single row.
 func FromConfigRoute(rc config.RouteConfig) Route {
-	return Route{Model: rc.Model, Provider: rc.Provider, Fallback: rc.Fallback}
+	return Route{
+		Model:    rc.Model,
+		Provider: rc.Provider,
+		Fallback: rc.Fallback,
+	}
 }
 
 // Import upserts every provider and route from a YAML bundle into the
