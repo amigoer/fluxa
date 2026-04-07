@@ -239,7 +239,6 @@ function Shell() {
               <button
                 key={n.id}
                 onClick={() => setTab(n.id)}
-                title={collapsed ? label : undefined}
                 aria-label={label}
                 className={cn(
                   "group relative flex items-center rounded-md text-sm transition-colors",
@@ -272,6 +271,12 @@ function Shell() {
                   )}
                 />
                 {!collapsed && label}
+                {/* Hover tooltip — only meaningful in collapsed mode
+                    where the label would otherwise be invisible. The
+                    span is absolutely positioned so it escapes the
+                    9x9 button box and renders to the right of the
+                    sidebar without disturbing layout. */}
+                {collapsed && <SidebarTooltip label={label} />}
               </button>
             );
           })}
@@ -366,9 +371,9 @@ function Shell() {
 }
 
 // SidebarIconAction is the compact icon-only button used in the
-// sidebar footer. It always renders as a 8x8 square with a native
-// tooltip; the layout (stacked when collapsed, evenly distributed
-// inside the user card when expanded) is the caller's responsibility.
+// sidebar footer. It always renders as a 8x8 square; because it has no
+// visible label in either collapsed or expanded mode, it always shows
+// a hover tooltip so the operator can tell what each glyph does.
 function SidebarIconAction({
   icon: Icon,
   label,
@@ -381,13 +386,29 @@ function SidebarIconAction({
   return (
     <button
       type="button"
-      title={label}
       aria-label={label}
       onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className="group relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
       <Icon className="h-4 w-4" />
+      <SidebarTooltip label={label} />
     </button>
+  );
+}
+
+// SidebarTooltip is a CSS-only hover hint that floats to the right of
+// its parent button. The parent must be `relative group` so that the
+// `group-hover` selector + `left-full` positioning work; we keep it
+// pointer-events-none and z-50 so it never blocks clicks and always
+// renders above adjacent rows. Using a custom tooltip (rather than the
+// browser's `title` attribute) lets us match the dashboard's font and
+// theming, and crucially shows up instantly instead of after the OS's
+// ~1s delay — important when scanning a column of unfamiliar icons.
+function SidebarTooltip({ label }: { label: string }) {
+  return (
+    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border/60 bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+      {label}
+    </span>
   );
 }
 
