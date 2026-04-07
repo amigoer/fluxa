@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RegexRoutes, type RegexRoute } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   route: RegexRoute;
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function RegexRoutePanel({ route, onChange, onClose }: Props) {
+  const { t } = useT();
   // Local form state — copied from props on mount; we never reach back
   // into props during edits because the side panel is the source of
   // truth until the user saves.
@@ -41,7 +43,7 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
       await onChange();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("graph.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -49,7 +51,7 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
 
   async function remove() {
     if (!form.id) return;
-    if (!confirm("Delete this regex route?")) return;
+    if (!confirm(t("graph.confirm.deleteRegex"))) return;
     setSaving(true);
     setError(null);
     try {
@@ -57,7 +59,7 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
       await onChange();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      setError(err instanceof Error ? err.message : t("graph.errors.delete"));
     } finally {
       setSaving(false);
     }
@@ -66,9 +68,9 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold">Regex Route</h3>
+        <h3 className="text-sm font-semibold">{t("graph.panel.regexTitle")}</h3>
         <p className="text-xs text-muted-foreground">
-          Intercepts incoming model names by regex.
+          {t("graph.panel.regexSubtitle")}
         </p>
       </div>
 
@@ -79,7 +81,7 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
       )}
 
       <div className="space-y-2">
-        <Label className="text-xs">Pattern</Label>
+        <Label className="text-xs">{t("graph.field.pattern")}</Label>
         <Input
           value={form.pattern}
           onChange={(e) => setForm({ ...form, pattern: e.target.value })}
@@ -89,7 +91,7 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label className="text-xs">Priority</Label>
+          <Label className="text-xs">{t("graph.field.priority")}</Label>
           <Input
             type="number"
             value={form.priority}
@@ -97,7 +99,7 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-xs">Target type</Label>
+          <Label className="text-xs">{t("graph.field.targetType")}</Label>
           <select
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
             value={form.target_type}
@@ -105,14 +107,14 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
               setForm({ ...form, target_type: e.target.value as "real" | "virtual" })
             }
           >
-            <option value="virtual">virtual</option>
-            <option value="real">real</option>
+            <option value="virtual">{t("graph.targetType.virtual")}</option>
+            <option value="real">{t("graph.targetType.real")}</option>
           </select>
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs">Target model</Label>
+        <Label className="text-xs">{t("graph.field.targetModel")}</Label>
         <Input
           value={form.target_model}
           onChange={(e) => setForm({ ...form, target_model: e.target.value })}
@@ -121,7 +123,7 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
 
       {form.target_type === "real" && (
         <div className="space-y-2">
-          <Label className="text-xs">Provider</Label>
+          <Label className="text-xs">{t("graph.field.provider")}</Label>
           <Input
             value={form.provider ?? ""}
             onChange={(e) => setForm({ ...form, provider: e.target.value })}
@@ -130,7 +132,7 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
       )}
 
       <div className="space-y-2">
-        <Label className="text-xs">Description</Label>
+        <Label className="text-xs">{t("graph.field.description")}</Label>
         <Textarea
           value={form.description ?? ""}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -144,15 +146,15 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
           checked={form.enabled ?? true}
           onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
         />
-        Enabled
+        {t("graph.field.enabled")}
       </label>
 
       <div className="flex gap-2 pt-2">
         <Button onClick={save} disabled={saving} size="sm" className="flex-1">
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("graph.action.saving") : t("graph.action.save")}
         </Button>
         <Button onClick={remove} disabled={saving} size="sm" variant="destructive">
-          Delete
+          {t("graph.action.delete")}
         </Button>
       </div>
     </div>

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
 import { RegexRoutes, VirtualModels } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export function GraphToolbar({ onLayout, onChange }: Props) {
+  const { t } = useT();
   const liveMode = useRouteGraphStore((s) => s.liveMode);
   const toggleLiveMode = useRouteGraphStore((s) => s.toggleLiveMode);
   const { fitView } = useReactFlow();
@@ -47,14 +49,19 @@ export function GraphToolbar({ onLayout, onChange }: Props) {
     <>
       <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/95 backdrop-blur px-2 py-1.5 shadow-sm">
         <Button size="sm" variant="ghost" onClick={() => setShowRegex(true)}>
-          <RegexIcon className="h-3.5 w-3.5" /> Regex Route
+          <RegexIcon className="h-3.5 w-3.5" /> {t("graph.toolbar.regex")}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setShowVm(true)}>
-          <GitBranch className="h-3.5 w-3.5" /> Virtual Model
+          <GitBranch className="h-3.5 w-3.5" /> {t("graph.toolbar.virtual")}
         </Button>
         <div className="h-4 w-px bg-border" />
-        <Button size="sm" variant="ghost" onClick={onLayout} title="Re-run auto layout">
-          <RefreshCw className="h-3.5 w-3.5" /> Auto Layout
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onLayout}
+          title={t("graph.toolbar.autoLayoutTitle")}
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> {t("graph.toolbar.autoLayout")}
         </Button>
         <div className="h-4 w-px bg-border" />
         <Button
@@ -69,11 +76,11 @@ export function GraphToolbar({ onLayout, onChange }: Props) {
               <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
             )}
           </span>
-          Live
+          {t("graph.toolbar.live")}
         </Button>
         <div className="h-4 w-px bg-border" />
         <Button size="sm" variant="ghost" onClick={() => fitView({ duration: 300 })}>
-          <Maximize2 className="h-3.5 w-3.5" /> Fit View
+          <Maximize2 className="h-3.5 w-3.5" /> {t("graph.toolbar.fitView")}
         </Button>
       </div>
 
@@ -104,6 +111,7 @@ function CreateRegexDialog({
   onClose: () => void;
   onChange: () => void | Promise<void>;
 }) {
+  const { t } = useT();
   const [pattern, setPattern] = useState("");
   const [priority, setPriority] = useState(100);
   const [targetType, setTargetType] = useState<"real" | "virtual">("virtual");
@@ -134,7 +142,7 @@ function CreateRegexDialog({
       await onChange();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(err instanceof Error ? err.message : t("graph.errors.create"));
     } finally {
       setSaving(false);
     }
@@ -144,7 +152,7 @@ function CreateRegexDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New regex route</DialogTitle>
+          <DialogTitle>{t("graph.dialog.newRegex")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           {error && (
@@ -153,11 +161,11 @@ function CreateRegexDialog({
             </div>
           )}
           <div className="space-y-2">
-            <Label className="text-xs">Pattern</Label>
+            <Label className="text-xs">{t("graph.field.pattern")}</Label>
             <Input
               value={pattern}
               onChange={(e) => setPattern(e.target.value)}
-              placeholder="^gpt-4.*"
+              placeholder={t("graph.dialog.patternPlaceholder")}
               className="font-mono"
               required
               autoFocus
@@ -165,7 +173,7 @@ function CreateRegexDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-xs">Priority</Label>
+              <Label className="text-xs">{t("graph.field.priority")}</Label>
               <Input
                 type="number"
                 value={priority}
@@ -174,7 +182,7 @@ function CreateRegexDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Target type</Label>
+              <Label className="text-xs">{t("graph.field.targetType")}</Label>
               <select
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
                 value={targetType}
@@ -182,13 +190,13 @@ function CreateRegexDialog({
                   setTargetType(e.target.value as "real" | "virtual")
                 }
               >
-                <option value="virtual">virtual</option>
-                <option value="real">real</option>
+                <option value="virtual">{t("graph.targetType.virtual")}</option>
+                <option value="real">{t("graph.targetType.real")}</option>
               </select>
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Target model</Label>
+            <Label className="text-xs">{t("graph.field.targetModel")}</Label>
             <Input
               value={targetModel}
               onChange={(e) => setTargetModel(e.target.value)}
@@ -197,7 +205,7 @@ function CreateRegexDialog({
           </div>
           {targetType === "real" && (
             <div className="space-y-2">
-              <Label className="text-xs">Provider</Label>
+              <Label className="text-xs">{t("graph.field.provider")}</Label>
               <Input
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
@@ -208,11 +216,11 @@ function CreateRegexDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                Cancel
+                {t("graph.action.cancel")}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Create"}
+              {saving ? t("graph.action.saving") : t("graph.action.create")}
             </Button>
           </DialogFooter>
         </form>
@@ -233,6 +241,7 @@ function CreateVirtualModelDialog({
   onClose: () => void;
   onChange: () => void | Promise<void>;
 }) {
+  const { t } = useT();
   const [name, setName] = useState("");
   const [targetModel, setTargetModel] = useState("");
   const [provider, setProvider] = useState("");
@@ -263,7 +272,7 @@ function CreateVirtualModelDialog({
       await onChange();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(err instanceof Error ? err.message : t("graph.errors.create"));
     } finally {
       setSaving(false);
     }
@@ -273,7 +282,7 @@ function CreateVirtualModelDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New virtual model</DialogTitle>
+          <DialogTitle>{t("graph.dialog.newVirtual")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           {error && (
@@ -282,44 +291,44 @@ function CreateVirtualModelDialog({
             </div>
           )}
           <div className="space-y-2">
-            <Label className="text-xs">Name</Label>
+            <Label className="text-xs">{t("graph.field.name")}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="qwen-latest"
+              placeholder={t("graph.dialog.namePlaceholder")}
               required
               autoFocus
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Initial target model</Label>
+            <Label className="text-xs">{t("graph.field.initialTarget")}</Label>
             <Input
               value={targetModel}
               onChange={(e) => setTargetModel(e.target.value)}
-              placeholder="qwen3-72b-instruct"
+              placeholder={t("graph.dialog.targetPlaceholder")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Provider</Label>
+            <Label className="text-xs">{t("graph.field.provider")}</Label>
             <Input
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
-              placeholder="qwen"
+              placeholder={t("graph.dialog.providerPlaceholder")}
               required
             />
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Add more weighted targets later from the side panel.
+            {t("graph.dialog.virtualHint")}
           </p>
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                Cancel
+                {t("graph.action.cancel")}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Create"}
+              {saving ? t("graph.action.saving") : t("graph.action.create")}
             </Button>
           </DialogFooter>
         </form>

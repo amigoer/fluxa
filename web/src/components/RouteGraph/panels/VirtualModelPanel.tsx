@@ -16,6 +16,7 @@ import {
   type VirtualModel,
   type VirtualModelRoute,
 } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   model: VirtualModel;
@@ -32,6 +33,7 @@ const emptyRoute = (): VirtualModelRoute => ({
 });
 
 export function VirtualModelPanel({ model, onChange, onClose }: Props) {
+  const { t } = useT();
   const [form, setForm] = useState<VirtualModel>({
     ...model,
     routes: model.routes.map((r) => ({ ...r })),
@@ -53,7 +55,7 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
 
   async function save() {
     if (form.routes.length === 0) {
-      setError("Add at least one route");
+      setError(t("graph.routes.empty"));
       return;
     }
     setSaving(true);
@@ -74,14 +76,14 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
       await onChange();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("graph.errors.save"));
     } finally {
       setSaving(false);
     }
   }
 
   async function remove() {
-    if (!confirm(`Delete virtual model "${form.name}"?`)) return;
+    if (!confirm(t("graph.confirm.deleteVirtual", { name: form.name }))) return;
     setSaving(true);
     setError(null);
     try {
@@ -89,7 +91,7 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
       await onChange();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      setError(err instanceof Error ? err.message : t("graph.errors.delete"));
     } finally {
       setSaving(false);
     }
@@ -98,9 +100,9 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold">Virtual Model</h3>
+        <h3 className="text-sm font-semibold">{t("graph.panel.virtualTitle")}</h3>
         <p className="text-xs text-muted-foreground">
-          Alias with weighted fanout to one or more targets.
+          {t("graph.panel.virtualSubtitle")}
         </p>
       </div>
 
@@ -111,12 +113,12 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
       )}
 
       <div className="space-y-2">
-        <Label className="text-xs">Name</Label>
+        <Label className="text-xs">{t("graph.field.name")}</Label>
         <Input value={form.name} disabled />
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs">Description</Label>
+        <Label className="text-xs">{t("graph.field.description")}</Label>
         <Textarea
           value={form.description ?? ""}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -130,12 +132,12 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
           checked={form.enabled ?? true}
           onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
         />
-        Enabled
+        {t("graph.field.enabled")}
       </label>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs">Routes</Label>
+          <Label className="text-xs">{t("graph.field.routes")}</Label>
           <Button
             type="button"
             variant="outline"
@@ -144,13 +146,13 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
               setForm({ ...form, routes: [...form.routes, emptyRoute()] })
             }
           >
-            <Plus className="h-3 w-3" /> Add
+            <Plus className="h-3 w-3" /> {t("graph.field.add")}
           </Button>
         </div>
 
         {totalWeight !== 100 && totalWeight > 0 && (
           <div className="text-[10px] text-amber-600 dark:text-amber-400">
-            Weights sum to {totalWeight} (not 100). Traffic still splits proportionally.
+            {t("graph.weights.warning", { total: totalWeight })}
           </div>
         )}
 
@@ -169,7 +171,7 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
                     patchRoute(idx, { weight: Number(e.target.value) })
                   }
                   className="w-16"
-                  placeholder="w"
+                  placeholder={t("graph.field.weightPlaceholder")}
                 />
                 <select
                   className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm"
@@ -180,8 +182,8 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
                     })
                   }
                 >
-                  <option value="real">real</option>
-                  <option value="virtual">virtual</option>
+                  <option value="real">{t("graph.targetType.real")}</option>
+                  <option value="virtual">{t("graph.targetType.virtual")}</option>
                 </select>
                 <Button
                   type="button"
@@ -201,14 +203,14 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
               <Input
                 value={r.target_model}
                 onChange={(e) => patchRoute(idx, { target_model: e.target.value })}
-                placeholder="target model"
+                placeholder={t("graph.field.targetPlaceholder")}
                 className="text-xs"
               />
               {r.target_type === "real" && (
                 <Input
                   value={r.provider ?? ""}
                   onChange={(e) => patchRoute(idx, { provider: e.target.value })}
-                  placeholder="provider"
+                  placeholder={t("graph.field.providerPlaceholder")}
                   className="text-xs"
                 />
               )}
@@ -219,10 +221,10 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
 
       <div className="flex gap-2 pt-2">
         <Button onClick={save} disabled={saving} size="sm" className="flex-1">
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("graph.action.saving") : t("graph.action.save")}
         </Button>
         <Button onClick={remove} disabled={saving} size="sm" variant="destructive">
-          Delete
+          {t("graph.action.delete")}
         </Button>
       </div>
     </div>

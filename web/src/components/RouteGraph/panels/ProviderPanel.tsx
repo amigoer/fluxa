@@ -6,6 +6,7 @@
 
 import { useMemo } from "react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
+import { useT } from "@/lib/i18n";
 import type { ProviderNodeData } from "../utils/buildGraph";
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function ProviderPanel({ data, nodeId }: Props) {
+  const { t } = useT();
   const liveMode = useRouteGraphStore((s) => s.liveMode);
   const liveStats = useRouteGraphStore((s) => s.liveStats);
   const edges = useRouteGraphStore((s) => s.edges);
@@ -42,30 +44,30 @@ export function ProviderPanel({ data, nodeId }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold">Provider</h3>
+        <h3 className="text-sm font-semibold">{t("graph.panel.providerTitle")}</h3>
         <p className="text-xs text-muted-foreground">
-          Concrete upstream endpoint (read-only here).
+          {t("graph.panel.providerSubtitle")}
         </p>
       </div>
 
       <dl className="space-y-2 text-xs">
         <div>
-          <dt className="text-muted-foreground">Provider</dt>
+          <dt className="text-muted-foreground">{t("graph.field.provider")}</dt>
           <dd className="font-mono">{data.provider}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Model</dt>
+          <dt className="text-muted-foreground">{t("graph.field.targetModel")}</dt>
           <dd className="font-mono">{data.model}</dd>
         </div>
         {data.config?.kind && (
           <div>
-            <dt className="text-muted-foreground">Kind</dt>
+            <dt className="text-muted-foreground">{t("graph.field.kind")}</dt>
             <dd className="font-mono">{data.config.kind}</dd>
           </div>
         )}
         {data.config?.base_url && (
           <div>
-            <dt className="text-muted-foreground">Base URL</dt>
+            <dt className="text-muted-foreground">{t("graph.field.baseUrl")}</dt>
             <dd className="font-mono break-all">{data.config.base_url}</dd>
           </div>
         )}
@@ -74,23 +76,23 @@ export function ProviderPanel({ data, nodeId }: Props) {
       {liveMode && (
         <div className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-1.5 text-xs">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            Live (last 30s)
+            {t("graph.live.title")}
           </div>
           {summary.hasData ? (
             <>
               <div className="flex justify-between">
-                <span>Throughput</span>
+                <span>{t("graph.live.throughput")}</span>
                 <span className="font-mono">{summary.rps.toFixed(1)} req/s</span>
               </div>
               <div className="flex justify-between">
-                <span>Error rate</span>
+                <span>{t("graph.live.errorRate")}</span>
                 <span className="font-mono">
                   {(summary.errorRate * 100).toFixed(2)}%
                 </span>
               </div>
             </>
           ) : (
-            <div className="text-muted-foreground">no traffic</div>
+            <div className="text-muted-foreground">{t("graph.live.noTraffic")}</div>
           )}
         </div>
       )}

@@ -6,6 +6,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useMemo } from "react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { ProviderNodeData } from "../utils/buildGraph";
 
@@ -31,6 +32,7 @@ export function ProviderNode({
   data,
   selected,
 }: NodeProps & { data: ProviderNodeData }) {
+  const { t } = useT();
   const selectNode = useRouteGraphStore((s) => s.selectNode);
   const liveMode = useRouteGraphStore((s) => s.liveMode);
   const liveStats = useRouteGraphStore((s) => s.liveStats);
@@ -87,7 +89,11 @@ export function ProviderNode({
         </div>
         <div
           className={cn("h-2 w-2 rounded-full shrink-0", dotColor)}
-          title={`status: ${health}`}
+          title={t(`graph.errors.status${health.charAt(0).toUpperCase() + health.slice(1)}` as
+            | "graph.errors.statusOk"
+            | "graph.errors.statusWarn"
+            | "graph.errors.statusDown"
+            | "graph.errors.statusUnknown")}
         />
       </div>
       <Handle type="target" position={Position.Left} className="!h-2 !w-2 !bg-emerald-500 !border-none" />

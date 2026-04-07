@@ -5,6 +5,7 @@
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { RegexNodeData } from "../utils/buildGraph";
 
@@ -13,6 +14,7 @@ export function RegexRouteNode({
   data,
   selected,
 }: NodeProps & { data: RegexNodeData }) {
+  const { t } = useT();
   const selectNode = useRouteGraphStore((s) => s.selectNode);
   const r = data.route;
 
@@ -34,7 +36,7 @@ export function RegexRouteNode({
             "h-2 w-2 shrink-0 rounded-full mt-1",
             r.enabled ? "bg-emerald-500" : "bg-zinc-400",
           )}
-          title={r.enabled ? "enabled" : "disabled"}
+          title={r.enabled ? t("graph.regex.statusEnabled") : t("graph.regex.statusDisabled")}
         />
       </div>
       <div className="mt-2 flex items-center justify-between text-[10px]">

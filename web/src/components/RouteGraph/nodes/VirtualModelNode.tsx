@@ -7,6 +7,7 @@
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { VirtualModelNodeData } from "../utils/buildGraph";
 
@@ -65,6 +66,7 @@ export function VirtualModelNode({
   data,
   selected,
 }: NodeProps & { data: VirtualModelNodeData }) {
+  const { t } = useT();
   const selectNode = useRouteGraphStore((s) => s.selectNode);
   const vm = data.model;
   const weights = vm.routes.map((r) => r.weight || 0);
@@ -83,7 +85,7 @@ export function VirtualModelNode({
           {vm.name}
         </div>
         <span className="text-[10px] uppercase tracking-wide text-purple-600 dark:text-purple-300 shrink-0">
-          virtual
+          {t("graph.virtual.badge")}
         </span>
       </div>
       <div className="mt-2 flex items-center gap-3">
@@ -105,7 +107,7 @@ export function VirtualModelNode({
           ))}
           {vm.routes.length > 4 && (
             <div className="text-purple-500 italic">
-              +{vm.routes.length - 4} more
+              {t("graph.virtual.more", { count: vm.routes.length - 4 })}
             </div>
           )}
         </div>

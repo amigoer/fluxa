@@ -32,6 +32,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { Providers, RegexRoutes, VirtualModels } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { useRouteGraphStore, type EdgeStat } from "@/store/routeGraphStore";
 import { buildGraph } from "./utils/buildGraph";
 import {
@@ -80,6 +81,7 @@ export function RouteGraphPage() {
 }
 
 function RouteGraphInner() {
+  const { t } = useT();
   const nodes = useRouteGraphStore((s) => s.nodes);
   const edges = useRouteGraphStore((s) => s.edges);
   const setGraph = useRouteGraphStore((s) => s.setGraph);
@@ -112,11 +114,11 @@ function RouteGraphInner() {
       setGraph(withStored, laid.edges);
       setEmpty(vms.length === 0 && rxs.length === 0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load graph");
+      setError(err instanceof Error ? err.message : t("graph.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [setGraph]);
+  }, [setGraph, t]);
 
   useEffect(() => {
     void load();
@@ -254,18 +256,14 @@ function RouteGraphInner() {
       {empty && !loading && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="rounded-xl border border-border/60 bg-background/90 backdrop-blur p-6 max-w-sm text-center pointer-events-auto shadow-lg">
-            <div className="text-sm font-semibold mb-1">No routes yet</div>
-            <p className="text-xs text-muted-foreground">
-              Use the toolbar at the top-left to create a regex route or a
-              virtual model. The graph will materialise as soon as you add
-              your first rule.
-            </p>
+            <div className="text-sm font-semibold mb-1">{t("graph.empty.title")}</div>
+            <p className="text-xs text-muted-foreground">{t("graph.empty.hint")}</p>
           </div>
         </div>
       )}
       {loading && nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-          loading routing graph…
+          {t("graph.loading")}
         </div>
       )}
     </div>

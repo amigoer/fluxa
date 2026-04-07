@@ -9,6 +9,7 @@ import {
   getBezierPath,
   type EdgeProps,
 } from "@xyflow/react";
+import { useT } from "@/lib/i18n";
 import type { RouteEdgeData } from "../utils/buildGraph";
 
 export function RouteEdge({
@@ -21,6 +22,7 @@ export function RouteEdge({
   targetPosition,
   data,
 }: EdgeProps & { data?: RouteEdgeData }) {
+  const { t } = useT();
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -30,10 +32,18 @@ export function RouteEdge({
     targetPosition,
   });
 
+  // Resolve the localized label from labelKind. Priority edges keep
+  // the numeric value visible (P{n}) since the number itself carries
+  // information independent of locale.
+  let label: string | undefined;
+  if (data?.labelKind === "matched") label = t("graph.edge.matched");
+  else if (data?.labelKind === "noMatch") label = t("graph.edge.noMatch");
+  else if (data?.labelKind === "priority") label = `P${data.priority ?? 100}`;
+
   return (
     <>
       <BaseEdge id={id} path={path} style={{ stroke: "#94a3b8", strokeWidth: 1.5 }} />
-      {data?.label && (
+      {label && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -43,7 +53,7 @@ export function RouteEdge({
             }}
             className="rounded-sm bg-white/90 dark:bg-zinc-800/90 border border-border/40 px-1.5 py-0 text-[9px] font-mono text-muted-foreground"
           >
-            {data.label}
+            {label}
           </div>
         </EdgeLabelRenderer>
       )}

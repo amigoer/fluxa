@@ -6,6 +6,7 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
+import { useT } from "@/lib/i18n";
 import { RegexRoutePanel } from "./RegexRoutePanel";
 import { VirtualModelPanel } from "./VirtualModelPanel";
 import { ProviderPanel } from "./ProviderPanel";
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function NodeSidePanel({ onChange }: Props) {
+  const { t } = useT();
   const selectedId = useRouteGraphStore((s) => s.selectedNodeId);
   const nodes = useRouteGraphStore((s) => s.nodes);
   const selectNode = useRouteGraphStore((s) => s.selectNode);
@@ -63,7 +65,7 @@ export function NodeSidePanel({ onChange }: Props) {
         )}
         {(node.type === "source" || node.type === "fallback") && (
           <div className="text-xs text-muted-foreground">
-            This is a synthetic node — nothing to configure.
+            {t("graph.synthetic")}
           </div>
         )}
       </div>

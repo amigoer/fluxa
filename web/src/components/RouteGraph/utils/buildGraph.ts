@@ -68,7 +68,13 @@ export interface FallbackNodeData {
 export interface RouteEdgeData {
   weight?: number;
   weightPct?: number;
-  label?: string;
+  // labelKind tags the edge so the renderer can pull the right
+  // localized string at draw time. We store the *kind* (plus the raw
+  // priority for the source-side edge) instead of a pre-formatted
+  // English label so the same buildGraph snapshot renders correctly
+  // in any locale without a rebuild.
+  labelKind?: "priority" | "matched" | "noMatch";
+  priority?: number;
 }
 
 // DONUT_PALETTE is the colour ring used for VirtualModelNode segments.
@@ -167,7 +173,10 @@ export function buildGraph(
       source: SOURCE_ID,
       target: id,
       type: "route",
-      data: { label: `P${r.priority ?? 100}` } satisfies RouteEdgeData,
+      data: {
+        labelKind: "priority",
+        priority: r.priority ?? 100,
+      } satisfies RouteEdgeData,
     });
 
     // Wire each regex node to its target. Real targets land on the
@@ -180,7 +189,7 @@ export function buildGraph(
         source: id,
         target: pid,
         type: "route",
-        data: { label: "matched" } satisfies RouteEdgeData,
+        data: { labelKind: "matched" } satisfies RouteEdgeData,
       });
     } else if (r.target_type === "virtual" && vmIndex.has(r.target_model)) {
       edges.push({
@@ -188,7 +197,7 @@ export function buildGraph(
         source: id,
         target: vmId(r.target_model),
         type: "route",
-        data: { label: "matched" } satisfies RouteEdgeData,
+        data: { labelKind: "matched" } satisfies RouteEdgeData,
       });
     }
   }
@@ -208,7 +217,7 @@ export function buildGraph(
     source: SOURCE_ID,
     target: FALLBACK_ID,
     type: "route",
-    data: { label: "no match" } satisfies RouteEdgeData,
+    data: { labelKind: "noMatch" } satisfies RouteEdgeData,
   });
 
   // 6. Virtual model fanout edges. We compute total weight per VM
