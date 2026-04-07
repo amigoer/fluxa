@@ -320,7 +320,7 @@ const dict = {
     "graph.action.cancel": "Cancel",
     "graph.action.saving": "Saving…",
     "graph.weights.warning":
-      "Weights sum to {total} (not 100). Traffic still splits proportionally.",
+      "Weights must sum to 100; current total is {total}.",
     "graph.routes.empty": "Add at least one route",
     "graph.dialog.newRegex": "New regex route",
     "graph.dialog.newVirtual": "New virtual model",
@@ -628,7 +628,7 @@ const dict = {
     "graph.action.cancel": "取消",
     "graph.action.saving": "保存中…",
     "graph.weights.warning":
-      "权重总和为 {total}（非 100），流量仍按比例分配。",
+      "权重之和必须等于 100，当前为 {total}",
     "graph.routes.empty": "请至少添加一个目标",
     "graph.dialog.newRegex": "新建正则路由",
     "graph.dialog.newVirtual": "新建虚拟模型",

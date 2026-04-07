@@ -279,7 +279,10 @@ function CreateVirtualModelDialog({
         enabled: true,
         routes: [
           {
-            weight: 1,
+            // Default the only route to 100% so the new VM is
+            // immediately valid; the operator can rebalance after
+            // adding more targets.
+            weight: 100,
             target_type: "real",
             target_model: targetModel,
             provider,

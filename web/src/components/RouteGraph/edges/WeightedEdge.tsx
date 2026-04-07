@@ -1,15 +1,13 @@
-// WeightedEdge — VirtualModelNode → target. The label combines the
-// configured weight (always shown) with the live RPS (only when live
-// mode is on) so the operator reads "30% · 43rps" as one tight unit
-// instead of two stacked numbers. The line itself is drawn by React
-// Flow's BaseEdge using a smooth bezier path.
+// WeightedEdge — VirtualModelNode → target. Always renders as a solid
+// purple line so the operator instantly distinguishes the "weighted
+// fanout" semantic from the dashed-fallback "no match" semantic.
 //
-// Animation: when live mode is on we add the .fluxa-edge-flow class
-// (defined in the global <style> block injected by RouteGraph/index)
-// so the dash pattern marches from source to target. We do NOT use
-// React Flow's built-in `animated` flag because we want full control
-// over dash sizing and timing — the default 5px dashes at 0.5s look
-// jittery on long edges.
+// Live mode adds a small set of staggered particles that flow along
+// the path via SVG animateMotion, so the operator sees direction of
+// flow without breaking the solid-line convention. Particles use the
+// `path` attribute on animateMotion (rather than mpath/href) so we do
+// not have to worry about element id resolution inside the React Flow
+// SVG transform group.
 
 import {
   BaseEdge,
@@ -18,8 +16,9 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
-import { cn } from "@/lib/utils";
 import type { RouteEdgeData } from "../utils/buildGraph";
+
+const PURPLE = "#7F77DD";
 
 export function WeightedEdge({
   id,
@@ -43,26 +42,40 @@ export function WeightedEdge({
     targetPosition,
   });
 
-  // Tight inline format: "30%" when static, "30% · 43rps" when live.
-  // Using `·` rather than a dash keeps the badge narrow on screens
-  // where the operator has many fanout edges in view at once.
+  // Label format: weight % from buildGraph (already integer-normalised
+  // against the visible-weight total). When live mode is on we append
+  // the rolling RPS as a second line so the operator reads the
+  // configured share + the actual flow at a glance.
   const pct = data?.weightPct ?? 0;
-  const label =
-    liveMode && stat
-      ? `${pct}% · ${Math.round(stat.rps)}rps`
-      : `${pct}%`;
 
   return (
     <>
       <BaseEdge
         id={id}
         path={path}
-        style={{
-          stroke: "#7F77DD",
-          strokeWidth: 1.75,
-        }}
-        className={cn(liveMode && "fluxa-edge-flow")}
+        style={{ stroke: PURPLE, strokeWidth: 1.75 }}
       />
+      {/* Particle flow — three small dots staggered by a third of the
+          animation duration so the eye reads a continuous stream
+          rather than a single moving dot. The particles share the
+          edge stroke colour so they read as part of the line, not as
+          a foreign overlay. */}
+      {liveMode &&
+        [0, 0.5, 1].map((begin) => (
+          <circle
+            key={begin}
+            r={2.6}
+            fill={PURPLE}
+            opacity={0.9}
+          >
+            <animateMotion
+              dur="1.5s"
+              repeatCount="indefinite"
+              path={path}
+              begin={`${begin}s`}
+            />
+          </circle>
+        ))}
       <EdgeLabelRenderer>
         <div
           style={{
@@ -70,9 +83,14 @@ export function WeightedEdge({
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             pointerEvents: "all",
           }}
-          className="rounded-md border border-purple-200 dark:border-purple-800 bg-white dark:bg-zinc-900 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300 shadow-sm whitespace-nowrap"
+          className="rounded-md border border-[#AFA9EC] bg-white dark:bg-zinc-900 px-1.5 py-0.5 text-[10px] font-semibold text-[#534AB7] dark:text-purple-300 shadow-sm whitespace-nowrap leading-tight"
         >
-          {label}
+          {pct}%
+          {liveMode && stat && (
+            <span className="ml-1 text-[#7F77DD]/80 font-medium">
+              · {Math.round(stat.rps)}rps
+            </span>
+          )}
         </div>
       </EdgeLabelRenderer>
     </>

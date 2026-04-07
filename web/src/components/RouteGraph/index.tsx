@@ -221,20 +221,6 @@ function RouteGraphInner() {
 
   return (
     <div className="absolute inset-0 bg-[#f8f8f6] dark:bg-zinc-950">
-      {/* Global keyframes for the live-mode flowing dash effect.
-          Both WeightedEdge and RouteEdge opt in via the
-          .fluxa-edge-flow class — keeping the keyframes in one place
-          guarantees every edge animates in lockstep. The !important
-          on stroke-dasharray is necessary because BaseEdge sets
-          inline styles on the underlying <path> and inline styles
-          would otherwise win over a class selector. */}
-      <style>{`
-        @keyframes fluxa-edge-flow { to { stroke-dashoffset: -28; } }
-        .fluxa-edge-flow {
-          stroke-dasharray: 8 6 !important;
-          animation: fluxa-edge-flow 0.8s linear infinite;
-        }
-      `}</style>
       {error && (
         <div className="absolute top-3 right-3 z-20 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {error}

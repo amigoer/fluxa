@@ -1,16 +1,23 @@
 // buildGraph.ts — converts a snapshot of admin API data into the
 // (nodes, edges) shape that React Flow consumes.
 //
-// The graph has five distinct node types and a strict topological
-// shape:
+// The graph is a single connected DAG with this shape:
 //
-//   SourceNode (1)  ─┬─►  RegexRouteNode  ─►  VirtualModelNode  ─►  ProviderNode
-//                    │                    └►  ProviderNode
-//                    └─►  FallbackNode
+//   SourceNode ─┬─► RegexRouteNode ─► VirtualModelNode ─┬─► ProviderNode
+//               │                  └► ProviderNode      ├─► ProviderNode
+//               │                                       └─► ProviderNode
+//               ├─► VirtualModelNode (direct name match)
+//               └─► FallbackNode (always last, dashed)
 //
-// VirtualModelNodes can also point at *other* virtual model nodes
-// (nested aliasing) — buildGraph handles that case by emitting a
-// virtual→virtual edge instead of a virtual→provider edge.
+// Two important semantic rules embedded here:
+//   1. A VirtualModel that no regex route points to is still a valid
+//      runtime entry point (a request whose model name matches the
+//      VM's name resolves directly). We draw a source→VM edge for
+//      every such VM so the graph is *always* connected — never a
+//      floating subgraph.
+//   2. Disabled regex routes and disabled VM routes are skipped.
+//      Disabled rules do not run at the data plane, so showing them
+//      on the topology view would be misleading.
 //
 // We deliberately compute the graph from a single immutable snapshot
 // rather than mutating an existing one. The cost is rebuilding ~50
@@ -73,22 +80,21 @@ export interface RouteEdgeData {
   // priority for the source-side edge) instead of a pre-formatted
   // English label so the same buildGraph snapshot renders correctly
   // in any locale without a rebuild.
-  labelKind?: "priority" | "matched" | "noMatch";
+  labelKind?: "priority" | "matched" | "noMatch" | "direct";
   priority?: number;
 }
 
-// DONUT_PALETTE is the colour ring used for VirtualModelNode segments.
-// Picked to stay legible on both light and dark backgrounds and to
-// avoid the red/green pair that we reserve for live-mode health dots.
-const DONUT_PALETTE = [
-  "#8b5cf6", // violet-500
-  "#06b6d4", // cyan-500
-  "#f59e0b", // amber-500
-  "#ec4899", // pink-500
-  "#10b981", // emerald-500
-  "#3b82f6", // blue-500
-  "#f97316", // orange-500
-  "#a855f7", // purple-500
+// SEGMENT_PALETTE is the colour ring used for VirtualModelNode weight
+// bar segments. We deliberately stick to four shades of one purple
+// family rather than a multi-hue palette: the user reads the bar as
+// "this VM splits into N pieces", and rainbow segments would imply
+// the targets are categorically different when in fact they are all
+// downstream of the same alias.
+const SEGMENT_PALETTE = [
+  "#534AB7", // deepest
+  "#7F77DD",
+  "#AFA9EC",
+  "#CECBF6", // lightest
 ];
 
 // buildGraph is the workhorse: take three lists, return the full
@@ -113,16 +119,22 @@ export function buildGraph(
 
   // 2. VirtualModelNodes — one per configured virtual model. We index
   //    them by name so the regex-route loop below can wire targets
-  //    without a second pass over the list.
+  //    without a second pass over the list. Disabled VM routes are
+  //    stripped here so the segment colour palette stays in lockstep
+  //    with the actually-rendered fanout edges below.
   const vmIndex = new Map<string, VirtualModel>();
   for (const vm of virtualModels) {
-    vmIndex.set(vm.name, vm);
-    const colors = vm.routes.map((_, i) => DONUT_PALETTE[i % DONUT_PALETTE.length]);
+    const enabledRoutes = vm.routes.filter((r) => r.enabled !== false);
+    const visibleVm: VirtualModel = { ...vm, routes: enabledRoutes };
+    vmIndex.set(vm.name, visibleVm);
+    const colors = enabledRoutes.map(
+      (_, i) => SEGMENT_PALETTE[i % SEGMENT_PALETTE.length],
+    );
     nodes.push({
       id: vmId(vm.name),
       type: "virtualModel",
       position: { x: 0, y: 0 },
-      data: { model: vm, colors } satisfies VirtualModelNodeData,
+      data: { model: visibleVm, colors } satisfies VirtualModelNodeData,
     });
   }
 
@@ -154,12 +166,19 @@ export function buildGraph(
   }
 
   // 4. RegexRouteNodes — emitted in priority order (lowest number =
-  //    highest priority). The visual stacking matches the actual
-  //    runtime evaluation order, which is the single most important
-  //    thing the operator wants to verify on this screen.
-  const sortedRegex = [...regexRoutes].sort(
-    (a, b) => (a.priority ?? 100) - (b.priority ?? 100),
-  );
+  //    highest priority). Disabled rules are filtered out because the
+  //    data plane skips them at runtime; showing them on the topology
+  //    view would imply they take traffic. The visual stacking matches
+  //    the runtime evaluation order, which is the single most
+  //    important thing the operator wants to verify on this screen.
+  //
+  //    Side effect: we record which VMs are reached via a regex match
+  //    so the next loop knows whether to draw a "direct name match"
+  //    fallback edge into them.
+  const regexTargetedVMs = new Set<string>();
+  const sortedRegex = [...regexRoutes]
+    .filter((r) => r.enabled !== false)
+    .sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100));
   for (const r of sortedRegex) {
     const id = regexId(r);
     nodes.push({
@@ -192,6 +211,7 @@ export function buildGraph(
         data: { labelKind: "matched" } satisfies RouteEdgeData,
       });
     } else if (r.target_type === "virtual" && vmIndex.has(r.target_model)) {
+      regexTargetedVMs.add(r.target_model);
       edges.push({
         id: `e:${id}->${vmId(r.target_model)}`,
         source: id,
@@ -200,6 +220,24 @@ export function buildGraph(
         data: { labelKind: "matched" } satisfies RouteEdgeData,
       });
     }
+  }
+
+  // 4b. Direct source→VM edges. Any virtual model that no enabled
+  //     regex route points at is still reachable at runtime by sending
+  //     the request with model=<vm name>. Without these edges, such a
+  //     VM would float orphaned on the canvas and the operator could
+  //     not see how requests reach it. The edge is the same "route"
+  //     type as source→regex (solid gray) and carries no label —
+  //     "direct" mode is the implicit default for virtual models.
+  for (const vm of virtualModels) {
+    if (regexTargetedVMs.has(vm.name)) continue;
+    edges.push({
+      id: `e:${SOURCE_ID}->${vmId(vm.name)}`,
+      source: SOURCE_ID,
+      target: vmId(vm.name),
+      type: "route",
+      data: { labelKind: "direct" } satisfies RouteEdgeData,
+    });
   }
 
   // 5. FallbackNode — the terminal "no rule matched, pass the model
@@ -220,19 +258,25 @@ export function buildGraph(
     data: { labelKind: "noMatch" } satisfies RouteEdgeData,
   });
 
-  // 6. Virtual model fanout edges. We compute total weight per VM
-  //    once so the per-edge percentage is honest even when the
-  //    operator has weights that do not sum to 100. The
-  //    handle id (`route-${idx}`) lets the VirtualModelNode render one
-  //    output handle per route on its right edge — without per-route
-  //    handles, dagre routes every fanout edge through a single point
-  //    and the layout looks crowded.
+  // 6. Virtual model fanout edges. We iterate the *visible* (enabled-
+  //    only) routes from vmIndex so the edges and the segment colours
+  //    in the VM card stay perfectly aligned by index. Each enabled
+  //    route gets its own outgoing edge with its own source handle —
+  //    without per-route handles dagre routes every fanout line
+  //    through one point and the layout looks crowded.
+  //
+  //    The percentage shown on the edge is computed by normalising
+  //    against the sum of *visible* weights. When the operator has
+  //    typed weights that already sum to 100 this collapses to the
+  //    raw integer; when they don't, we still show an honest split.
   for (const vm of virtualModels) {
-    const total = vm.routes.reduce(
+    const visibleVm = vmIndex.get(vm.name);
+    if (!visibleVm) continue;
+    const total = visibleVm.routes.reduce(
       (acc: number, r: VirtualModelRoute) => acc + (r.weight || 0),
       0,
     );
-    vm.routes.forEach((route, idx) => {
+    visibleVm.routes.forEach((route, idx) => {
       const sourceHandle = `route-${idx}`;
       const pct = total > 0 ? Math.round(((route.weight || 0) / total) * 100) : 0;
       if (route.target_type === "real" && route.provider) {

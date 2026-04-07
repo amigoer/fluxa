@@ -1,15 +1,20 @@
-// RouteEdge — non-weighted edges. Three flavours, distinguished by
+// RouteEdge — non-weighted edges. Four flavours, distinguished by
 // data.labelKind:
 //
 //   - "priority": SourceNode → RegexRouteNode. Solid gray, P{n} label.
-//   - "matched":  RegexRouteNode → target. Amber, "matched" label.
-//   - "noMatch":  SourceNode → FallbackNode. Gray dashed, "no match".
+//   - "matched":  RegexRouteNode → target. Solid amber, "matched".
+//   - "direct":   SourceNode → VirtualModelNode (no regex pointed at
+//                 it; reachable by direct name match). Solid gray, no
+//                 label — the source→VM line tells the whole story.
+//   - "noMatch":  SourceNode → FallbackNode. Dashed gray, "no match".
+//                 The *only* edge type that uses dashes — dashes are
+//                 the dedicated semantic for the catchall path.
 //
-// In live mode every variant flips on the .fluxa-edge-flow class so
-// the dash pattern marches in the direction of traffic, matching the
-// WeightedEdge animation. The label gains the live RPS suffix when a
-// stat sample is available, formatted as "matched · 12rps" so the
-// operator reads weight + traffic in one glance.
+// In live mode every flavour except noMatch flows particles via SVG
+// animateMotion so direction of flow is visible without breaking the
+// solid-vs-dashed convention. The fallback edge stays static dashed
+// so it remains visually quiet (operators rarely care which exact
+// requests fell through, just that the catchall exists).
 
 import {
   BaseEdge,
@@ -19,7 +24,6 @@ import {
 } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import type { RouteEdgeData } from "../utils/buildGraph";
 
 export function RouteEdge({
@@ -47,35 +51,39 @@ export function RouteEdge({
 
   // Per-flavour visual styling. Amber for the regex match line keeps
   // the colour narrative consistent with the regex node body; gray
-  // for source-side and fallback edges keeps them visually quiet so
-  // the action (the orange/purple flow downstream) reads first.
+  // for source-side, direct, and fallback edges keeps them visually
+  // quiet so the action (the orange/purple flow downstream) reads
+  // first.
   let stroke = "#94a3b8";
   let baseLabel: string | undefined;
   let dashed = false;
+  let particles = false;
   if (data?.labelKind === "matched") {
     stroke = "#EF9F27";
     baseLabel = t("graph.edge.matched");
+    particles = true;
   } else if (data?.labelKind === "noMatch") {
     stroke = "#B4B2A9";
     baseLabel = t("graph.edge.noMatch");
     dashed = true;
+    particles = false;
   } else if (data?.labelKind === "priority") {
     stroke = "#94a3b8";
     baseLabel = `P${data.priority ?? 100}`;
+    particles = true;
+  } else if (data?.labelKind === "direct") {
+    stroke = "#94a3b8";
+    baseLabel = undefined;
+    particles = true;
   }
 
-  // Live RPS suffix. We always render the base label (priority / status)
-  // and append the rps so the unit reads as one composite badge.
+  // Live RPS suffix. Only attached when there's a base label to anchor
+  // it to — the unlabeled "direct" edges stay clean.
   const label =
     liveMode && stat && baseLabel
       ? `${baseLabel} · ${Math.round(stat.rps)}rps`
       : baseLabel;
 
-  // The static-dashed fallback edge keeps a wider dash pattern when
-  // not in live mode so it still reads as "passive". Live mode
-  // overrides this with the global .fluxa-edge-flow class which
-  // marches dashes from source to target — the dasharray inside the
-  // class wins because it carries !important.
   return (
     <>
       <BaseEdge
@@ -84,10 +92,26 @@ export function RouteEdge({
         style={{
           stroke,
           strokeWidth: 1.5,
-          strokeDasharray: !liveMode && dashed ? "5 4" : undefined,
+          strokeDasharray: dashed ? "6 4" : undefined,
         }}
-        className={cn(liveMode && "fluxa-edge-flow")}
       />
+      {liveMode &&
+        particles &&
+        [0, 0.5, 1].map((begin) => (
+          <circle
+            key={begin}
+            r={2.2}
+            fill={stroke}
+            opacity={0.85}
+          >
+            <animateMotion
+              dur="1.5s"
+              repeatCount="indefinite"
+              path={path}
+              begin={`${begin}s`}
+            />
+          </circle>
+        ))}
       {label && (
         <EdgeLabelRenderer>
           <div

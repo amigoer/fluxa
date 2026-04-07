@@ -24,8 +24,14 @@ interface Props {
   onClose: () => void;
 }
 
-const emptyRoute = (): VirtualModelRoute => ({
-  weight: 1,
+// emptyRoute returns a fresh weighted route with a *smart* default
+// weight: whatever is needed to bring the running total up to 100. So
+// the first route on a brand-new VM defaults to 100, a second route
+// added to a [100] list defaults to 0 (operator must rebalance), and
+// a third added to [50, 30] defaults to 20. This trains the operator
+// to think of weights as percentages from the very first interaction.
+const emptyRoute = (currentTotal = 0): VirtualModelRoute => ({
+  weight: Math.max(0, 100 - currentTotal),
   target_type: "real",
   target_model: "",
   provider: "",
@@ -136,7 +142,10 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
             variant="outline"
             size="sm"
             onClick={() =>
-              setForm({ ...form, routes: [...form.routes, emptyRoute()] })
+              setForm({
+                ...form,
+                routes: [...form.routes, emptyRoute(totalWeight)],
+              })
             }
           >
             <Plus className="h-3 w-3" /> {t("graph.field.add")}
