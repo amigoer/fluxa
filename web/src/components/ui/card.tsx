@@ -8,7 +8,11 @@ export const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border bg-card text-card-foreground shadow",
+      // Slightly softer shadow + ring-tinted border so cards float
+      // gently against the muted page background instead of looking
+      // like flat boxes. The transition keeps hover states smooth for
+      // any wrapper that opts into a hover style.
+      "rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm transition-shadow",
       className,
     )}
     {...props}

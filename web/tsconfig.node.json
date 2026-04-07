@@ -6,7 +6,15 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "types": ["node"]
+    "types": ["node"],
+    // Redirect tsc emit away from the source tree. Without this,
+    // `tsc -b` drops a `vite.config.js` next to `vite.config.ts`, and
+    // Vite happily picks up the stale `.js` sibling instead of the
+    // freshly-edited `.ts` file — which silently defeats any config
+    // change (e.g. tweaking `base`). Emitting into a cache dir keeps
+    // the incremental build working without polluting the workspace.
+    "outDir": "./node_modules/.cache/tsc-node",
+    "tsBuildInfoFile": "./node_modules/.cache/tsc-node/tsconfig.node.tsbuildinfo"
   },
   "include": ["vite.config.ts"]
 }

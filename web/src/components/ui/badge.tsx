@@ -14,6 +14,14 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground",
         outline: "text-foreground",
+        // Soft semantic tints used for status pills (e.g. enabled /
+        // disabled). They render as a tinted background + matching
+        // foreground so the colour reads at a glance without competing
+        // with the heavier `default` (filled black) variant.
+        success:
+          "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
+        muted:
+          "border-transparent bg-muted text-muted-foreground",
       },
     },
     defaultVariants: { variant: "default" },

@@ -95,14 +95,32 @@ export const Auth = {
 
 // -- provider types + endpoints ----------------------------------------
 
+// Provider mirrors the backend providerDTO 1:1 so the dashboard can edit
+// every field the gateway supports — no more "edit-via-YAML-only" gaps
+// for AWS Bedrock credentials, Azure deployments, custom headers, etc.
 export interface Provider {
   name: string;
   kind: string;
   api_key?: string;
   base_url?: string;
+  // Azure / OpenAI-compatible fields.
   api_version?: string;
+  // AWS Bedrock SigV4 credentials. Region is also reused by other
+  // region-aware backends.
   region?: string;
+  access_key?: string;
+  secret_key?: string;
+  session_token?: string;
+  // Azure: model-name → deployment-name map. Free-form key/value pairs.
+  deployments?: Record<string, string>;
+  // Optional advertised model list (used by the router's "find any
+  // provider that serves this model" fallback when no explicit route
+  // entry exists).
   models?: string[];
+  // Extra HTTP headers injected on every upstream request.
+  headers?: Record<string, string>;
+  // Per-request timeout in seconds. 0 = use the gateway default.
+  timeout_sec?: number;
   enabled?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -111,6 +129,8 @@ export interface Provider {
 export const Providers = {
   list: () =>
     request<{ data: Provider[] }>("GET", "/admin/providers").then((r) => r.data ?? []),
+  // POST is upsert: the backend treats the body's `name` as the primary
+  // key, so the same call serves both create and edit flows.
   upsert: (p: Provider) => request<Provider>("POST", "/admin/providers", p),
   delete: (name: string) => request<void>("DELETE", `/admin/providers/${name}`),
 };

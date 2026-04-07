@@ -4,14 +4,14 @@ import react from "@vitejs/plugin-react";
 
 // Vite config for the Fluxa admin dashboard.
 //
-// - `base: "./"` makes the built bundle path-relative so the same
-//   compiled assets work whether the Go binary mounts the SPA at the
-//   root URL or under a sub-path (the go:embed filesystem does not
-//   know the URL prefix at build time).
+// - `base: "/"` keeps asset URLs absolute (e.g. /assets/index-xyz.js)
+//   so client-side routes like /providers or /keys still load the
+//   bundle correctly on a hard refresh — relative paths would resolve
+//   against the deepest URL segment and 404 the JS chunk.
 // - dev mode proxies /admin and /v1 to the Go backend so you can run
 //   `npm run dev` side-by-side with `go run ./cmd/fluxa`.
 export default defineConfig({
-  base: "./",
+  base: "/",
   plugins: [react()],
   resolve: {
     alias: {
