@@ -152,6 +152,103 @@ export const Routes = {
   delete: (model: string) => request<void>("DELETE", `/admin/routes/${model}`),
 };
 
+// -- virtual model types + endpoints -----------------------------------
+//
+// Virtual models are user-facing aliases that fan out to one or more
+// concrete targets with weighted random picking. They live behind
+// /admin/virtual-models and the data plane resolves them in front of
+// the legacy provider chain — see internal/router/model_resolver.go.
+
+export interface VirtualModelRoute {
+  id?: string;
+  weight: number;
+  target_type: "real" | "virtual";
+  target_model: string;
+  provider?: string;
+  enabled?: boolean;
+  position?: number;
+}
+
+export interface VirtualModel {
+  id?: string;
+  name: string;
+  description?: string;
+  enabled?: boolean;
+  routes: VirtualModelRoute[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const VirtualModels = {
+  list: () =>
+    request<{ data: VirtualModel[] }>("GET", "/admin/virtual-models").then(
+      (r) => r.data ?? [],
+    ),
+  // POST is upsert by name (full replace of the routes list).
+  upsert: (vm: VirtualModel) =>
+    request<VirtualModel>("POST", "/admin/virtual-models", vm),
+  delete: (name: string) =>
+    request<void>("DELETE", `/admin/virtual-models/${name}`),
+};
+
+// -- regex route types + endpoints -------------------------------------
+
+export interface RegexRoute {
+  id?: string;
+  pattern: string;
+  priority: number;
+  target_type: "real" | "virtual";
+  target_model: string;
+  provider?: string;
+  description?: string;
+  enabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const RegexRoutes = {
+  list: () =>
+    request<{ data: RegexRoute[] }>("GET", "/admin/regex-routes").then(
+      (r) => r.data ?? [],
+    ),
+  create: (r: RegexRoute) =>
+    request<RegexRoute>("POST", "/admin/regex-routes", r),
+  update: (id: string, r: RegexRoute) =>
+    request<RegexRoute>("PUT", `/admin/regex-routes/${id}`, r),
+  setPriority: (id: string, priority: number) =>
+    request<void>("PATCH", `/admin/regex-routes/${id}/priority`, { priority }),
+  delete: (id: string) => request<void>("DELETE", `/admin/regex-routes/${id}`),
+};
+
+// -- resolve tester ----------------------------------------------------
+
+export interface ResolveTraceStep {
+  depth: number;
+  type: "regex_match" | "virtual_model" | "passthrough";
+  pattern?: string;
+  name?: string;
+  target_type?: string;
+  target?: string;
+  provider?: string;
+  weight_picked?: number;
+}
+
+export interface ResolveResult {
+  input: string;
+  passthrough: boolean;
+  target?: { provider: string; model: string };
+  trace: ResolveTraceStep[];
+  error?: string;
+}
+
+export const Resolver = {
+  test: (model: string) =>
+    request<ResolveResult>(
+      "GET",
+      `/admin/resolve-model?model=${encodeURIComponent(model)}`,
+    ),
+};
+
 // -- virtual key types + endpoints -------------------------------------
 
 export interface VirtualKey {

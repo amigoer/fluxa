@@ -11,6 +11,9 @@ import {
   Zap,
   PanelLeftClose,
   PanelLeftOpen,
+  GitBranch,
+  Regex,
+  TestTube2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +32,9 @@ import { I18nProvider, useT, type TranslationKey } from "@/lib/i18n";
 import { DashboardPage } from "@/pages/Dashboard";
 import { ProvidersPage } from "@/pages/Providers";
 import { RoutesPage } from "@/pages/Routes";
+import { VirtualModelsPage } from "@/pages/VirtualModels";
+import { RegexRoutesPage } from "@/pages/RegexRoutes";
+import { ResolveTesterPage } from "@/pages/ResolveTester";
 import { KeysPage } from "@/pages/Keys";
 import { UsagePage } from "@/pages/Usage";
 import { SettingsPage } from "@/pages/Settings";
@@ -36,7 +42,16 @@ import { SettingsPage } from "@/pages/Settings";
 // Tab is the top-level navigation entry. The dashboard is deliberately
 // a single-file router: six tabs, no nested pages, keeps the bundle
 // tiny and matches the scope of the admin REST surface.
-type Tab = "dashboard" | "providers" | "routes" | "keys" | "usage" | "settings";
+type Tab =
+  | "dashboard"
+  | "providers"
+  | "routes"
+  | "virtual-models"
+  | "regex-routes"
+  | "resolve-tester"
+  | "keys"
+  | "usage"
+  | "settings";
 
 interface NavEntry {
   id: Tab;
@@ -48,6 +63,9 @@ const NAV: NavEntry[] = [
   { id: "dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
   { id: "providers", labelKey: "nav.providers", icon: Server },
   { id: "routes", labelKey: "nav.routes", icon: Waypoints },
+  { id: "virtual-models", labelKey: "nav.virtualModels", icon: GitBranch },
+  { id: "regex-routes", labelKey: "nav.regexRoutes", icon: Regex },
+  { id: "resolve-tester", labelKey: "nav.resolveTester", icon: TestTube2 },
   { id: "keys", labelKey: "nav.keys", icon: KeyRound },
   { id: "usage", labelKey: "nav.usage", icon: BarChart3 },
   { id: "settings", labelKey: "nav.settings", icon: SettingsIcon },
@@ -321,6 +339,9 @@ function Shell() {
           {tab === "dashboard" && <DashboardPage />}
           {tab === "providers" && <ProvidersPage />}
           {tab === "routes" && <RoutesPage />}
+          {tab === "virtual-models" && <VirtualModelsPage />}
+          {tab === "regex-routes" && <RegexRoutesPage />}
+          {tab === "resolve-tester" && <ResolveTesterPage />}
           {tab === "keys" && <KeysPage />}
           {tab === "usage" && <UsagePage />}
           {tab === "settings" && <SettingsPage onSignOut={signOut} />}
