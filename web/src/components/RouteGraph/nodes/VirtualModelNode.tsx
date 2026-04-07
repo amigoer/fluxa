@@ -20,10 +20,11 @@ export function VirtualModelNode({
   id,
   data,
   selected,
-}: NodeProps & { data: VirtualModelNodeData }) {
+}: NodeProps & { data: VirtualModelNodeData & { draft?: boolean } }) {
   const { t } = useT();
   const selectNode = useRouteGraphStore((s) => s.selectNode);
   const vm = data.model;
+  const isDraft = !!data.draft;
   const total =
     vm.routes.reduce((acc, r) => acc + (r.weight || 0), 0) || 1;
 
@@ -31,22 +32,40 @@ export function VirtualModelNode({
     <div
       onClick={() => selectNode(id)}
       className={cn(
-        "rounded-xl border-[1.5px] bg-[#EEEDFE] dark:bg-purple-950/40 border-[#AFA9EC] dark:border-purple-700 px-3.5 py-3 shadow-sm w-[230px] cursor-pointer transition-all",
+        "rounded-xl bg-[#EEEDFE] dark:bg-purple-950/40 px-3.5 py-3 shadow-sm w-[230px] cursor-pointer transition-all",
+        isDraft
+          ? "border-2 border-dashed border-[#AFA9EC]/80"
+          : "border-[1.5px] border-[#AFA9EC] dark:border-purple-700",
         "hover:shadow-[0_0_0_3px_rgba(127,119,221,0.25)]",
         selected &&
-          "shadow-[0_0_0_3px_rgba(127,119,221,0.35)] border-[#7F77DD]",
-        !vm.enabled && "opacity-60",
+          "shadow-[0_0_0_3px_rgba(127,119,221,0.35)] !border-[#7F77DD]",
+        !vm.enabled && !isDraft && "opacity-60",
       )}
     >
-      {/* Header: name on the left, "virtual" pill on the right.
-          The name is the user-facing identifier so it gets the most
-          weight; the pill is a quiet visual marker of node type. */}
+      {/* Header: name on the left, "virtual" or "draft" pill on the
+          right. The name is the user-facing identifier so it gets the
+          most weight; the pill is a quiet visual marker of node type
+          (or unsaved status, in draft mode). */}
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[13px] font-semibold text-[#3C3489] dark:text-purple-100 truncate">
-          {vm.name}
+        <div
+          className={cn(
+            "text-[13px] font-semibold truncate",
+            vm.name
+              ? "text-[#3C3489] dark:text-purple-100"
+              : "text-[#3C3489]/50 italic",
+          )}
+        >
+          {vm.name || t("graph.draft.virtualPlaceholder")}
         </div>
-        <span className="text-[9px] uppercase tracking-wide text-[#7F77DD] dark:text-purple-300 shrink-0 font-medium">
-          {t("graph.virtual.badge")}
+        <span
+          className={cn(
+            "text-[9px] uppercase tracking-wide shrink-0 font-medium",
+            isDraft
+              ? "rounded bg-[#7F77DD] text-white px-1 py-px normal-case"
+              : "text-[#7F77DD] dark:text-purple-300",
+          )}
+        >
+          {isDraft ? t("graph.draft.badge") : t("graph.virtual.badge")}
         </span>
       </div>
 

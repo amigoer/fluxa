@@ -19,10 +19,24 @@ import {
 import { useT } from "@/lib/i18n";
 
 interface Props {
-  // Undefined = create mode: form starts blank with one default
-  // route, name field is editable, no Delete button. Defined = edit
-  // mode: form starts from the supplied row, name is read-only.
+  // model + onUpdate describe two modes:
+  //
+  //   1. Edit mode  : model has an id (or at least came from the
+  //                   server), onUpdate is undefined. The form keeps
+  //                   its own local state, only touches the server
+  //                   on Save (POST upsert).
+  //
+  //   2. Create mode: model is the in-progress draft sitting on the
+  //                   canvas, onUpdate is the write-through hook.
+  //                   The form is a *controlled* component so the
+  //                   canvas card visually mirrors what the operator
+  //                   types — and so drag-to-connect updates from
+  //                   onConnect propagate back into the form.
+  //
+  // We use the presence of onUpdate to discriminate (rather than
+  // model.id, which is not always populated by the API).
   model?: VirtualModel;
+  onUpdate?: (model: VirtualModel) => void;
   onChange: () => void | Promise<void>;
   onClose: () => void;
 }
@@ -59,14 +73,27 @@ const EMPTY_VM: VirtualModel = {
   ],
 };
 
-export function VirtualModelPanel({ model, onChange, onClose }: Props) {
+export function VirtualModelPanel({
+  model,
+  onUpdate,
+  onChange,
+  onClose,
+}: Props) {
   const { t } = useT();
-  const isCreate = !model;
-  const [form, setForm] = useState<VirtualModel>(
+  const isControlled = !!onUpdate;
+  const isCreate = isControlled || !model;
+  const [localForm, setLocalForm] = useState<VirtualModel>(
     model
       ? { ...model, routes: model.routes.map((r) => ({ ...r })) }
       : { ...EMPTY_VM, routes: EMPTY_VM.routes.map((r) => ({ ...r })) },
   );
+  const form: VirtualModel = isControlled
+    ? (model ?? EMPTY_VM)
+    : localForm;
+  const setForm = (next: VirtualModel) => {
+    if (isControlled) onUpdate!(next);
+    else setLocalForm(next);
+  };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

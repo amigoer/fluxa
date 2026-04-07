@@ -23,13 +23,16 @@ interface Props {
   // the parent's wiring stays the same — easier to add new toolbar
   // actions later that *do* need a refresh hook.
   onChange?: () => void | Promise<void>;
+  // onStartCreate inserts a draft node into the canvas + opens the
+  // side panel bound to it. The toolbar dispatches but the parent
+  // owns the actual node insertion (it has the position context).
+  onStartCreate: (kind: "regexRoute" | "virtualModel") => void;
 }
 
-export function GraphToolbar({ onLayout }: Props) {
+export function GraphToolbar({ onLayout, onStartCreate }: Props) {
   const { t } = useT();
   const liveMode = useRouteGraphStore((s) => s.liveMode);
   const toggleLiveMode = useRouteGraphStore((s) => s.toggleLiveMode);
-  const startCreate = useRouteGraphStore((s) => s.startCreate);
   const { fitView } = useReactFlow();
 
   return (
@@ -43,14 +46,14 @@ export function GraphToolbar({ onLayout }: Props) {
           edges are animated because *they turned it on*. */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 rounded-xl border border-border/60 bg-background/95 backdrop-blur px-2 py-1.5 shadow-md">
         <button
-          onClick={() => startCreate("regexRoute")}
+          onClick={() => onStartCreate("regexRoute")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-foreground hover:bg-muted transition-colors"
         >
           <RegexIcon className="h-3.5 w-3.5" />
           {t("graph.toolbar.regex")}
         </button>
         <button
-          onClick={() => startCreate("virtualModel")}
+          onClick={() => onStartCreate("virtualModel")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-foreground hover:bg-muted transition-colors"
         >
           <GitBranch className="h-3.5 w-3.5" />

@@ -11,6 +11,7 @@
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { RegexNodeData } from "../utils/buildGraph";
 
@@ -18,19 +19,27 @@ export function RegexRouteNode({
   id,
   data,
   selected,
-}: NodeProps & { data: RegexNodeData }) {
+}: NodeProps & { data: RegexNodeData & { draft?: boolean } }) {
+  const { t } = useT();
   const selectNode = useRouteGraphStore((s) => s.selectNode);
   const r = data.route;
+  const isDraft = !!data.draft;
 
   return (
     <div
       onClick={() => selectNode(id)}
       className={cn(
-        "rounded-xl border-[1.5px] bg-[#FAEEDA] dark:bg-amber-950/40 border-[#EF9F27] dark:border-amber-700 px-3.5 py-2.5 shadow-sm w-[200px] cursor-pointer transition-all",
+        "rounded-xl bg-[#FAEEDA] dark:bg-amber-950/40 px-3.5 py-2.5 shadow-sm w-[200px] cursor-pointer transition-all",
+        // Draft border is dashed to signal "unsaved" without losing
+        // the colour identity of the regex node family. Saved nodes
+        // get a solid 1.5px border in the same amber.
+        isDraft
+          ? "border-2 border-dashed border-[#EF9F27]/70"
+          : "border-[1.5px] border-[#EF9F27] dark:border-amber-700",
         "hover:shadow-[0_0_0_3px_rgba(127,119,221,0.25)]",
         selected &&
-          "shadow-[0_0_0_3px_rgba(127,119,221,0.35)] border-[#7F77DD]",
-        !r.enabled && "opacity-60",
+          "shadow-[0_0_0_3px_rgba(127,119,221,0.35)] !border-[#7F77DD]",
+        !r.enabled && !isDraft && "opacity-60",
       )}
     >
       {/* Header row: pattern + priority pill + on/off badge.
@@ -38,29 +47,47 @@ export function RegexRouteNode({
           lets it shrink with truncate while keeping the pills
           right-anchored. */}
       <div className="flex items-center gap-1.5">
-        <span className="font-mono text-[11px] font-semibold text-[#633806] dark:text-amber-200 truncate flex-1">
-          {r.pattern}
-        </span>
-        <span className="bg-[#FAC775] text-[#633806] text-[9px] font-semibold px-1 py-px rounded">
-          P{r.priority ?? 100}
-        </span>
         <span
           className={cn(
-            "text-[9px] font-semibold px-1 py-px rounded",
-            r.enabled
-              ? "bg-[#9FE1CB] text-[#085041]"
-              : "bg-[#D3D1C7] text-[#444441]",
+            "font-mono text-[11px] font-semibold truncate flex-1",
+            r.pattern
+              ? "text-[#633806] dark:text-amber-200"
+              : "text-[#854F0B]/50 italic",
           )}
         >
-          {r.enabled ? "on" : "off"}
+          {r.pattern || t("graph.draft.regexPlaceholder")}
         </span>
+        {isDraft ? (
+          <span className="bg-[#EF9F27] text-white text-[9px] font-semibold px-1 py-px rounded">
+            {t("graph.draft.badge")}
+          </span>
+        ) : (
+          <>
+            <span className="bg-[#FAC775] text-[#633806] text-[9px] font-semibold px-1 py-px rounded">
+              P{r.priority ?? 100}
+            </span>
+            <span
+              className={cn(
+                "text-[9px] font-semibold px-1 py-px rounded",
+                r.enabled
+                  ? "bg-[#9FE1CB] text-[#085041]"
+                  : "bg-[#D3D1C7] text-[#444441]",
+              )}
+            >
+              {r.enabled ? "on" : "off"}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Subtitle: "regex route → target". Reads as a complete
           sentence so the operator instantly knows where the rule
           sends matched traffic without opening the side panel. */}
       <div className="text-[10px] text-[#854F0B] dark:text-amber-300 mt-1 font-mono truncate">
-        regex route → {r.target_model}
+        regex route →{" "}
+        {r.target_model || (
+          <span className="italic text-[#854F0B]/50">…</span>
+        )}
         {r.target_type === "real" && r.provider ? `@${r.provider}` : ""}
       </div>
 

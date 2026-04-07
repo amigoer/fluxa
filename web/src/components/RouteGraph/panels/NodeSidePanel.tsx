@@ -31,6 +31,11 @@ import type {
 
 interface Props {
   onChange: () => void | Promise<void>;
+  // onCancelCreate is invoked when the operator dismisses the panel
+  // while in create mode. The parent owns the draft node sitting on
+  // the canvas, so it has to do the cleanup (remove the node + the
+  // source→draft edge) — we just signal intent.
+  onCancelCreate: () => void;
 }
 
 // CHIP_TONE maps each node type to a {dot, label} colour pair so the
@@ -72,13 +77,23 @@ const CHIP_TONE: Record<
   },
 };
 
-export function NodeSidePanel({ onChange }: Props) {
+export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
   const { t } = useT();
   const selectedId = useRouteGraphStore((s) => s.selectedNodeId);
   const creatingKind = useRouteGraphStore((s) => s.creatingKind);
+  const draftNodeId = useRouteGraphStore((s) => s.draftNodeId);
   const nodes = useRouteGraphStore((s) => s.nodes);
   const selectNode = useRouteGraphStore((s) => s.selectNode);
-  const startCreate = useRouteGraphStore((s) => s.startCreate);
+  const updateDraftRegex = useRouteGraphStore((s) => s.updateDraftRegex);
+  const updateDraftVirtual = useRouteGraphStore((s) => s.updateDraftVirtual);
+
+  // The currently mounted draft node — read fresh from the nodes
+  // array on every render so the panel reacts when onConnect or
+  // local form edits mutate it. We never have more than one draft
+  // at a time so a linear scan is fine.
+  const draftNode = draftNodeId
+    ? nodes.find((n) => n.id === draftNodeId)
+    : undefined;
 
   // displayed mirrors the *currently rendered* intent. It lags the
   // store by one transition cycle on close so the body content does
@@ -159,12 +174,13 @@ export function NodeSidePanel({ onChange }: Props) {
     }
   })();
 
-  // close() clears whichever intent is currently open. Edit and
-  // create both pass through here so the close button always works
-  // regardless of which mode the panel is in.
+  // close() clears whichever intent is currently open. In edit mode
+  // we just drop the selection; in create mode we delegate to the
+  // parent's onCancelCreate so it can also remove the draft node
+  // and the source→draft edge from the canvas.
   const close = () => {
     if (selectedId) selectNode(null);
-    if (creatingKind) startCreate(null);
+    if (creatingKind) onCancelCreate();
   };
 
   return (
@@ -223,14 +239,29 @@ export function NodeSidePanel({ onChange }: Props) {
         <div className="flex-1 overflow-auto px-4 py-4">
           {isCreate && resolvedType === "regexRoute" && (
             <RegexRoutePanel
-              key="create-regex"
+              // Key by draftNodeId so a brand-new draft (after a
+              // cancel + new click) gets a fresh component mount
+              // and the local UI state is reset cleanly.
+              key={`create-regex-${draftNodeId}`}
+              route={
+                draftNode
+                  ? (draftNode.data as unknown as RegexNodeData).route
+                  : undefined
+              }
+              onUpdate={updateDraftRegex}
               onChange={onChange}
               onClose={close}
             />
           )}
           {isCreate && resolvedType === "virtualModel" && (
             <VirtualModelPanel
-              key="create-virtual"
+              key={`create-virtual-${draftNodeId}`}
+              model={
+                draftNode
+                  ? (draftNode.data as unknown as VirtualModelNodeData).model
+                  : undefined
+              }
+              onUpdate={updateDraftVirtual}
               onChange={onChange}
               onClose={close}
             />

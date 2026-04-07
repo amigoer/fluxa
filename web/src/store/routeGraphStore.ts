@@ -16,6 +16,7 @@
 
 import { create } from "zustand";
 import type { Edge, Node } from "@xyflow/react";
+import type { RegexRoute, VirtualModel } from "@/lib/api";
 
 // EdgeStat is the per-edge sample we get back from /admin/stats/edges.
 // rps is requests-per-second, errorRate is a 0..1 fraction. Both are
@@ -38,6 +39,15 @@ interface RouteGraphState {
   // one closes the other. The side panel checks both to decide
   // whether to render and what to render.
   creatingKind: CreatingKind;
+  // draftNodeId is the id of the placeholder node currently sitting
+  // on the canvas while the operator fills out the create form. The
+  // node lives in the regular `nodes` array (so React Flow renders
+  // it like any other) but with `data.draft = true` so the node
+  // components can give it a "未保存" treatment. The form on the
+  // side panel reads/writes the node's data through the dedicated
+  // updateDraft* actions below — this gives the operator a live
+  // preview as they type.
+  draftNodeId: string | null;
   liveMode: boolean;
   // liveStats is keyed by edge id so the WeightedEdge / RouteEdge
   // components can do an O(1) lookup during render. Provider node
@@ -49,7 +59,15 @@ interface RouteGraphState {
   setEdges: (edges: Edge[]) => void;
   setGraph: (nodes: Node[], edges: Edge[]) => void;
   selectNode: (id: string | null) => void;
-  startCreate: (kind: CreatingKind) => void;
+  // startCreate registers a create intent and (optionally) the id of
+  // the draft node the caller already inserted into the canvas. Pass
+  // null to clear without touching the nodes array.
+  startCreate: (kind: CreatingKind, draftNodeId?: string | null) => void;
+  // updateDraftRegex / updateDraftVirtual mutate the draft node's
+  // inner data so the canvas card visually reflects whatever the
+  // operator just typed in the side panel form.
+  updateDraftRegex: (route: RegexRoute) => void;
+  updateDraftVirtual: (model: VirtualModel) => void;
   toggleLiveMode: () => void;
   updateLiveStats: (stats: Record<string, EdgeStat>) => void;
 }
@@ -59,6 +77,7 @@ export const useRouteGraphStore = create<RouteGraphState>((set) => ({
   edges: [],
   selectedNodeId: null,
   creatingKind: null,
+  draftNodeId: null,
   // Live mode is on by default so the canvas immediately shows
   // animated traffic flow when an operator opens the page. Without
   // this the page would look static and the routing topology would
@@ -74,7 +93,47 @@ export const useRouteGraphStore = create<RouteGraphState>((set) => ({
   // mode dismisses the other so the side panel never holds two open
   // intents at once.
   selectNode: (id) => set({ selectedNodeId: id, creatingKind: null }),
-  startCreate: (kind) => set({ creatingKind: kind, selectedNodeId: null }),
+  startCreate: (kind, draftNodeId = null) =>
+    set({ creatingKind: kind, draftNodeId, selectedNodeId: null }),
+  // updateDraftRegex finds the current draft node by id and writes
+  // the new RegexRoute object into its `data.route` field. The whole
+  // node object is replaced (not just the data slice) so React Flow
+  // sees the change and re-renders the card. We never touch any
+  // other node here so unrelated nodes don't re-render.
+  updateDraftRegex: (route) =>
+    set((s) => {
+      if (!s.draftNodeId) return s;
+      return {
+        nodes: s.nodes.map((n) =>
+          n.id === s.draftNodeId
+            ? {
+                ...n,
+                data: { ...n.data, route, draft: true },
+              }
+            : n,
+        ),
+      };
+    }),
+  // updateDraftVirtual mirrors updateDraftRegex but writes to the
+  // `data.model` slot used by VirtualModelNode. We also recompute
+  // the colours array so a route added or removed in the side panel
+  // immediately re-paints the segment bar.
+  updateDraftVirtual: (model) =>
+    set((s) => {
+      if (!s.draftNodeId) return s;
+      const palette = ["#534AB7", "#7F77DD", "#AFA9EC", "#CECBF6"];
+      const colors = model.routes.map((_, i) => palette[i % palette.length]);
+      return {
+        nodes: s.nodes.map((n) =>
+          n.id === s.draftNodeId
+            ? {
+                ...n,
+                data: { ...n.data, model, colors, draft: true },
+              }
+            : n,
+        ),
+      };
+    }),
   toggleLiveMode: () => set((s) => ({ liveMode: !s.liveMode })),
   updateLiveStats: (stats) => set({ liveStats: stats }),
 }));

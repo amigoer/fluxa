@@ -95,6 +95,9 @@ function RouteGraphInner() {
   const setEdges = useRouteGraphStore((s) => s.setEdges);
   const liveMode = useRouteGraphStore((s) => s.liveMode);
   const updateLiveStats = useRouteGraphStore((s) => s.updateLiveStats);
+  const startCreate = useRouteGraphStore((s) => s.startCreate);
+  const updateDraftRegex = useRouteGraphStore((s) => s.updateDraftRegex);
+  const updateDraftVirtual = useRouteGraphStore((s) => s.updateDraftVirtual);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,6 +212,121 @@ function RouteGraphInner() {
     [],
   );
 
+  // onStartCreate — toolbar entry point. Inserts a draft node onto
+  // the canvas (positioned a comfortable offset from the source so
+  // it lands somewhere visible without disturbing the existing
+  // layout) and wires a source→draft edge so the new card is part
+  // of the topology from the moment it appears. Then it pings
+  // store.startCreate so the side panel knows to render the create
+  // form bound to this draft. The form mutates the draft node's
+  // data live via updateDraftRegex / updateDraftVirtual.
+  const onStartCreate = useCallback(
+    (kind: "regexRoute" | "virtualModel") => {
+      // Clean up any previous draft so consecutive clicks of the
+      // toolbar buttons swap drafts cleanly instead of stacking.
+      const prior = useRouteGraphStore.getState().draftNodeId;
+      const baseNodes = prior
+        ? nodes.filter((n) => n.id !== prior)
+        : nodes;
+      const baseEdges = prior
+        ? edges.filter((e) => e.source !== prior && e.target !== prior)
+        : edges;
+
+      // Pick a spot offset from the source node. Falls back to the
+      // origin if there is no source node yet (shouldn't happen but
+      // keeps the function total).
+      const sourceNode = baseNodes.find((n) => n.id === "source");
+      const offsetX = sourceNode ? sourceNode.position.x + 320 : 320;
+      const offsetY = sourceNode ? sourceNode.position.y - 60 : 0;
+
+      const id =
+        kind === "regexRoute"
+          ? `draft-regex-${Date.now()}`
+          : `draft-virtual-${Date.now()}`;
+
+      let draftNode: Node;
+      if (kind === "regexRoute") {
+        draftNode = {
+          id,
+          type: "regexRoute",
+          position: { x: offsetX, y: offsetY },
+          data: {
+            route: {
+              pattern: "",
+              priority: 100,
+              target_type: "virtual",
+              target_model: "",
+              provider: "",
+              description: "",
+              enabled: true,
+            },
+            draft: true,
+          } as unknown as Record<string, unknown>,
+        };
+      } else {
+        draftNode = {
+          id,
+          type: "virtualModel",
+          position: { x: offsetX, y: offsetY },
+          data: {
+            model: {
+              name: "",
+              description: "",
+              enabled: true,
+              routes: [
+                {
+                  weight: 100,
+                  target_type: "real",
+                  target_model: "",
+                  provider: "",
+                  enabled: true,
+                },
+              ],
+            },
+            colors: ["#534AB7"],
+            draft: true,
+          } as unknown as Record<string, unknown>,
+        };
+      }
+
+      // The source→draft edge uses the same labelKind we'd assign
+      // after the rule was saved (priority for regex, direct for VM)
+      // so the visual is identical pre/post save — only the dashed
+      // border on the draft card itself signals "unsaved".
+      const draftEdge: Edge = {
+        id: `e:source->${id}`,
+        source: "source",
+        target: id,
+        type: "route",
+        data: {
+          labelKind: kind === "regexRoute" ? "priority" : "direct",
+          priority: 100,
+        },
+      };
+
+      setGraph([...baseNodes, draftNode], [...baseEdges, draftEdge]);
+      startCreate(kind, id);
+    },
+    [nodes, edges, setGraph, startCreate],
+  );
+
+  // onCancelCreate — invoked by the side panel when the operator
+  // dismisses the create form without saving. Removes the draft
+  // node + its source edge from the canvas and clears the create
+  // intent in the store.
+  const onCancelCreate = useCallback(() => {
+    const draftId = useRouteGraphStore.getState().draftNodeId;
+    if (!draftId) {
+      startCreate(null);
+      return;
+    }
+    setGraph(
+      nodes.filter((n) => n.id !== draftId),
+      edges.filter((e) => e.source !== draftId && e.target !== draftId),
+    );
+    startCreate(null);
+  }, [nodes, edges, setGraph, startCreate]);
+
   // onConnect — wires the user's manual handle-to-handle drag to a
   // backend mutation so the new connection actually persists. We
   // interpret the drag as "rewire the source-side route's target":
@@ -260,6 +378,54 @@ function RouteGraphInner() {
         return; // dropping on source / fallback / regex is meaningless
       }
 
+      // Drafts are intercepted before any network call: dragging
+      // from a not-yet-saved draft node should mutate the *form*
+      // bound to that draft, not POST half-built data to the
+      // server. The side panel observes the same store update and
+      // re-renders the input fields with the dropped target.
+      const isDraft = sourceNode.id.startsWith("draft-");
+      if (isDraft) {
+        if (sourceNode.type === "virtualModel") {
+          const v = sourceNode.data as unknown as VirtualModelNodeData;
+          // Reject the same self-loop as the persisted-edit branch.
+          if (
+            newTarget.target_type === "virtual" &&
+            newTarget.target_model === v.model.name
+          ) {
+            return;
+          }
+          // Idx defaults to 0 because a brand-new draft VM has
+          // exactly one seeded route. If the operator has already
+          // added more routes via the form they can drop into the
+          // matching handle and we honour the route-N convention.
+          const idxStr = (conn.sourceHandle ?? "route-0").replace(
+            /^route-/,
+            "",
+          );
+          const idx = parseInt(idxStr, 10);
+          if (Number.isNaN(idx) || idx < 0 || idx >= v.model.routes.length) {
+            return;
+          }
+          updateDraftVirtual({
+            ...v.model,
+            routes: v.model.routes.map((r, i) =>
+              i === idx ? { ...r, ...newTarget } : r,
+            ),
+          });
+          return;
+        }
+        if (sourceNode.type === "regexRoute") {
+          const r = (sourceNode.data as unknown as RegexNodeData).route;
+          updateDraftRegex({
+            ...r,
+            target_type: newTarget.target_type,
+            target_model: newTarget.target_model,
+            provider: newTarget.provider,
+          });
+          return;
+        }
+      }
+
       try {
         if (sourceNode.type === "virtualModel") {
           // Rewire route N of this VM. The handle id encodes the
@@ -305,7 +471,7 @@ function RouteGraphInner() {
         setError(err instanceof Error ? err.message : t("graph.errors.save"));
       }
     },
-    [load, t],
+    [load, t, updateDraftRegex, updateDraftVirtual],
   );
 
   // isValidConnection — runs while the operator is dragging, so
@@ -442,8 +608,12 @@ function RouteGraphInner() {
         />
       </ReactFlow>
 
-      <GraphToolbar onLayout={relayout} onChange={load} />
-      <NodeSidePanel onChange={load} />
+      <GraphToolbar
+        onLayout={relayout}
+        onChange={load}
+        onStartCreate={onStartCreate}
+      />
+      <NodeSidePanel onChange={load} onCancelCreate={onCancelCreate} />
 
       {empty && !loading && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
