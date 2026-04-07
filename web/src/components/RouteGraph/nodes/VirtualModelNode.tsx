@@ -1,65 +1,20 @@
-// VirtualModelNode — purple "alias with weighted fanout" node. The
-// donut is rendered inline as SVG (no chart library) so the node stays
-// cheap to render even with dozens of routes. Each route gets its own
-// output handle on the right edge so React Flow's edge router can
-// space the fanout cleanly instead of bunching every line through one
-// point.
+// VirtualModelNode — purple "alias with weighted fanout" node.
+//
+// Originally a donut chart, redesigned to use a horizontal segmented
+// weight bar plus inline percentages. The horizontal layout reads
+// faster than a donut for the typical 2–4 routes operators configure
+// (the eye scans left-to-right naturally and the bar width is
+// proportional to traffic share without doing any rotation math).
+//
+// Each route gets its own output handle on the right edge so React
+// Flow's edge router spaces the fanout cleanly instead of bunching
+// every line through one point.
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { VirtualModelNodeData } from "../utils/buildGraph";
-
-// Donut geometry. Radius / stroke chosen so the chart fits comfortably
-// inside the 260px-wide node card without dominating it. The dasharray
-// trick: each segment is one circle whose stroke-dasharray is set so
-// only the segment's arc is visible, then rotated into position via a
-// CSS transform on the parent <g>.
-const DONUT_RADIUS = 18;
-const DONUT_STROKE = 8;
-const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
-
-interface DonutProps {
-  weights: number[];
-  colors: string[];
-}
-
-function Donut({ weights, colors }: DonutProps) {
-  const total = weights.reduce((a, b) => a + b, 0) || 1;
-  let offset = 0;
-  return (
-    <svg
-      width={56}
-      height={56}
-      viewBox="0 0 56 56"
-      className="shrink-0"
-    >
-      <g transform="translate(28 28) rotate(-90)">
-        {weights.map((w, i) => {
-          const fraction = w / total;
-          const segLen = fraction * DONUT_CIRCUMFERENCE;
-          const dasharray = `${segLen} ${DONUT_CIRCUMFERENCE - segLen}`;
-          const dashoffset = -offset;
-          offset += segLen;
-          return (
-            <circle
-              key={i}
-              r={DONUT_RADIUS}
-              cx={0}
-              cy={0}
-              fill="none"
-              stroke={colors[i] ?? "#a855f7"}
-              strokeWidth={DONUT_STROKE}
-              strokeDasharray={dasharray}
-              strokeDashoffset={dashoffset}
-            />
-          );
-        })}
-      </g>
-    </svg>
-  );
-}
 
 export function VirtualModelNode({
   id,
@@ -69,50 +24,76 @@ export function VirtualModelNode({
   const { t } = useT();
   const selectNode = useRouteGraphStore((s) => s.selectNode);
   const vm = data.model;
-  const weights = vm.routes.map((r) => r.weight || 0);
+  const total =
+    vm.routes.reduce((acc, r) => acc + (r.weight || 0), 0) || 1;
 
   return (
     <div
       onClick={() => selectNode(id)}
       className={cn(
-        "rounded-lg border bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800 px-3 py-2.5 shadow-sm w-[260px] cursor-pointer transition-shadow hover:shadow-md",
-        selected && "ring-2 ring-purple-500",
+        "rounded-xl border-[1.5px] bg-[#EEEDFE] dark:bg-purple-950/40 border-[#AFA9EC] dark:border-purple-700 px-3.5 py-3 shadow-sm w-[230px] cursor-pointer transition-all",
+        "hover:shadow-[0_0_0_3px_rgba(127,119,221,0.25)]",
+        selected &&
+          "shadow-[0_0_0_3px_rgba(127,119,221,0.35)] border-[#7F77DD]",
         !vm.enabled && "opacity-60",
       )}
     >
+      {/* Header: name on the left, "virtual" pill on the right.
+          The name is the user-facing identifier so it gets the most
+          weight; the pill is a quiet visual marker of node type. */}
       <div className="flex items-center justify-between gap-2">
-        <div className="font-medium text-sm text-purple-900 dark:text-purple-100 truncate">
+        <div className="text-[13px] font-semibold text-[#3C3489] dark:text-purple-100 truncate">
           {vm.name}
         </div>
-        <span className="text-[10px] uppercase tracking-wide text-purple-600 dark:text-purple-300 shrink-0">
+        <span className="text-[9px] uppercase tracking-wide text-[#7F77DD] dark:text-purple-300 shrink-0 font-medium">
           {t("graph.virtual.badge")}
         </span>
       </div>
-      <div className="mt-2 flex items-center gap-3">
-        <Donut weights={weights} colors={data.colors} />
-        <div className="flex-1 min-w-0 space-y-0.5 text-[10px]">
-          {vm.routes.slice(0, 4).map((r, i) => (
-            <div key={i} className="flex items-center gap-1.5 min-w-0">
-              <span
-                className="h-2 w-2 rounded-sm shrink-0"
-                style={{ background: data.colors[i] }}
-              />
-              <span className="font-mono truncate text-purple-900 dark:text-purple-100">
-                {r.target_model}
-              </span>
-              <span className="ml-auto text-purple-600 dark:text-purple-300 shrink-0">
-                {r.weight}
-              </span>
-            </div>
-          ))}
-          {vm.routes.length > 4 && (
-            <div className="text-purple-500 italic">
-              {t("graph.virtual.more", { count: vm.routes.length - 4 })}
-            </div>
-          )}
-        </div>
+
+      {/* Horizontal weight bar — one segment per route, width
+          proportional to its share of the total weight. Segments use
+          the per-route palette computed in buildGraph so the colours
+          stay stable across edge labels and the side panel. */}
+      <div className="mt-2.5 flex h-2 overflow-hidden rounded-full bg-white/60 dark:bg-purple-900/40">
+        {vm.routes.map((r, i) => {
+          const pct = ((r.weight || 0) / total) * 100;
+          return (
+            <div
+              key={i}
+              style={{
+                width: `${pct}%`,
+                background: data.colors[i],
+              }}
+              className="h-full"
+            />
+          );
+        })}
       </div>
-      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !bg-purple-500 !border-none" />
+
+      {/* Inline percentage labels coloured to match each segment.
+          We render at most four labels in the body and overflow into
+          a "+N" tail so the node never grows wider than 230px. */}
+      <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-semibold">
+        {vm.routes.slice(0, 4).map((r, i) => {
+          const pct = Math.round(((r.weight || 0) / total) * 100);
+          return (
+            <span key={i} style={{ color: data.colors[i] }}>
+              {pct}%
+            </span>
+          );
+        })}
+        {vm.routes.length > 4 && (
+          <span className="text-[#7F77DD]/70 italic">
+            {t("graph.virtual.more", { count: vm.routes.length - 4 })}
+          </span>
+        )}
+      </div>
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !bg-white !border-2 !border-[#AFA9EC]"
+      />
       {/* One output handle per route, distributed vertically along the
           right edge so dagre and the edge router can keep the fanout
           tidy. The id matches what buildGraph emitted as
@@ -126,7 +107,7 @@ export function VirtualModelNode({
             type="source"
             position={Position.Right}
             style={{ top }}
-            className="!h-2 !w-2 !bg-purple-500 !border-none"
+            className="!h-3 !w-3 !bg-white !border-2 !border-[#AFA9EC]"
           />
         );
       })}

@@ -10,7 +10,6 @@ import { useState } from "react";
 import {
   Maximize2,
   RefreshCw,
-  Activity,
   GitBranch,
   Regex as RegexIcon,
 } from "lucide-react";
@@ -47,41 +46,63 @@ export function GraphToolbar({ onLayout, onChange }: Props) {
 
   return (
     <>
-      <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/95 backdrop-blur px-2 py-1.5 shadow-sm">
-        <Button size="sm" variant="ghost" onClick={() => setShowRegex(true)}>
-          <RegexIcon className="h-3.5 w-3.5" /> {t("graph.toolbar.regex")}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setShowVm(true)}>
-          <GitBranch className="h-3.5 w-3.5" /> {t("graph.toolbar.virtual")}
-        </Button>
-        <div className="h-4 w-px bg-border" />
-        <Button
-          size="sm"
-          variant="ghost"
+      {/* Centered floating toolbar pinned to the top of the canvas.
+          Each button is rendered as a flat pill so the toolbar reads
+          as one unit; vertical separators carve it into logical
+          groups (create / layout / live / view). The Live button
+          gets a special active treatment — purple background plus a
+          pulsing red dot — so the operator instantly sees that
+          edges are animated because *they turned it on*. */}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 rounded-xl border border-border/60 bg-background/95 backdrop-blur px-2 py-1.5 shadow-md">
+        <button
+          onClick={() => setShowRegex(true)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-foreground hover:bg-muted transition-colors"
+        >
+          <RegexIcon className="h-3.5 w-3.5" />
+          {t("graph.toolbar.regex")}
+        </button>
+        <button
+          onClick={() => setShowVm(true)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-foreground hover:bg-muted transition-colors"
+        >
+          <GitBranch className="h-3.5 w-3.5" />
+          {t("graph.toolbar.virtual")}
+        </button>
+        <div className="h-4 w-px bg-border mx-0.5" />
+        <button
           onClick={onLayout}
           title={t("graph.toolbar.autoLayoutTitle")}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-foreground hover:bg-muted transition-colors"
         >
-          <RefreshCw className="h-3.5 w-3.5" /> {t("graph.toolbar.autoLayout")}
-        </Button>
-        <div className="h-4 w-px bg-border" />
-        <Button
-          size="sm"
-          variant="ghost"
+          <RefreshCw className="h-3.5 w-3.5" />
+          {t("graph.toolbar.autoLayout")}
+        </button>
+        <div className="h-4 w-px bg-border mx-0.5" />
+        <button
           onClick={toggleLiveMode}
-          className={cn(liveMode && "text-red-500")}
+          className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors",
+            liveMode
+              ? "bg-[#EEEDFE] text-[#3C3489] border border-[#AFA9EC]/60"
+              : "text-foreground hover:bg-muted",
+          )}
         >
-          <span className="relative inline-flex items-center">
-            <Activity className="h-3.5 w-3.5" />
-            {liveMode && (
-              <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              liveMode ? "bg-[#E24B4A] animate-pulse" : "bg-muted-foreground/40",
             )}
-          </span>
+          />
           {t("graph.toolbar.live")}
-        </Button>
-        <div className="h-4 w-px bg-border" />
-        <Button size="sm" variant="ghost" onClick={() => fitView({ duration: 300 })}>
-          <Maximize2 className="h-3.5 w-3.5" /> {t("graph.toolbar.fitView")}
-        </Button>
+        </button>
+        <div className="h-4 w-px bg-border mx-0.5" />
+        <button
+          onClick={() => fitView({ duration: 300 })}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-foreground hover:bg-muted transition-colors"
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+          {t("graph.toolbar.fitView")}
+        </button>
       </div>
 
       <CreateRegexDialog

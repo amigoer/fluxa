@@ -48,7 +48,12 @@ export const useRouteGraphStore = create<RouteGraphState>((set) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
-  liveMode: false,
+  // Live mode is on by default so the canvas immediately shows
+  // animated traffic flow when an operator opens the page. Without
+  // this the page would look static and the routing topology would
+  // be hard to read at a glance — the animated dashes are the single
+  // strongest visual cue that traffic flows left-to-right.
+  liveMode: true,
   liveStats: {},
 
   setNodes: (nodes) => set({ nodes }),
