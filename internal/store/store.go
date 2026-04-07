@@ -170,6 +170,51 @@ func (s *Store) migrate(ctx context.Context) error {
 			FOREIGN KEY (user_id) REFERENCES admin_users(id) ON DELETE CASCADE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON admin_sessions(expires_at)`,
+		// virtual_models is the "user-facing model name" alias table
+		// added in v2.4. A virtual model fans out to one or more real
+		// (or virtual) targets with weighted traffic splitting; the
+		// resolver in internal/router/model_resolver.go evaluates the
+		// chain at request time. ON DELETE CASCADE on the child table
+		// keeps an admin "delete virtual model" call from leaving
+		// orphaned route rows behind.
+		`CREATE TABLE IF NOT EXISTS virtual_models (
+			id          TEXT PRIMARY KEY,
+			name        TEXT NOT NULL UNIQUE,
+			description TEXT NOT NULL DEFAULT '',
+			enabled     INTEGER NOT NULL DEFAULT 1,
+			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS virtual_model_routes (
+			id               TEXT PRIMARY KEY,
+			virtual_model_id TEXT NOT NULL,
+			weight           INTEGER NOT NULL CHECK(weight > 0),
+			target_type      TEXT NOT NULL CHECK(target_type IN ('real','virtual')),
+			target_model     TEXT NOT NULL,
+			provider         TEXT NOT NULL DEFAULT '',
+			enabled          INTEGER NOT NULL DEFAULT 1,
+			position         INTEGER NOT NULL DEFAULT 0,
+			FOREIGN KEY (virtual_model_id) REFERENCES virtual_models(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_vmr_parent ON virtual_model_routes(virtual_model_id)`,
+		// regex_routes is the "intercept by pattern" table also added
+		// in v2.4. priority is ASC = highest first; ties break by
+		// insertion order which is fine because admins can edit it.
+		// We pre-compile patterns at router reload time so the
+		// request path never pays a regexp.MustCompile cost.
+		`CREATE TABLE IF NOT EXISTS regex_routes (
+			id           TEXT PRIMARY KEY,
+			pattern      TEXT NOT NULL,
+			priority     INTEGER NOT NULL DEFAULT 100,
+			target_type  TEXT NOT NULL CHECK(target_type IN ('real','virtual')),
+			target_model TEXT NOT NULL,
+			provider     TEXT NOT NULL DEFAULT '',
+			description  TEXT NOT NULL DEFAULT '',
+			enabled      INTEGER NOT NULL DEFAULT 1,
+			created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_regex_routes_priority ON regex_routes(priority ASC)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
