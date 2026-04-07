@@ -4,6 +4,25 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        // Match macOS / iOS native chrome. Falling through to Helvetica
+        // Neue → Arial keeps non-Apple platforms readable, and the
+        // explicit Chinese fallback (PingFang SC then Microsoft YaHei)
+        // ensures the dashboard renders crisply in zh-CN as well.
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"SF Pro Text"',
+          '"SF Pro Display"',
+          '"Helvetica Neue"',
+          "Helvetica",
+          "Arial",
+          '"PingFang SC"',
+          '"Hiragino Sans GB"',
+          '"Microsoft YaHei"',
+          "sans-serif",
+        ],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

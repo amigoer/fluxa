@@ -276,62 +276,76 @@ function Shell() {
             );
           })}
         </nav>
-        <Separator />
+        {/* Footer block. Expanded layout is a single rounded "user
+            card" — avatar + username on top, a row of three icon
+            actions on the bottom — so the whole thing reads as one
+            unit instead of four loose rows. Collapsed layout stacks
+            the same elements vertically as before so the narrow
+            column stays scannable. */}
         <div
           className={cn(
-            "py-3",
-            collapsed
-              ? "flex flex-col items-center gap-1 px-0"
-              : "px-3 space-y-1",
+            "p-3",
+            collapsed && "flex flex-col items-center gap-1.5",
           )}
         >
-          {/* Account row: avatar + username when expanded, just the
-              avatar centered when collapsed. The avatar always shows
-              the first two letters of the username so identity stays
-              recognisable in the narrow layout. In collapsed mode the
-              avatar is sized to exactly h-9 w-9 — same square as the
-              action buttons below — so every item in this column
-              shares one vertical axis. */}
           {collapsed ? (
-            <div
-              title={user.username}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold uppercase"
-            >
-              {user.username.slice(0, 2)}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2.5 px-2 py-2">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold uppercase">
+            <>
+              <div
+                title={user.username}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold uppercase tracking-wide"
+              >
                 {user.username.slice(0, 2)}
               </div>
-              <div className="min-w-0 leading-tight">
-                <div className="text-xs text-muted-foreground">
-                  {t("nav.account")}
+              <SidebarIconAction
+                icon={Languages}
+                label={t("lang.toggle")}
+                onClick={() => setLocale(locale === "en" ? "zh" : "en")}
+              />
+              <SidebarIconAction
+                icon={LogOut}
+                label={t("nav.signOut")}
+                onClick={signOut}
+              />
+              <SidebarIconAction
+                icon={PanelLeftOpen}
+                label={t("nav.expand")}
+                onClick={toggleCollapsed}
+              />
+            </>
+          ) : (
+            <div className="rounded-xl border border-border/60 bg-muted/40 p-2.5 space-y-2">
+              <div className="flex items-center gap-2.5 px-1">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-[11px] font-semibold uppercase tracking-wide shadow-sm border border-border/60">
+                  {user.username.slice(0, 2)}
                 </div>
-                <div className="text-sm font-medium truncate">
-                  {user.username}
+                <div className="min-w-0 leading-tight">
+                  <div className="text-sm font-medium truncate">
+                    {user.username}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {t("nav.account")}
+                  </div>
                 </div>
+              </div>
+              <div className="flex items-center justify-between gap-1 border-t border-border/60 pt-2">
+                <SidebarIconAction
+                  icon={Languages}
+                  label={t("lang.toggle")}
+                  onClick={() => setLocale(locale === "en" ? "zh" : "en")}
+                />
+                <SidebarIconAction
+                  icon={LogOut}
+                  label={t("nav.signOut")}
+                  onClick={signOut}
+                />
+                <SidebarIconAction
+                  icon={PanelLeftClose}
+                  label={t("nav.collapse")}
+                  onClick={toggleCollapsed}
+                />
               </div>
             </div>
           )}
-          <SidebarAction
-            collapsed={collapsed}
-            icon={Languages}
-            label={t("lang.toggle")}
-            onClick={() => setLocale(locale === "en" ? "zh" : "en")}
-          />
-          <SidebarAction
-            collapsed={collapsed}
-            icon={LogOut}
-            label={t("nav.signOut")}
-            onClick={signOut}
-          />
-          <SidebarAction
-            collapsed={collapsed}
-            icon={collapsed ? PanelLeftOpen : PanelLeftClose}
-            label={collapsed ? t("nav.expand") : t("nav.collapse")}
-            onClick={toggleCollapsed}
-          />
         </div>
       </aside>
       <main className="flex-1 overflow-auto">
@@ -351,38 +365,29 @@ function Shell() {
   );
 }
 
-// SidebarAction is a tiny helper for the bottom-of-sidebar buttons
-// (language toggle, sign out, collapse). It collapses gracefully into
-// an icon-only square when the sidebar is folded, and shows a native
-// tooltip with the label so users still know what each icon does.
-function SidebarAction({
-  collapsed,
+// SidebarIconAction is the compact icon-only button used in the
+// sidebar footer. It always renders as a 8x8 square with a native
+// tooltip; the layout (stacked when collapsed, evenly distributed
+// inside the user card when expanded) is the caller's responsibility.
+function SidebarIconAction({
   icon: Icon,
   label,
   onClick,
 }: {
-  collapsed: boolean;
   icon: typeof LayoutDashboard;
   label: string;
   onClick: () => void;
 }) {
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      title={collapsed ? label : undefined}
+    <button
+      type="button"
+      title={label}
       aria-label={label}
-      className={cn(
-        "text-muted-foreground hover:text-foreground",
-        collapsed
-          ? "h-9 w-9 p-0 justify-center"
-          : "w-full justify-start",
-      )}
       onClick={onClick}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
       <Icon className="h-4 w-4" />
-      {!collapsed && label}
-    </Button>
+    </button>
   );
 }
 
