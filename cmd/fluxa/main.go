@@ -84,9 +84,21 @@ func main() {
 	}
 
 	r := router.New()
+	r.SetStore(st)
+	r.SetLogger(logger)
 	if err := r.Reload(provs, routes); err != nil && len(provs) > 0 {
 		logger.Error("build router", "err", err)
 		os.Exit(1)
+	}
+	// v2.4 — load virtual model and regex route tables into the
+	// resolver's snapshot. Failures here are non-fatal: a brand new
+	// install will have empty tables and the resolver simply passes
+	// every request through to the legacy provider chain.
+	if err := r.ReloadVirtualModels(context.Background()); err != nil {
+		logger.Warn("load virtual models", "err", err)
+	}
+	if err := r.ReloadRegexRoutes(context.Background()); err != nil {
+		logger.Warn("load regex routes", "err", err)
 	}
 
 	// Build the virtual-key runtime. An empty ring is the "legacy / no
