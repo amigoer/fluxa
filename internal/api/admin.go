@@ -112,6 +112,13 @@ func (a *AdminServer) Routes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /admin/resolve-model", a.requireAuth(a.resolveModel))
 
+	// Live edge stats for the visual route graph editor. The handler
+	// is currently a stub that returns an empty map; the dashboard
+	// falls back to client-side mocked numbers when no real data is
+	// available, so the canvas still animates while the metrics
+	// pipeline is being built out.
+	mux.HandleFunc("GET /admin/stats/edges", a.requireAuth(a.statsEdges))
+
 	mux.HandleFunc("POST /admin/reload", a.requireAuth(a.reload))
 }
 
