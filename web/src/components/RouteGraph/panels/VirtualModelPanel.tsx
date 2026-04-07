@@ -99,13 +99,6 @@ export function VirtualModelPanel({ model, onChange, onClose }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold">{t("graph.panel.virtualTitle")}</h3>
-        <p className="text-xs text-muted-foreground">
-          {t("graph.panel.virtualSubtitle")}
-        </p>
-      </div>
-
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {error}

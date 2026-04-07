@@ -67,13 +67,6 @@ export function RegexRoutePanel({ route, onChange, onClose }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold">{t("graph.panel.regexTitle")}</h3>
-        <p className="text-xs text-muted-foreground">
-          {t("graph.panel.regexSubtitle")}
-        </p>
-      </div>
-
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {error}

@@ -43,13 +43,6 @@ export function ProviderPanel({ data, nodeId }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold">{t("graph.panel.providerTitle")}</h3>
-        <p className="text-xs text-muted-foreground">
-          {t("graph.panel.providerSubtitle")}
-        </p>
-      </div>
-
       <dl className="space-y-2 text-xs">
         <div>
           <dt className="text-muted-foreground">{t("graph.field.provider")}</dt>
