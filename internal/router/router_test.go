@@ -6,23 +6,30 @@ import (
 	"github.com/amigoer/fluxa/internal/config"
 )
 
+// buildForTest is a tiny helper that spins up a Router from raw DTO
+// slices. It replaces the old Build(cfg config.Config) convenience that
+// v2.1 dropped now that the gateway no longer owns a top-level Config
+// struct.
+func buildForTest(t *testing.T, providers []config.ProviderConfig, routes []config.RouteConfig) *Router {
+	t.Helper()
+	r := New()
+	if err := r.Reload(providers, routes); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	return r
+}
+
 func TestBuildAndResolve(t *testing.T) {
-	cfg := config.Config{
-		Server: config.ServerConfig{Port: 8080},
-		Providers: []config.ProviderConfig{
-			{Name: "openai", Kind: "openai", APIKey: "sk-a"},
-			{Name: "deepseek", Kind: "deepseek", APIKey: "sk-b"},
-			{Name: "claude", Kind: "anthropic", APIKey: "sk-c"},
-		},
-		Routes: []config.RouteConfig{
-			{Model: "gpt-4o", Provider: "openai", Fallback: []string{"deepseek"}},
-			{Model: "claude-3-5-sonnet", Provider: "claude"},
-		},
+	providers := []config.ProviderConfig{
+		{Name: "openai", Kind: "openai", APIKey: "sk-a"},
+		{Name: "deepseek", Kind: "deepseek", APIKey: "sk-b"},
+		{Name: "claude", Kind: "anthropic", APIKey: "sk-c"},
 	}
-	r, err := Build(cfg)
-	if err != nil {
-		t.Fatalf("Build: %v", err)
+	routes := []config.RouteConfig{
+		{Model: "gpt-4o", Provider: "openai", Fallback: []string{"deepseek"}},
+		{Model: "claude-3-5-sonnet", Provider: "claude"},
 	}
+	r := buildForTest(t, providers, routes)
 
 	chain, err := r.Resolve("gpt-4o")
 	if err != nil {
@@ -47,34 +54,25 @@ func TestBuild_OpenAICompatibleKinds(t *testing.T) {
 	for _, kind := range kinds {
 		kind := kind
 		t.Run(kind, func(t *testing.T) {
-			cfg := config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Providers: []config.ProviderConfig{
-					{Name: kind, Kind: kind, APIKey: "sk-test"},
-				},
-				Routes: []config.RouteConfig{{Model: "*", Provider: kind}},
+			providers := []config.ProviderConfig{
+				{Name: kind, Kind: kind, APIKey: "sk-test"},
 			}
-			if _, err := Build(cfg); err != nil {
-				t.Fatalf("Build(%s): %v", kind, err)
+			routes := []config.RouteConfig{{Model: "*", Provider: kind}}
+			if err := New().Reload(providers, routes); err != nil {
+				t.Fatalf("Reload(%s): %v", kind, err)
 			}
 		})
 	}
 }
 
 func TestBuild_CatchAllRoute(t *testing.T) {
-	cfg := config.Config{
-		Server: config.ServerConfig{Port: 8080},
-		Providers: []config.ProviderConfig{
-			{Name: "openai", Kind: "openai", APIKey: "sk-a"},
-		},
-		Routes: []config.RouteConfig{
-			{Model: "*", Provider: "openai"},
-		},
+	providers := []config.ProviderConfig{
+		{Name: "openai", Kind: "openai", APIKey: "sk-a"},
 	}
-	r, err := Build(cfg)
-	if err != nil {
-		t.Fatalf("Build: %v", err)
+	routes := []config.RouteConfig{
+		{Model: "*", Provider: "openai"},
 	}
+	r := buildForTest(t, providers, routes)
 	chain, err := r.Resolve("gpt-4o-mini")
 	if err != nil {
 		t.Fatalf("Resolve via catch-all: %v", err)

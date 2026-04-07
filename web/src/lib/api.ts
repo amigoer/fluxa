@@ -1,22 +1,23 @@
 // api.ts — thin fetch wrapper around the Fluxa admin REST endpoints.
 //
-// The master key is held in sessionStorage rather than localStorage so
-// it disappears with the tab: admins can bookmark the dashboard URL
-// without worrying about a stale credential getting persisted across
-// machine reboots. An explicit `setMasterKey` lets the login screen
-// push the value once the user authenticates.
+// Authentication moved from a static master key to username + password
+// in v2.2: callers POST /admin/auth/login, get back an opaque session
+// token, and present it as Authorization: Bearer <token> on every
+// subsequent call. We hold the token in localStorage so the dashboard
+// survives a page reload (the server-side TTL is one week, after which
+// the user signs in again anyway).
 
-const MASTER_KEY_STORAGE = "fluxa-master-key";
+const TOKEN_STORAGE = "fluxa-session-token";
 
-export function getMasterKey(): string {
-  return sessionStorage.getItem(MASTER_KEY_STORAGE) ?? "";
+export function getSessionToken(): string {
+  return localStorage.getItem(TOKEN_STORAGE) ?? "";
 }
 
-export function setMasterKey(key: string): void {
-  if (key) {
-    sessionStorage.setItem(MASTER_KEY_STORAGE, key);
+export function setSessionToken(token: string): void {
+  if (token) {
+    localStorage.setItem(TOKEN_STORAGE, token);
   } else {
-    sessionStorage.removeItem(MASTER_KEY_STORAGE);
+    localStorage.removeItem(TOKEN_STORAGE);
   }
 }
 
@@ -29,7 +30,7 @@ async function request<T>(
     method,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getMasterKey()}`,
+      Authorization: `Bearer ${getSessionToken()}`,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -44,6 +45,53 @@ async function request<T>(
   }
   return data as T;
 }
+
+// -- auth types + endpoints --------------------------------------------
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  created_at?: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  expires_at: string;
+  user: AdminUser;
+}
+
+export const Auth = {
+  login: async (username: string, password: string): Promise<LoginResponse> => {
+    const res = await fetch("/admin/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok) {
+      throw new Error(data?.error?.message ?? res.statusText);
+    }
+    setSessionToken(data.token);
+    return data as LoginResponse;
+  },
+  logout: async (): Promise<void> => {
+    try {
+      await request<void>("POST", "/admin/auth/logout");
+    } catch {
+      // Logout is best-effort: even if the server rejects the call we
+      // still clear local state below so the UI returns to the login
+      // screen.
+    }
+    setSessionToken("");
+  },
+  me: () => request<AdminUser>("GET", "/admin/auth/me"),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request<void>("POST", "/admin/auth/password", {
+      old_password: oldPassword,
+      new_password: newPassword,
+    }),
+};
 
 // -- provider types + endpoints ----------------------------------------
 
@@ -141,6 +189,44 @@ export interface UsageSummary {
   daily: UsageTotals;
   monthly: UsageTotals;
 }
+
+// -- config import / export --------------------------------------------
+//
+// The gateway boots from env vars only, but operators still want a
+// human-readable snapshot format for backup and bulk edits. Export
+// fetches the live store as a YAML bundle and returns it as a raw
+// string so the caller can drop it into a download link or a
+// textarea. Import accepts the same shape back: it is a plain text
+// POST rather than JSON because the body is YAML, not a DTO.
+
+export const Config = {
+  export: async (): Promise<string> => {
+    const res = await fetch("/admin/config/export", {
+      headers: { Authorization: `Bearer ${getSessionToken()}` },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText);
+    }
+    return res.text();
+  },
+  import: async (yaml: string): Promise<{ providers: number; routes: number }> => {
+    const res = await fetch("/admin/config/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/yaml",
+        Authorization: `Bearer ${getSessionToken()}`,
+      },
+      body: yaml,
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : {};
+    if (!res.ok) {
+      throw new Error(data?.error?.message ?? res.statusText);
+    }
+    return { providers: data.providers ?? 0, routes: data.routes ?? 0 };
+  },
+};
 
 export const Usage = {
   list: (keyID?: string, limit = 100) => {

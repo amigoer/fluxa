@@ -14,12 +14,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Providers, type Provider } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 // ProvidersPage manages the gateway's upstream provider entries. Every
 // mutation hits POST /admin/providers which already triggers a router
 // reload backend-side, so the only thing this page has to do after a
 // write is refetch the list.
 export function ProvidersPage() {
+  const { t } = useT();
   const [rows, setRows] = useState<Provider[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Provider | null>(null);
@@ -28,12 +30,13 @@ export function ProvidersPage() {
     try {
       setRows(await Providers.list());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "load failed");
+      setError(err instanceof Error ? err.message : t("common.loadFailed"));
     }
   }
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function save() {
@@ -43,17 +46,17 @@ export function ProvidersPage() {
       setForm(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "save failed");
+      setError(err instanceof Error ? err.message : t("common.saveFailed"));
     }
   }
 
   async function remove(name: string) {
-    if (!confirm(`Delete provider ${name}?`)) return;
+    if (!confirm(t("providers.deleteConfirm", { name }))) return;
     try {
       await Providers.delete(name);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "delete failed");
+      setError(err instanceof Error ? err.message : t("common.deleteFailed"));
     }
   }
 
@@ -61,17 +64,15 @@ export function ProvidersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Providers</h1>
-          <p className="text-sm text-muted-foreground">
-            Upstream vendors Fluxa can route to.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("providers.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("providers.subtitle")}</p>
         </div>
         <Button
           onClick={() =>
             setForm({ name: "", kind: "openai", enabled: true, api_key: "" })
           }
         >
-          <Plus className="h-4 w-4" /> New provider
+          <Plus className="h-4 w-4" /> {t("providers.new")}
         </Button>
       </div>
 
@@ -82,10 +83,10 @@ export function ProvidersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Kind</TableHead>
-                <TableHead>Base URL</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{t("providers.colName")}</TableHead>
+                <TableHead>{t("providers.colKind")}</TableHead>
+                <TableHead>{t("providers.colBaseURL")}</TableHead>
+                <TableHead>{t("providers.colStatus")}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -99,7 +100,7 @@ export function ProvidersPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={p.enabled ? "default" : "secondary"}>
-                      {p.enabled ? "enabled" : "disabled"}
+                      {p.enabled ? t("providers.statusEnabled") : t("providers.statusDisabled")}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -119,7 +120,7 @@ export function ProvidersPage() {
                     colSpan={5}
                     className="text-center text-muted-foreground py-8"
                   >
-                    No providers yet.
+                    {t("providers.empty")}
                   </TableCell>
                 </TableRow>
               )}
@@ -131,30 +132,30 @@ export function ProvidersPage() {
       {form && (
         <Card>
           <CardHeader>
-            <CardTitle>New provider</CardTitle>
+            <CardTitle>{t("providers.new")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Field label="Name">
+            <Field label={t("providers.fieldName")}>
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </Field>
-            <Field label="Kind">
+            <Field label={t("providers.fieldKind")}>
               <Input
                 value={form.kind}
                 onChange={(e) => setForm({ ...form, kind: e.target.value })}
                 placeholder="openai | anthropic | azure | bedrock | gemini | deepseek | ..."
               />
             </Field>
-            <Field label="API key">
+            <Field label={t("providers.fieldAPIKey")}>
               <Input
                 type="password"
                 value={form.api_key ?? ""}
                 onChange={(e) => setForm({ ...form, api_key: e.target.value })}
               />
             </Field>
-            <Field label="Base URL (optional)">
+            <Field label={t("providers.fieldBaseURL")}>
               <Input
                 value={form.base_url ?? ""}
                 onChange={(e) => setForm({ ...form, base_url: e.target.value })}
@@ -162,9 +163,9 @@ export function ProvidersPage() {
               />
             </Field>
             <div className="flex gap-2">
-              <Button onClick={save}>Save</Button>
+              <Button onClick={save}>{t("common.save")}</Button>
               <Button variant="outline" onClick={() => setForm(null)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </CardContent>

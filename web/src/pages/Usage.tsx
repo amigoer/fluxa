@@ -11,12 +11,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Usage, type UsageRecord } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 // UsagePage lists the most recent usage_records rows, with an optional
 // filter by virtual key id. The built-in table stays usable up to the
 // 1000-row cap enforced on the server; heavier analytics live outside
 // the admin surface.
 export function UsagePage() {
+  const { t } = useT();
   const [rows, setRows] = useState<UsageRecord[]>([]);
   const [keyFilter, setKeyFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export function UsagePage() {
     try {
       setRows(await Usage.list(keyFilter || undefined, 200));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "load failed");
+      setError(err instanceof Error ? err.message : t("common.loadFailed"));
     }
   }
 
@@ -37,14 +39,12 @@ export function UsagePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Usage</h1>
-        <p className="text-sm text-muted-foreground">
-          Recent per-request accounting. Up to 200 rows per view.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("usage.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("usage.subtitle")}</p>
       </div>
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-2">
-          <Label>Filter by virtual key id</Label>
+          <Label>{t("usage.filterLabel")}</Label>
           <Input
             value={keyFilter}
             onChange={(e) => setKeyFilter(e.target.value)}
@@ -55,7 +55,7 @@ export function UsagePage() {
           onClick={load}
           className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
         >
-          Refresh
+          {t("usage.refresh")}
         </button>
       </div>
       {error && <div className="text-sm text-destructive">{error}</div>}
@@ -64,15 +64,15 @@ export function UsagePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Key</TableHead>
-                <TableHead>Model</TableHead>
-                <TableHead>Provider</TableHead>
-                <TableHead className="text-right">Prompt</TableHead>
-                <TableHead className="text-right">Completion</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">USD</TableHead>
-                <TableHead className="text-right">Latency</TableHead>
+                <TableHead>{t("usage.colTime")}</TableHead>
+                <TableHead>{t("usage.colKey")}</TableHead>
+                <TableHead>{t("usage.colModel")}</TableHead>
+                <TableHead>{t("usage.colProvider")}</TableHead>
+                <TableHead className="text-right">{t("usage.colPrompt")}</TableHead>
+                <TableHead className="text-right">{t("usage.colCompletion")}</TableHead>
+                <TableHead className="text-right">{t("usage.colTotal")}</TableHead>
+                <TableHead className="text-right">{t("usage.colUSD")}</TableHead>
+                <TableHead className="text-right">{t("usage.colLatency")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -109,7 +109,7 @@ export function UsagePage() {
                     colSpan={9}
                     className="text-center text-muted-foreground py-8"
                   >
-                    No usage recorded yet.
+                    {t("usage.empty")}
                   </TableCell>
                 </TableRow>
               )}

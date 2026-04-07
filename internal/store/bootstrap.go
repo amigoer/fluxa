@@ -1,8 +1,7 @@
 // bootstrap.go bridges the persistent store rows and the in-memory
 // config.ProviderConfig / config.RouteConfig types consumed by the router.
-// It also handles the "first run" flow where the operator still has a YAML
-// file — we copy any providers/routes it declares into the database so the
-// gateway starts with its legacy configuration intact.
+// It also exposes the Import entry point used by the admin YAML import
+// endpoint to replay a Bundle into the database.
 
 package store
 
@@ -59,8 +58,8 @@ func ToConfigRoutes(rows []Route) []config.RouteConfig {
 }
 
 // FromConfigProvider is the inverse of ToConfigProviders for a single row.
-// It is the form used when the admin API ingests a JSON payload or when
-// seed data is copied from YAML into the database.
+// It is used by the admin API ingest path and by Import when replaying a
+// YAML bundle.
 func FromConfigProvider(pc config.ProviderConfig) Provider {
 	return Provider{
 		Name:         pc.Name,
@@ -85,33 +84,23 @@ func FromConfigRoute(rc config.RouteConfig) Route {
 	return Route{Model: rc.Model, Provider: rc.Provider, Fallback: rc.Fallback}
 }
 
-// SeedIfEmpty copies the providers and routes sections of cfg into the
-// store if and only if both tables are currently empty. Returns true when
-// a seed actually happened. Subsequent restarts leave the database
-// untouched so admin edits are never clobbered by the YAML file.
-func (s *Store) SeedIfEmpty(ctx context.Context, cfg config.Config) (bool, error) {
-	provs, err := s.ListProviders(ctx)
-	if err != nil {
-		return false, err
-	}
-	routes, err := s.ListRoutes(ctx)
-	if err != nil {
-		return false, err
-	}
-	if len(provs) > 0 || len(routes) > 0 {
-		return false, nil
-	}
-	for _, pc := range cfg.Providers {
+// Import upserts every provider and route from a YAML bundle into the
+// store unconditionally. Unlike the old SeedIfEmpty flow it never inspects
+// the current row count: operators who hit /admin/config/import explicitly
+// asked for the incoming document to win. Existing rows not mentioned in
+// the bundle are left alone so imports can be additive.
+func (s *Store) Import(ctx context.Context, providers []config.ProviderConfig, routes []config.RouteConfig) error {
+	for _, pc := range providers {
 		if err := s.UpsertProvider(ctx, FromConfigProvider(pc)); err != nil {
-			return false, err
+			return err
 		}
 	}
-	for _, rc := range cfg.Routes {
+	for _, rc := range routes {
 		if err := s.UpsertRoute(ctx, FromConfigRoute(rc)); err != nil {
-			return false, err
+			return err
 		}
 	}
-	return len(cfg.Providers) > 0 || len(cfg.Routes) > 0, nil
+	return nil
 }
 
 // LoadRouterInputs fetches the enabled providers and all routes from the

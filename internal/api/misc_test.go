@@ -14,19 +14,16 @@ import (
 func TestListModels(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer upstream.Close()
-	cfg := config.Config{
-		Server: config.ServerConfig{Port: 8080},
-		Providers: []config.ProviderConfig{
-			{Name: "openai", Kind: "openai", APIKey: "sk", BaseURL: upstream.URL},
-		},
-		Routes: []config.RouteConfig{
-			{Model: "gpt-4o", Provider: "openai"},
-			{Model: "gpt-4o-mini", Provider: "openai"},
-		},
+	providers := []config.ProviderConfig{
+		{Name: "openai", Kind: "openai", APIKey: "sk", BaseURL: upstream.URL},
 	}
-	r, err := router.Build(cfg)
-	if err != nil {
-		t.Fatalf("router.Build: %v", err)
+	routes := []config.RouteConfig{
+		{Model: "gpt-4o", Provider: "openai"},
+		{Model: "gpt-4o-mini", Provider: "openai"},
+	}
+	r := router.New()
+	if err := r.Reload(providers, routes); err != nil {
+		t.Fatalf("router.Reload: %v", err)
 	}
 	s := New(r, nil, nil, nil)
 	mux := http.NewServeMux()

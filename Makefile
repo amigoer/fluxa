@@ -3,7 +3,7 @@
 # Targets are intentionally thin wrappers around the Go toolchain so the
 # same commands work locally, in CI, and inside Docker builds. The build
 # and run targets also compile the React admin dashboard first so the
-# resulting binary embeds a ready-to-use /ui/ out of the box — one
+# resulting binary serves a ready-to-use admin UI at the root URL — one
 # command, no separate npm step.
 
 BINARY  ?= fluxa
@@ -25,8 +25,8 @@ build: web ## build the fluxa binary (dashboard + gateway) into ./bin
 	@mkdir -p bin
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
 
-run: web fluxa.yaml ## build dashboard then run fluxa against a local fluxa.yaml
-	go run $(PKG) -config fluxa.yaml
+run: web ## build dashboard then run fluxa from env vars
+	FLUXA_MASTER_KEY=$${FLUXA_MASTER_KEY:-dev} go run $(PKG)
 
 # web is a phony alias for the real dist artefact so callers can type
 # `make web` without caring about the file path.
@@ -42,6 +42,11 @@ web/dist/.built: web/node_modules/.install-stamp $(WEB_SRC)
 	  exit 1; \
 	}
 	cd web && npm run build
+	@# Vite empties dist/ at the start of every build, which would wipe
+	@# the tracked .gitkeep placeholder. Recreate it so a subsequent
+	@# `git status` stays clean and a fresh clone still has a non-empty
+	@# dist/ for the go:embed directive to latch onto.
+	@touch web/dist/.gitkeep
 	@touch web/dist/.built
 
 # Cache-friendly npm install: only re-runs when package.json changes.
@@ -56,12 +61,6 @@ web/node_modules/.install-stamp: web/package.json
 
 web-clean: ## remove the dashboard build output and node_modules
 	rm -rf web/dist web/node_modules
-
-# Auto-seed fluxa.yaml from the committed example on first run so
-# `make run` works out of the box on a fresh clone.
-fluxa.yaml:
-	@echo "fluxa.yaml not found — copying configs/fluxa.example.yaml"
-	@cp configs/fluxa.example.yaml fluxa.yaml
 
 test: ## run unit tests
 	go test ./...

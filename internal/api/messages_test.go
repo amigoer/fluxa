@@ -12,18 +12,15 @@ import (
 
 func newAnthropicTestServer(t *testing.T, upstream *httptest.Server) *Server {
 	t.Helper()
-	cfg := config.Config{
-		Server: config.ServerConfig{Port: 8080},
-		Providers: []config.ProviderConfig{
-			{Name: "claude", Kind: "anthropic", APIKey: "sk-ant", BaseURL: upstream.URL},
-		},
-		Routes: []config.RouteConfig{
-			{Model: "claude-3-5-sonnet", Provider: "claude"},
-		},
+	providers := []config.ProviderConfig{
+		{Name: "claude", Kind: "anthropic", APIKey: "sk-ant", BaseURL: upstream.URL},
 	}
-	r, err := router.Build(cfg)
-	if err != nil {
-		t.Fatalf("router.Build: %v", err)
+	routes := []config.RouteConfig{
+		{Model: "claude-3-5-sonnet", Provider: "claude"},
+	}
+	r := router.New()
+	if err := r.Reload(providers, routes); err != nil {
+		t.Fatalf("router.Reload: %v", err)
 	}
 	return New(r, nil, nil, nil)
 }
@@ -63,18 +60,15 @@ func TestHandleMessages_RejectsNonAnthropicProvider(t *testing.T) {
 	// OpenAI-only config → /v1/messages must return 501.
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer upstream.Close()
-	cfg := config.Config{
-		Server: config.ServerConfig{Port: 8080},
-		Providers: []config.ProviderConfig{
-			{Name: "openai", Kind: "openai", APIKey: "sk", BaseURL: upstream.URL},
-		},
-		Routes: []config.RouteConfig{
-			{Model: "gpt-4o", Provider: "openai"},
-		},
+	providers := []config.ProviderConfig{
+		{Name: "openai", Kind: "openai", APIKey: "sk", BaseURL: upstream.URL},
 	}
-	r, err := router.Build(cfg)
-	if err != nil {
-		t.Fatalf("router.Build: %v", err)
+	routes := []config.RouteConfig{
+		{Model: "gpt-4o", Provider: "openai"},
+	}
+	r := router.New()
+	if err := r.Reload(providers, routes); err != nil {
+		t.Fatalf("router.Reload: %v", err)
 	}
 	s := New(r, nil, nil, nil)
 	mux := http.NewServeMux()

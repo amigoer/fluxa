@@ -13,11 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Routes, type Route } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 // RoutesPage is the model → provider map. Fallbacks are entered as a
 // comma-separated list to keep the form trivial; the store itself holds
 // them as a JSON array.
 export function RoutesPage() {
+  const { t } = useT();
   const [rows, setRows] = useState<Route[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<
@@ -28,11 +30,12 @@ export function RoutesPage() {
     try {
       setRows(await Routes.list());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "load failed");
+      setError(err instanceof Error ? err.message : t("common.loadFailed"));
     }
   }
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function save() {
@@ -49,17 +52,17 @@ export function RoutesPage() {
       setForm(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "save failed");
+      setError(err instanceof Error ? err.message : t("common.saveFailed"));
     }
   }
 
   async function remove(model: string) {
-    if (!confirm(`Delete route for ${model}?`)) return;
+    if (!confirm(t("routes.deleteConfirm", { model }))) return;
     try {
       await Routes.delete(model);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "delete failed");
+      setError(err instanceof Error ? err.message : t("common.deleteFailed"));
     }
   }
 
@@ -67,17 +70,15 @@ export function RoutesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Routes</h1>
-          <p className="text-sm text-muted-foreground">
-            Model-name → provider mapping with optional fallback chain.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("routes.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("routes.subtitle")}</p>
         </div>
         <Button
           onClick={() =>
             setForm({ model: "", provider: "", fallback: [], fallbackText: "" })
           }
         >
-          <Plus className="h-4 w-4" /> New route
+          <Plus className="h-4 w-4" /> {t("routes.new")}
         </Button>
       </div>
 
@@ -88,9 +89,9 @@ export function RoutesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Model</TableHead>
-                <TableHead>Provider</TableHead>
-                <TableHead>Fallback</TableHead>
+                <TableHead>{t("routes.colModel")}</TableHead>
+                <TableHead>{t("routes.colProvider")}</TableHead>
+                <TableHead>{t("routes.colFallback")}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -119,7 +120,7 @@ export function RoutesPage() {
                     colSpan={4}
                     className="text-center text-muted-foreground py-8"
                   >
-                    No routes yet.
+                    {t("routes.empty")}
                   </TableCell>
                 </TableRow>
               )}
@@ -131,11 +132,11 @@ export function RoutesPage() {
       {form && (
         <Card>
           <CardHeader>
-            <CardTitle>New route</CardTitle>
+            <CardTitle>{t("routes.new")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Model</Label>
+              <Label>{t("routes.colModel")}</Label>
               <Input
                 value={form.model}
                 onChange={(e) => setForm({ ...form, model: e.target.value })}
@@ -143,7 +144,7 @@ export function RoutesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Provider</Label>
+              <Label>{t("routes.colProvider")}</Label>
               <Input
                 value={form.provider}
                 onChange={(e) => setForm({ ...form, provider: e.target.value })}
@@ -151,7 +152,7 @@ export function RoutesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Fallback (comma-separated)</Label>
+              <Label>{t("routes.fieldFallback")}</Label>
               <Input
                 value={form.fallbackText}
                 onChange={(e) =>
@@ -161,9 +162,9 @@ export function RoutesPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button onClick={save}>Save</Button>
+              <Button onClick={save}>{t("common.save")}</Button>
               <Button variant="outline" onClick={() => setForm(null)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </CardContent>

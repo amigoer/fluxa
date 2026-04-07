@@ -10,7 +10,7 @@
 #      dashboard baked in.
 #
 # This keeps the published image tiny while still shipping the UI so
-# operators get /ui/ for free on a cold docker pull.
+# operators get the dashboard at the root URL for free on a cold docker pull.
 
 FROM node:20-alpine AS web-build
 WORKDIR /web
@@ -39,9 +39,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 COPY --from=go-build /out/fluxa /app/fluxa
-COPY configs/fluxa.example.yaml /app/fluxa.example.yaml
 
+# Fluxa boots from environment variables only — FLUXA_MASTER_KEY is
+# the one secret operators must set before the /admin surface opens.
 EXPOSE 8080
 USER nonroot:nonroot
 ENTRYPOINT ["/app/fluxa"]
-CMD ["-config", "/app/fluxa.yaml"]

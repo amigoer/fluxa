@@ -148,6 +148,25 @@ func (s *Store) migrate(ctx context.Context) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_usage_vk_ts ON usage_records(virtual_key_id, ts)`,
 		`CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_records(ts)`,
+		// admin_users / admin_sessions back the dashboard login flow.
+		// Passwords are bcrypt hashes — never store anything reversible
+		// here. Sessions are opaque random tokens with a TTL; the
+		// requireAuth middleware joins on user_id to look up the caller.
+		`CREATE TABLE IF NOT EXISTS admin_users (
+			id            INTEGER PRIMARY KEY AUTOINCREMENT,
+			username      TEXT NOT NULL UNIQUE,
+			password_hash TEXT NOT NULL,
+			created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS admin_sessions (
+			token       TEXT PRIMARY KEY,
+			user_id     INTEGER NOT NULL,
+			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			expires_at  DATETIME NOT NULL,
+			FOREIGN KEY (user_id) REFERENCES admin_users(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON admin_sessions(expires_at)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {

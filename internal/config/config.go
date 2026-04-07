@@ -1,278 +1,84 @@
-// Package config loads and validates the Fluxa gateway configuration from a
-// YAML file. The loader supports ${VAR} / ${VAR:-default} environment variable
-// expansion so secrets can live outside the file and the same config can be
-// used across environments.
+// Package config holds the Fluxa gateway's runtime configuration
+// schema and its YAML import/export bundle.
+//
+// Starting with v2.1 Fluxa boots from environment variables only.
+// Providers and routes live exclusively in the SQLite store and are
+// mutated at runtime through the /admin REST API. The YAML format
+// that earlier versions used for bootstrap is now exposed through
+// the /admin/config/export and /admin/config/import endpoints so
+// operators can still snapshot and restore the full gateway state
+// in one human-readable file.
+//
+// This file declares the shared type vocabulary used by env.go,
+// yaml.go, store/bootstrap.go, router.Reload, and the admin key
+// wiring. Keeping them in one package lets the store continue to
+// speak in ProviderConfig / RouteConfig DTOs without dragging a
+// YAML parser into the data plane.
+
 package config
 
-import (
-	"errors"
-	"fmt"
-	"os"
-	"regexp"
-	"time"
+import "time"
 
-	"gopkg.in/yaml.v3"
-)
-
-// Config is the top-level gateway configuration.
-type Config struct {
-	Server    ServerConfig     `yaml:"server"`
-	Database  DatabaseConfig   `yaml:"database"`
-	Providers []ProviderConfig `yaml:"providers"`
-	Routes    []RouteConfig    `yaml:"routes"`
-	Logging   LoggingConfig    `yaml:"logging"`
+// Runtime bundles every setting the gateway process reads at
+// startup. It is populated by FromEnv() and never serialised — the
+// YAML bundle type (see yaml.go) is what the import/export admin
+// endpoints round-trip through.
+type Runtime struct {
+	Server   ServerConfig
+	Database DatabaseConfig
+	Logging  LoggingConfig
 }
 
-// ServerConfig controls the HTTP listener and admin authentication.
+// ServerConfig controls the HTTP listener. Admin authentication has
+// moved out of the static config: operators now sign in with a
+// username + password against the admin_users table, so there is no
+// master-key field here any more.
 type ServerConfig struct {
-	Host            string        `yaml:"host"`
-	Port            int           `yaml:"port"`
-	MasterKey       string        `yaml:"master_key"`
-	ReadTimeout     time.Duration `yaml:"read_timeout"`
-	WriteTimeout    time.Duration `yaml:"write_timeout"`
-	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
+	Host            string
+	Port            int
+	ReadTimeout     time.Duration
+	WriteTimeout    time.Duration
+	ShutdownTimeout time.Duration
 }
 
-// DatabaseConfig holds database configuration. SQLite is the default and only
-// supported backend in v1.0; Postgres support is planned for v6.0.
+// DatabaseConfig holds storage configuration. SQLite is the default
+// and only supported backend in v2.x; Postgres support is planned.
 type DatabaseConfig struct {
-	Path string `yaml:"path"`
-}
-
-// ProviderConfig is an upstream model provider configuration.
-type ProviderConfig struct {
-	// Name is the unique provider identifier referenced by routes.
-	Name string `yaml:"name"`
-	// Kind selects the adapter implementation. Supported values in v1.0:
-	// "openai", "anthropic", "deepseek", "qwen", "ollama". When empty it
-	// defaults to Name so that the simple single-provider case works with no
-	// extra configuration.
-	Kind    string            `yaml:"kind"`
-	APIKey  string            `yaml:"api_key"`
-	BaseURL string            `yaml:"base_url"`
-	Timeout time.Duration     `yaml:"timeout"`
-	Headers map[string]string `yaml:"headers"`
-
-	// Models is the list of model identifiers this provider advertises via
-	// GET /v1/models. When empty the provider serves only the models named
-	// in the routes section.
-	Models []string `yaml:"models"`
-
-	// Region is consumed by cloud providers that require a regional
-	// endpoint (AWS Bedrock, Azure). Ignored by the OpenAI-compatible kinds.
-	Region string `yaml:"region"`
-
-	// APIVersion is consumed by adapters that pin a specific API revision
-	// (Azure OpenAI uses e.g. "2024-02-15-preview", Anthropic uses
-	// "2023-06-01"). Ignored when empty.
-	APIVersion string `yaml:"api_version"`
-
-	// Deployments maps canonical model identifiers to provider-specific
-	// deployment names. Azure OpenAI requires a per-deployment URL, so this
-	// is how operators bridge e.g. "gpt-4o" to their Azure deployment name.
-	Deployments map[string]string `yaml:"deployments"`
-
-	// AccessKey / SecretKey / SessionToken carry AWS credentials for the
-	// Bedrock adapter. They are plain strings instead of a nested struct so
-	// that ${VAR} interpolation works on each field.
-	AccessKey    string `yaml:"access_key"`
-	SecretKey    string `yaml:"secret_key"`
-	SessionToken string `yaml:"session_token"`
-}
-
-// RouteConfig maps a model identifier to a primary provider plus an ordered
-// list of fallback providers used when the primary fails.
-type RouteConfig struct {
-	Model    string   `yaml:"model"`
-	Provider string   `yaml:"provider"`
-	Fallback []string `yaml:"fallback"`
+	Path string
 }
 
 // LoggingConfig controls the structured logger output.
 type LoggingConfig struct {
-	Level        string `yaml:"level"`
-	Format       string `yaml:"format"`
-	StoreContent bool   `yaml:"store_content"`
+	Level        string
+	Format       string
+	StoreContent bool
 }
 
-// Default returns a Config populated with sensible defaults. Callers overlay
-// values from the YAML file on top of these defaults.
-func Default() Config {
-	return Config{
-		Server: ServerConfig{
-			Host:            "0.0.0.0",
-			Port:            8080,
-			ReadTimeout:     30 * time.Second,
-			WriteTimeout:    5 * time.Minute,
-			ShutdownTimeout: 15 * time.Second,
-		},
-		Database: DatabaseConfig{Path: "./fluxa.db"},
-		Logging:  LoggingConfig{Level: "info", Format: "json"},
-	}
+// ProviderConfig is the DTO for an upstream model provider. It is
+// used both by the admin import/export YAML schema (via its `yaml`
+// tags) and as the in-memory handoff type between the store and
+// the router.
+type ProviderConfig struct {
+	Name         string            `yaml:"name"`
+	Kind         string            `yaml:"kind,omitempty"`
+	APIKey       string            `yaml:"api_key,omitempty"`
+	BaseURL      string            `yaml:"base_url,omitempty"`
+	APIVersion   string            `yaml:"api_version,omitempty"`
+	Region       string            `yaml:"region,omitempty"`
+	AccessKey    string            `yaml:"access_key,omitempty"`
+	SecretKey    string            `yaml:"secret_key,omitempty"`
+	SessionToken string            `yaml:"session_token,omitempty"`
+	Deployments  map[string]string `yaml:"deployments,omitempty"`
+	Models       []string          `yaml:"models,omitempty"`
+	Headers      map[string]string `yaml:"headers,omitempty"`
+	Timeout      time.Duration     `yaml:"timeout,omitempty"`
 }
 
-// Load reads the YAML file at path, expands environment variables and returns
-// a validated Config.
-func Load(path string) (Config, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return Config{}, fmt.Errorf("read config %q: %w", path, err)
-	}
-	return Parse(raw)
-}
-
-// Parse decodes YAML bytes into a Config. Exposed so tests and tools can feed
-// configs from memory.
-func Parse(raw []byte) (Config, error) {
-	expanded := expandEnv(string(raw))
-	cfg := Default()
-	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse yaml: %w", err)
-	}
-	cfg.applyDefaults()
-	cfg.dropUncredentialed()
-	if err := cfg.Validate(); err != nil {
-		return Config{}, err
-	}
-	return cfg, nil
-}
-
-// applyDefaults fills in per-section defaults that depend on other fields.
-func (c *Config) applyDefaults() {
-	for i := range c.Providers {
-		p := &c.Providers[i]
-		if p.Kind == "" {
-			p.Kind = p.Name
-		}
-		if p.Timeout == 0 {
-			p.Timeout = 5 * time.Minute
-		}
-	}
-}
-
-// dropUncredentialed removes providers whose required secrets were not
-// supplied by the environment, and then removes routes that pointed at
-// them. This lets the shipped example YAML list every supported vendor
-// without forcing the operator to invent placeholder API keys for the
-// ones they do not use on first run — only the providers actually
-// configured via env vars end up seeded into the store.
-func (c *Config) dropUncredentialed() {
-	// Record every name the author declared so we can distinguish
-	// "provider dropped because secrets missing" (skip the route) from
-	// "provider never declared" (let Validate raise the typo).
-	declared := make(map[string]struct{}, len(c.Providers))
-	for _, p := range c.Providers {
-		declared[p.Name] = struct{}{}
-	}
-
-	keptProviders := c.Providers[:0]
-	live := make(map[string]struct{}, len(c.Providers))
-	for _, p := range c.Providers {
-		ok := true
-		switch p.Kind {
-		case "ollama":
-			// No credentials required.
-		case "bedrock":
-			if p.AccessKey == "" || p.SecretKey == "" || p.Region == "" {
-				ok = false
-			}
-		default:
-			if p.APIKey == "" {
-				ok = false
-			}
-		}
-		if !ok {
-			continue
-		}
-		keptProviders = append(keptProviders, p)
-		live[p.Name] = struct{}{}
-	}
-	c.Providers = keptProviders
-
-	keptRoutes := c.Routes[:0]
-	for _, r := range c.Routes {
-		if _, ok := live[r.Provider]; !ok {
-			// Only silently drop routes whose provider was declared
-			// but later pruned for missing credentials. Unknown-name
-			// references still flow through to Validate.
-			if _, wasDeclared := declared[r.Provider]; wasDeclared {
-				continue
-			}
-		}
-		// Prune any fallback entries that reference a dropped provider
-		// so the router never sees a dangling name.
-		fb := r.Fallback[:0]
-		for _, f := range r.Fallback {
-			if _, ok := live[f]; ok {
-				fb = append(fb, f)
-			}
-		}
-		r.Fallback = fb
-		keptRoutes = append(keptRoutes, r)
-	}
-	c.Routes = keptRoutes
-}
-
-// Validate ensures the configuration has the minimum fields required to start
-// the gateway. It returns the first error encountered so operators can fix
-// problems incrementally.
-func (c *Config) Validate() error {
-	if c.Server.Port <= 0 || c.Server.Port > 65535 {
-		return fmt.Errorf("server.port %d out of range", c.Server.Port)
-	}
-	// providers and routes may be empty when they are sourced from the
-	// database instead of the YAML file. The router layer enforces the
-	// "at least one provider" invariant at reload time.
-	seen := make(map[string]struct{}, len(c.Providers))
-	for _, p := range c.Providers {
-		if p.Name == "" {
-			return errors.New("provider.name is required")
-		}
-		if _, dup := seen[p.Name]; dup {
-			return fmt.Errorf("duplicate provider name %q", p.Name)
-		}
-		seen[p.Name] = struct{}{}
-		switch p.Kind {
-		case "ollama":
-			// No credentials required.
-		case "bedrock":
-			if p.AccessKey == "" || p.SecretKey == "" || p.Region == "" {
-				return fmt.Errorf("provider %q: access_key, secret_key and region are required", p.Name)
-			}
-		default:
-			if p.APIKey == "" {
-				return fmt.Errorf("provider %q: api_key is required", p.Name)
-			}
-		}
-	}
-	for _, r := range c.Routes {
-		if r.Model == "" {
-			return errors.New("route.model is required")
-		}
-		if _, ok := seen[r.Provider]; !ok {
-			return fmt.Errorf("route %q references unknown provider %q", r.Model, r.Provider)
-		}
-		for _, fb := range r.Fallback {
-			if _, ok := seen[fb]; !ok {
-				return fmt.Errorf("route %q fallback references unknown provider %q", r.Model, fb)
-			}
-		}
-	}
-	return nil
-}
-
-// envPattern matches ${VAR} and ${VAR:-default} style placeholders.
-var envPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}`)
-
-// expandEnv replaces ${VAR} placeholders inside the YAML source with their
-// environment values. Unknown variables expand to the empty string unless a
-// ":-default" clause is supplied.
-func expandEnv(src string) string {
-	return envPattern.ReplaceAllStringFunc(src, func(match string) string {
-		groups := envPattern.FindStringSubmatch(match)
-		if v, ok := os.LookupEnv(groups[1]); ok {
-			return v
-		}
-		return groups[2]
-	})
+// RouteConfig maps a model identifier to a primary provider plus
+// an ordered list of fallback providers used when the primary
+// fails.
+type RouteConfig struct {
+	Model    string   `yaml:"model"`
+	Provider string   `yaml:"provider"`
+	Fallback []string `yaml:"fallback,omitempty"`
 }

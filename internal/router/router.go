@@ -43,16 +43,6 @@ type state struct {
 	catchAll []string
 }
 
-// Build constructs a Router from a validated Config. It is retained as a
-// convenience for tests and for the YAML-only legacy path.
-func Build(cfg config.Config) (*Router, error) {
-	r := &Router{}
-	if err := r.Reload(cfg.Providers, cfg.Routes); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
 // New returns an empty Router. Callers must invoke Reload before handling
 // requests.
 func New() *Router { return &Router{state: &state{providers: map[string]provider.Provider{}, routes: map[string][]string{}}} }

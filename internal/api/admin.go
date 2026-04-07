@@ -2,11 +2,15 @@
 // mutation writes through the store, then triggers router.Reload so the
 // gateway picks up the change with zero downtime.
 //
-// Authentication: every /admin/* request must present
-//   Authorization: Bearer <master_key>
-// where master_key matches server.master_key from the YAML config. When
-// master_key is empty the admin surface is disabled entirely so an
-// unconfigured gateway cannot leak credentials.
+// Authentication: every /admin/* request other than /admin/auth/login
+// must present
+//
+//	Authorization: Bearer <session_token>
+//
+// where session_token was minted by /admin/auth/login. The token is
+// resolved against the admin_sessions table on every call so a logout
+// invalidates instantly. There is no longer a static master key in env
+// vars — operators sign in with a username + password instead.
 
 package api
 
@@ -24,31 +28,50 @@ import (
 	"github.com/amigoer/fluxa/internal/store"
 )
 
+// adminCtxKey is the private context key under which requireAuth stows
+// the resolved AdminUser. Handlers downstream pull it back out via
+// userFromContext.
+type adminCtxKey struct{}
+
+// userFromContext returns the authenticated user attached by requireAuth.
+// Handlers that need the caller (e.g. me, changePassword) read it here
+// rather than re-querying the database on every call.
+func userFromContext(r *http.Request) (store.AdminUser, bool) {
+	v, ok := r.Context().Value(adminCtxKey{}).(store.AdminUser)
+	return v, ok
+}
+
 // AdminServer owns the admin REST endpoints. It is constructed once at
 // startup and installed alongside the data-plane routes on the same mux.
 type AdminServer struct {
-	router    *router.Router
-	store     *store.Store
-	keyring   *keys.Keyring // optional: nil disables virtual-key admin reloads
-	masterKey string
-	logger    *slog.Logger
+	router  *router.Router
+	store   *store.Store
+	keyring *keys.Keyring // optional: nil disables virtual-key admin reloads
+	logger  *slog.Logger
 }
 
-// NewAdmin returns a ready-to-wire AdminServer. A blank masterKey disables
-// the admin surface: every request will be rejected with 404 so the
-// endpoint shape is not discoverable. Keyring is optional — when nil the
-// virtual-key endpoints still work, but no in-memory cache is invalidated
-// so the data-plane will lag the store by at most one process lifetime.
-func NewAdmin(r *router.Router, s *store.Store, kr *keys.Keyring, masterKey string, logger *slog.Logger) *AdminServer {
+// NewAdmin returns a ready-to-wire AdminServer. Authentication is now
+// session-token based; the admin_users table is the source of truth for
+// who can sign in, so this constructor takes no master key. Keyring is
+// optional — when nil the virtual-key endpoints still work, but no
+// in-memory cache is invalidated so the data plane will lag the store
+// by at most one process lifetime.
+func NewAdmin(r *router.Router, s *store.Store, kr *keys.Keyring, logger *slog.Logger) *AdminServer {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &AdminServer{router: r, store: s, keyring: kr, masterKey: masterKey, logger: logger}
+	return &AdminServer{router: r, store: s, keyring: kr, logger: logger}
 }
 
 // Routes installs the admin handlers onto mux. They share the mux with the
 // data-plane API so one process listens on a single port.
 func (a *AdminServer) Routes(mux *http.ServeMux) {
+	// Auth surface — login is the only unauthenticated endpoint.
+	mux.HandleFunc("POST /admin/auth/login", a.login)
+	mux.HandleFunc("POST /admin/auth/logout", a.requireAuth(a.logout))
+	mux.HandleFunc("GET /admin/auth/me", a.requireAuth(a.me))
+	mux.HandleFunc("POST /admin/auth/password", a.requireAuth(a.changePassword))
+
 	mux.HandleFunc("GET /admin/providers", a.requireAuth(a.listProviders))
 	mux.HandleFunc("POST /admin/providers", a.requireAuth(a.upsertProvider))
 	mux.HandleFunc("GET /admin/providers/{name}", a.requireAuth(a.getProvider))
@@ -70,24 +93,30 @@ func (a *AdminServer) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/usage", a.requireAuth(a.listUsage))
 	mux.HandleFunc("GET /admin/usage/summary", a.requireAuth(a.usageSummary))
 
+	mux.HandleFunc("GET /admin/config/export", a.requireAuth(a.exportConfig))
+	mux.HandleFunc("POST /admin/config/import", a.requireAuth(a.importConfig))
+
 	mux.HandleFunc("POST /admin/reload", a.requireAuth(a.reload))
 }
 
-// requireAuth is the Bearer-token middleware used by every admin endpoint.
-// A mis-configured masterKey (empty string) hides the admin surface so an
-// operator who forgets to set one cannot accidentally expose writes.
+// requireAuth is the Bearer-token middleware used by every admin endpoint
+// other than /admin/auth/login. It resolves the bearer token to a row in
+// admin_sessions and stashes the joined AdminUser on the request
+// context so downstream handlers can read it via userFromContext.
 func (a *AdminServer) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if a.masterKey == "" {
-			http.NotFound(w, r)
+		token := bearerToken(r)
+		if token == "" {
+			writeAdminError(w, http.StatusUnauthorized, "missing bearer token")
 			return
 		}
-		header := r.Header.Get("Authorization")
-		if !strings.HasPrefix(header, "Bearer ") || strings.TrimPrefix(header, "Bearer ") != a.masterKey {
-			writeAdminError(w, http.StatusUnauthorized, "invalid master key")
+		user, err := a.store.LookupSession(r.Context(), token)
+		if err != nil {
+			writeAdminError(w, http.StatusUnauthorized, "invalid or expired session")
 			return
 		}
-		next(w, r)
+		ctx := context.WithValue(r.Context(), adminCtxKey{}, user)
+		next(w, r.WithContext(ctx))
 	}
 }
 

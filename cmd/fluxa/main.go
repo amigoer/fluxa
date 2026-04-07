@@ -1,9 +1,17 @@
 // Package main is the entrypoint for the Fluxa AI gateway binary.
 //
-// The binary is intentionally tiny: it parses flags, loads configuration,
-// builds the router, and starts the HTTP server. Every piece of real logic
-// lives under internal/ so that other entrypoints (CLI, tests, embedded
+// The binary is intentionally tiny: it reads its runtime configuration
+// from environment variables, opens the SQLite store that holds
+// providers, routes, and virtual keys, wires up the router plus admin
+// REST surface, and starts the HTTP server. Every piece of real logic
+// lives under internal/ so other entrypoints (CLI, tests, embedded
 // library use) can compose the same building blocks.
+//
+// Starting with v2.1 there is no YAML file on the startup path. The
+// `fluxa` binary boots on a fresh box with zero files — operators
+// configure providers through the dashboard at / or the /admin REST
+// API, and can still round-trip the full state as YAML through the
+// /admin/config/export and /admin/config/import endpoints.
 package main
 
 import (
@@ -38,22 +46,23 @@ func main() {
 		return
 	}
 
-	configPath := flag.String("config", "fluxa.yaml", "path to YAML configuration file")
-	logLevel := flag.String("log-level", "info", "log level: debug, info, warn, error")
+	// The only flag left is a convenience override for the log level so
+	// `fluxa -log-level=debug` still works without exporting an env var.
+	// Everything else is an env setting — see internal/config/env.go.
+	logLevel := flag.String("log-level", "", "log level override: debug, info, warn, error")
 	flag.Parse()
 
-	logger := newLogger(*logLevel)
-	slog.SetDefault(logger)
-
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		logger.Error("load config", "path", *configPath, "err", err)
-		os.Exit(1)
+	cfg := config.FromEnv()
+	if *logLevel != "" {
+		cfg.Logging.Level = *logLevel
 	}
 
-	// Open the SQLite-backed config store. Providers and routes live here
-	// so operators can mutate them through the admin API without editing
-	// YAML and bouncing the process.
+	logger := newLogger(cfg.Logging.Level)
+	slog.SetDefault(logger)
+
+	// Open the SQLite-backed config store. Providers, routes, virtual
+	// keys and usage rows all live here so operators can mutate them
+	// through the admin API without restarting the process.
 	st, err := store.Open(cfg.Database.Path)
 	if err != nil {
 		logger.Error("open store", "path", cfg.Database.Path, "err", err)
@@ -61,28 +70,17 @@ func main() {
 	}
 	defer st.Close()
 
-	// First-run ergonomics: if the store is empty, seed it from the
-	// providers/routes sections of the YAML file. Subsequent starts never
-	// touch the rows again so admin edits are preserved.
-	if seeded, err := st.SeedIfEmpty(context.Background(), cfg); err != nil {
-		logger.Error("seed store", "err", err)
-		os.Exit(1)
-	} else if seeded {
-		logger.Info("seeded store from yaml", "providers", len(cfg.Providers), "routes", len(cfg.Routes))
-	}
-
 	provs, routes, err := st.LoadRouterInputs(context.Background())
 	if err != nil {
 		logger.Error("load router inputs", "err", err)
 		os.Exit(1)
 	}
-	// Zero providers is non-fatal: the admin dashboard at /ui/ still
-	// boots so operators can configure their first provider live.
-	// The data-plane /v1/* endpoints will return errors until a
-	// provider exists, which is the expected behaviour on a brand
-	// new install.
+	// Zero providers is non-fatal: the admin dashboard at / still boots
+	// so operators can configure their first provider live. The data-plane
+	// /v1/* endpoints return errors until a provider exists, which is the
+	// expected behaviour on a brand new install.
 	if len(provs) == 0 {
-		logger.Warn("no providers configured — data plane is idle; open /ui/ or use the admin API to add one")
+		logger.Warn("no providers configured — data plane is idle; open the dashboard or use the admin API to add one")
 	}
 
 	r := router.New()
@@ -100,16 +98,38 @@ func main() {
 		os.Exit(1)
 	}
 
+	// First-run bootstrap: if there are no admin users in the store yet,
+	// seed a default account so a fresh deployment can sign in. The
+	// credentials come from FLUXA_BOOTSTRAP_USER / FLUXA_BOOTSTRAP_PASSWORD
+	// (defaults: admin / admin) and operators are nudged in the logs to
+	// rotate the password through the dashboard immediately.
+	if n, err := st.CountAdminUsers(context.Background()); err != nil {
+		logger.Error("count admin users", "err", err)
+		os.Exit(1)
+	} else if n == 0 {
+		bootstrapUser := getEnvDefault("FLUXA_BOOTSTRAP_USER", "admin")
+		bootstrapPass := getEnvDefault("FLUXA_BOOTSTRAP_PASSWORD", "admin")
+		if _, err := st.CreateAdminUser(context.Background(), bootstrapUser, bootstrapPass); err != nil {
+			logger.Error("bootstrap admin user", "err", err)
+			os.Exit(1)
+		}
+		logger.Warn("seeded default admin account — change the password immediately",
+			"username", bootstrapUser)
+	}
+	// Best-effort cleanup of any sessions that expired while the gateway
+	// was offline so the table does not grow forever.
+	_ = st.PurgeExpiredSessions(context.Background())
+
 	mux := http.NewServeMux()
 	api.New(r, logger, kr, st).Routes(mux)
-	api.NewAdmin(r, st, kr, cfg.Server.MasterKey, logger).Routes(mux)
+	api.NewAdmin(r, st, kr, logger).Routes(mux)
 
-	// Mount the embedded admin dashboard at /ui/. A bare /ui (no
-	// trailing slash) redirects so relative asset paths resolve.
-	mux.Handle("GET /ui/", fluxaweb.Handler("/ui/"))
-	mux.HandleFunc("GET /ui", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/ui/", http.StatusMovedPermanently)
-	})
+	// Mount the embedded admin dashboard at the root. The handler is a
+	// catch-all for GET requests, so anything that does not match a more
+	// specific pattern (the /v1/* data plane, the /admin/* control
+	// plane, /health) falls through to the SPA — which in turn serves
+	// index.html for unknown paths so client-side routes keep working.
+	mux.Handle("GET /", fluxaweb.Handler("/"))
 
 	addr := net.JoinHostPort(cfg.Server.Host, strconv.Itoa(cfg.Server.Port))
 	server := &http.Server{
@@ -150,6 +170,17 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("fluxa stopped cleanly")
+}
+
+// getEnvDefault is a tiny helper used by the bootstrap path to read an
+// optional env var with a fallback. The full FromEnv loader lives under
+// internal/config but the bootstrap user/password values do not belong
+// in Runtime — they only matter the first time the gateway boots.
+func getEnvDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
 
 // newLogger builds a JSON slog.Logger at the requested level. Invalid level

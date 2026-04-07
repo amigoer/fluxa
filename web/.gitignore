@@ -6,3 +6,15 @@ node_modules
 # matches something on a fresh clone where no build has run yet.
 dist/*
 !dist/.gitkeep
+
+# TypeScript incremental build cache. The composite project reference
+# for vite.config.ts (tsconfig.node.json) writes a *.tsbuildinfo file
+# next to each tsconfig; they are pure local cache, never committed.
+*.tsbuildinfo
+
+# Compiled output from tsc applied to vite.config.ts. The project
+# reference is composite (so it can type-check) which makes tsc emit
+# vite.config.js / vite.config.d.ts; both are throwaway artefacts —
+# the real config lives in vite.config.ts.
+vite.config.js
+vite.config.d.ts

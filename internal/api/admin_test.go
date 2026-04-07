@@ -31,6 +31,18 @@ func newAdminFixture(t *testing.T) (*http.ServeMux, *store.Store, string) {
 		t.Fatalf("seed provider: %v", err)
 	}
 
+	// Seed an admin user and mint a session token so the test can call
+	// the protected endpoints. The token replaces the old static
+	// master key as the value of the Authorization Bearer header.
+	user, err := st.CreateAdminUser(t.Context(), "admin", "admin1234")
+	if err != nil {
+		t.Fatalf("seed admin user: %v", err)
+	}
+	sess, err := st.CreateSession(t.Context(), user.ID)
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
 	r := router.New()
 	provs, routes, _ := st.LoadRouterInputs(t.Context())
 	if err := r.Reload(provs, routes); err != nil {
@@ -38,8 +50,8 @@ func newAdminFixture(t *testing.T) (*http.ServeMux, *store.Store, string) {
 	}
 
 	mux := http.NewServeMux()
-	NewAdmin(r, st, nil, "test-master-key", nil).Routes(mux)
-	return mux, st, "test-master-key"
+	NewAdmin(r, st, nil, nil).Routes(mux)
+	return mux, st, sess.Token
 }
 
 func doAdmin(t *testing.T, mux *http.ServeMux, method, path, key string, body any) *httptest.ResponseRecorder {
@@ -150,14 +162,58 @@ func TestAdmin_RouteCreateReloadsRouter(t *testing.T) {
 	}
 }
 
-func TestAdmin_DisabledWhenMasterKeyEmpty(t *testing.T) {
+func TestAdmin_LoginFlow(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "fluxa.db")
-	st, _ := store.Open(dbPath)
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
 	defer st.Close()
+	if _, err := st.CreateAdminUser(t.Context(), "alice", "wonderland"); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
 	mux := http.NewServeMux()
-	NewAdmin(router.New(), st, nil, "", nil).Routes(mux)
-	rec := doAdmin(t, mux, "GET", "/admin/providers", "anything", nil)
-	if rec.Code != http.StatusNotFound {
-		t.Errorf("expected 404 when admin disabled, got %d", rec.Code)
+	NewAdmin(router.New(), st, nil, nil).Routes(mux)
+
+	// Wrong password → 401.
+	rec := doAdmin(t, mux, "POST", "/admin/auth/login", "", map[string]string{
+		"username": "alice", "password": "nope",
+	})
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("wrong password should 401, got %d", rec.Code)
+	}
+
+	// Correct credentials → token + user.
+	rec = doAdmin(t, mux, "POST", "/admin/auth/login", "", map[string]string{
+		"username": "alice", "password": "wonderland",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login: %d %s", rec.Code, rec.Body)
+	}
+	var resp struct {
+		Token string `json:"token"`
+		User  struct {
+			Username string `json:"username"`
+		} `json:"user"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp.Token == "" || resp.User.Username != "alice" {
+		t.Fatalf("login response missing fields: %+v", resp)
+	}
+
+	// Token grants access to /admin/auth/me.
+	rec = doAdmin(t, mux, "GET", "/admin/auth/me", resp.Token, nil)
+	if rec.Code != 200 {
+		t.Errorf("me: %d %s", rec.Code, rec.Body)
+	}
+
+	// Logout invalidates the token.
+	rec = doAdmin(t, mux, "POST", "/admin/auth/logout", resp.Token, nil)
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("logout: %d", rec.Code)
+	}
+	rec = doAdmin(t, mux, "GET", "/admin/auth/me", resp.Token, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("revoked token should 401, got %d", rec.Code)
 	}
 }

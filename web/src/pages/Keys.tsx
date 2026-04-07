@@ -14,11 +14,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Keys, type VirtualKey } from "@/lib/api";
+import { useT, type TranslationKey } from "@/lib/i18n";
 
 // KeysPage manages virtual keys. Newly-created keys surface a banner
 // with the full id so the operator can copy it once — the list view
 // truncates the random suffix to reduce shoulder-surfing risk.
 export function KeysPage() {
+  const { t } = useT();
   const [rows, setRows] = useState<VirtualKey[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [justCreated, setJustCreated] = useState<VirtualKey | null>(null);
@@ -34,11 +36,12 @@ export function KeysPage() {
     try {
       setRows(await Keys.list());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "load failed");
+      setError(err instanceof Error ? err.message : t("common.loadFailed"));
     }
   }
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function save() {
@@ -61,17 +64,17 @@ export function KeysPage() {
       setForm(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "save failed");
+      setError(err instanceof Error ? err.message : t("common.saveFailed"));
     }
   }
 
   async function remove(id: string) {
-    if (!confirm(`Delete key ${id}? This also removes its usage history.`)) return;
+    if (!confirm(t("keys.deleteConfirm", { id }))) return;
     try {
       await Keys.delete(id);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "delete failed");
+      setError(err instanceof Error ? err.message : t("common.deleteFailed"));
     }
   }
 
@@ -81,7 +84,7 @@ export function KeysPage() {
       await Keys.update(k.id, { enabled: !k.enabled });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "toggle failed");
+      setError(err instanceof Error ? err.message : t("common.toggleFailed"));
     }
   }
 
@@ -89,10 +92,8 @@ export function KeysPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Virtual keys</h1>
-          <p className="text-sm text-muted-foreground">
-            Per-application credentials with rate limits and budgets.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("keys.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("keys.subtitle")}</p>
         </div>
         <Button
           onClick={() =>
@@ -109,7 +110,7 @@ export function KeysPage() {
             })
           }
         >
-          <Plus className="h-4 w-4" /> New key
+          <Plus className="h-4 w-4" /> {t("keys.new")}
         </Button>
       </div>
 
@@ -119,9 +120,7 @@ export function KeysPage() {
         <Card className="border-primary">
           <CardContent className="py-4 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium">
-                Copy this key — it will not be shown again
-              </div>
+              <div className="text-sm font-medium">{t("keys.copyOnce")}</div>
               <code className="text-xs font-mono">{justCreated.id}</code>
             </div>
             <div className="flex gap-2">
@@ -130,14 +129,14 @@ export function KeysPage() {
                 size="sm"
                 onClick={() => navigator.clipboard.writeText(justCreated.id!)}
               >
-                <Copy className="h-4 w-4" /> Copy
+                <Copy className="h-4 w-4" /> {t("keys.copy")}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setJustCreated(null)}
               >
-                Dismiss
+                {t("keys.dismiss")}
               </Button>
             </div>
           </CardContent>
@@ -149,11 +148,11 @@ export function KeysPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>ID</TableHead>
-                <TableHead>Models</TableHead>
-                <TableHead>RPM</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{t("keys.colName")}</TableHead>
+                <TableHead>{t("keys.colId")}</TableHead>
+                <TableHead>{t("keys.colModels")}</TableHead>
+                <TableHead>{t("keys.colRPM")}</TableHead>
+                <TableHead>{t("keys.colStatus")}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -171,7 +170,7 @@ export function KeysPage() {
                   <TableCell>
                     <button onClick={() => toggle(k)}>
                       <Badge variant={k.enabled ? "default" : "secondary"}>
-                        {k.enabled ? "enabled" : "disabled"}
+                        {k.enabled ? t("providers.statusEnabled") : t("providers.statusDisabled")}
                       </Badge>
                     </button>
                   </TableCell>
@@ -192,7 +191,7 @@ export function KeysPage() {
                     colSpan={6}
                     className="text-center text-muted-foreground py-8"
                   >
-                    No virtual keys yet.
+                    {t("keys.empty")}
                   </TableCell>
                 </TableRow>
               )}
@@ -204,19 +203,19 @@ export function KeysPage() {
       {form && (
         <Card>
           <CardHeader>
-            <CardTitle>New virtual key</CardTitle>
+            <CardTitle>{t("keys.formTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Name</Label>
+                <Label>{t("keys.fieldName")}</Label>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Description</Label>
+                <Label>{t("keys.fieldDescription")}</Label>
                 <Input
                   value={form.description ?? ""}
                   onChange={(e) =>
@@ -226,7 +225,7 @@ export function KeysPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Models (comma-separated, * for any)</Label>
+              <Label>{t("keys.fieldModels")}</Label>
               <Input
                 value={form.modelsText}
                 onChange={(e) =>
@@ -236,7 +235,7 @@ export function KeysPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>IP allowlist (CIDR or exact, comma-separated)</Label>
+              <Label>{t("keys.fieldIPs")}</Label>
               <Input
                 value={form.ipText}
                 onChange={(e) => setForm({ ...form, ipText: e.target.value })}
@@ -245,31 +244,31 @@ export function KeysPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <NumField
-                label="RPM limit"
+                labelKey="keys.fieldRPM"
                 value={form.rpm_limit}
                 onChange={(v) => setForm({ ...form, rpm_limit: v })}
               />
               <NumField
-                label="Daily tokens budget"
+                labelKey="keys.fieldDailyTokens"
                 value={form.budget_tokens_daily}
                 onChange={(v) =>
                   setForm({ ...form, budget_tokens_daily: v })
                 }
               />
               <NumField
-                label="Monthly tokens budget"
+                labelKey="keys.fieldMonthlyTokens"
                 value={form.budget_tokens_monthly}
                 onChange={(v) =>
                   setForm({ ...form, budget_tokens_monthly: v })
                 }
               />
               <NumField
-                label="Daily USD budget"
+                labelKey="keys.fieldDailyUSD"
                 value={form.budget_usd_daily}
                 onChange={(v) => setForm({ ...form, budget_usd_daily: v })}
               />
               <NumField
-                label="Monthly USD budget"
+                labelKey="keys.fieldMonthlyUSD"
                 value={form.budget_usd_monthly}
                 onChange={(v) =>
                   setForm({ ...form, budget_usd_monthly: v })
@@ -277,9 +276,9 @@ export function KeysPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button onClick={save}>Create</Button>
+              <Button onClick={save}>{t("keys.create")}</Button>
               <Button variant="outline" onClick={() => setForm(null)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </CardContent>
@@ -297,17 +296,18 @@ function splitList(s: string): string[] {
 }
 
 function NumField({
-  label,
+  labelKey,
   value,
   onChange,
 }: {
-  label: string;
+  labelKey: TranslationKey;
   value: number | undefined;
   onChange: (v: number) => void;
 }) {
+  const { t } = useT();
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label>{t(labelKey)}</Label>
       <Input
         type="number"
         value={value ?? 0}

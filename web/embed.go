@@ -5,7 +5,7 @@
 // deployment story — operators download one executable and get both
 // the gateway and the admin UI. `make build` and `make run` compile
 // the dashboard automatically, so normal workflows produce a binary
-// that already serves the real SPA at /ui/.
+// that already serves the real SPA at the root URL.
 //
 // The repository keeps an empty web/dist/.gitkeep so the embed
 // directive matches at least one file even on a brand-new clone that
@@ -30,8 +30,9 @@ import (
 var dist embed.FS
 
 // Handler returns an http.Handler rooted at the given URL prefix
-// (typically "/ui/"). It serves static assets for real files and
-// falls through to index.html for SPA routes.
+// (typically "/"). It serves static assets for real files and falls
+// through to index.html for SPA routes so client-side navigation
+// works on a hard reload.
 func Handler(prefix string) http.Handler {
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
@@ -92,7 +93,7 @@ const fallbackIndex = `<!doctype html>
     <p>
       This will run <code>npm install &amp;&amp; npm run build</code> inside
       <code>web/</code> and then recompile the Go binary so the React SPA
-      ends up embedded under <code>/ui/</code>. The admin REST API under
+      ends up embedded at the root URL. The admin REST API under
       <code>/admin/*</code> is already live on this port — the React UI
       is just a client on top of it.
     </p>
