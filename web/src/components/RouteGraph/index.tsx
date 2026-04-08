@@ -662,7 +662,15 @@ function RouteGraphInner() {
         onConnect={onConnect}
         isValidConnection={isValidConnection}
         onNodeDragStop={onNodeDragStop}
-        onPaneClick={() => useRouteGraphStore.getState().selectNode(null)}
+        onPaneClick={() => {
+          // Clicking empty canvas should only dismiss a node edit
+          // selection; an in-progress create flow must NOT be
+          // closed by a stray click (the operator has form state
+          // in the panel that would be lost). They close it
+          // explicitly via the X button.
+          const s = useRouteGraphStore.getState();
+          if (s.selectedNodeId) s.selectNode(null);
+        }}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionLineStyle={{ stroke: "#7F77DD", strokeWidth: 2 }}
         fitView

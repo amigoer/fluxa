@@ -30,7 +30,15 @@ export function VirtualModelNode({
 
   return (
     <div
-      onClick={() => selectNode(id)}
+      // Draft nodes are still being edited in the create panel that
+      // is already open — clicking them must not swap the panel
+      // into edit mode (which would disable the name field and
+      // wipe the form on the next save). Non-draft clicks fall
+      // through to the normal edit-selection path.
+      onClick={() => {
+        if (isDraft) return;
+        selectNode(id);
+      }}
       className={cn(
         "rounded-xl bg-[#EEEDFE] dark:bg-purple-950/40 px-3.5 py-3 shadow-sm w-[230px] cursor-pointer transition-all",
         isDraft

@@ -27,7 +27,13 @@ export function RegexRouteNode({
 
   return (
     <div
-      onClick={() => selectNode(id)}
+      // Draft click is a no-op because the create panel is already
+      // open; swapping the panel into edit mode would disable the
+      // pattern field and discard the in-progress form state.
+      onClick={() => {
+        if (isDraft) return;
+        selectNode(id);
+      }}
       className={cn(
         "rounded-xl bg-[#FAEEDA] dark:bg-amber-950/40 px-3.5 py-2.5 shadow-sm w-[200px] cursor-pointer transition-all",
         // Draft border is dashed to signal "unsaved" without losing
