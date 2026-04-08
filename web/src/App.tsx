@@ -14,6 +14,8 @@ import {
   Network,
   ChevronLeft,
   ChevronRight,
+  Menu,
+  Github,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,7 @@ import { RouteGraphPage } from "@/components/RouteGraph";
 import { KeysPage } from "@/pages/Keys";
 import { UsagePage } from "@/pages/Usage";
 import { SettingsPage } from "@/pages/Settings";
+import { ProfilePage } from "@/pages/Profile";
 
 // Tab is the top-level navigation entry. The dashboard is deliberately
 // a single-file router: six tabs, no nested pages, keeps the bundle
@@ -53,7 +56,8 @@ type Tab =
   | "route-graph"
   | "keys"
   | "usage"
-  | "settings";
+  | "settings"
+  | "profile";
 
 interface NavEntry {
   id: Tab;
@@ -107,6 +111,7 @@ const TAB_IDS = new Set<Tab>([
   "keys",
   "usage",
   "settings",
+  "profile",
 ]);
 
 // pathToTab maps a pathname like "/providers" or "/" to a Tab id.
@@ -153,6 +158,17 @@ function Shell() {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     return localStorage.getItem(SIDEBAR_STORAGE) === "1";
   });
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const effectiveCollapsed = collapsed && !isMobile;
 
   // Listen for back/forward navigation so the browser's history
   // controls work the same way they would in a multi-page app.
@@ -175,6 +191,7 @@ function Shell() {
     if (window.location.pathname !== path) {
       window.history.pushState({}, "", path);
     }
+    setMobileOpen(false); // Close mobile sidebar after navigating
   }
 
   function toggleCollapsed() {
@@ -222,19 +239,46 @@ function Shell() {
     // stays anchored even when the active page is taller than the
     // window. With min-h-screen the aside would grow with the document
     // and its footer would scroll out of sight along with the page.
-    <div className="h-screen flex bg-background text-foreground font-[Inter,sans-serif]">
+    <div className="h-screen flex flex-col md:flex-row bg-background text-foreground font-[Inter,sans-serif]">
+      {/* Mobile Top Header */}
+      <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border/40 bg-background shrink-0 shadow-sm z-30">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <Zap className="h-4 w-4" strokeWidth={2.5} />
+          </div>
+          <span className="font-semibold text-sm tracking-tight">{t("app.title")}</span>
+        </div>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="p-1 -mr-1 text-muted-foreground hover:text-foreground transition-colors"
+          title={t("nav.expand")}
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileOpen && (
+        <div 
+          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 md:hidden transition-opacity" 
+          onClick={() => setMobileOpen(false)} 
+        />
+      )}
+
       <aside
         className={cn(
-          "relative shrink-0 border-r border-border/40 bg-background/95 backdrop-blur flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] z-20",
-          collapsed ? "w-[68px]" : "w-64",
+          "fixed inset-y-0 left-0 z-50 md:relative md:z-20 shrink-0 border-r border-border/40 bg-background/95 backdrop-blur flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          effectiveCollapsed ? "w-[68px]" : "w-64",
+          mobileOpen ? "translate-x-0 shadow-2xl md:shadow-none" : "-translate-x-full md:translate-x-0"
         )}
       >
+        {/* Toggle Collapse Button (Desktop Only) */}
         <button
           onClick={toggleCollapsed}
-          className="absolute -right-3.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground transition-all duration-200 z-50"
-          title={collapsed ? t("nav.expand") : t("nav.collapse")}
+          className="hidden md:flex absolute -right-3.5 top-1/2 -translate-y-1/2 h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground transition-all duration-200 z-50"
+          title={effectiveCollapsed ? t("nav.expand") : t("nav.collapse")}
         >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {effectiveCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
         {/* Brand block: a tiny logomark + wordmark. The wordmark hides
             when the sidebar is collapsed so only the logo square
@@ -242,13 +286,13 @@ function Shell() {
         <div
           className={cn(
             "py-5 flex items-center gap-3",
-            collapsed ? "px-0 justify-center" : "px-5",
+            effectiveCollapsed ? "px-0 justify-center" : "px-5",
           )}
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <Zap className="h-4 w-4" strokeWidth={2.5} />
           </div>
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <div className="leading-tight min-w-0">
               <div className="text-sm font-semibold tracking-tight truncate">
                 {t("app.title")}
@@ -263,14 +307,14 @@ function Shell() {
         <nav
           className={cn(
             "flex-1 overflow-y-auto py-2",
-            collapsed
+            effectiveCollapsed
               ? "flex flex-col items-center gap-1.5 px-0"
               : "px-2 space-y-4",
           )}
         >
           {NAV_GROUPS.map((group, gIdx) => (
-            <div key={gIdx} className={cn("flex flex-col", collapsed ? "gap-1.5" : "gap-0.5")}>
-              {!collapsed && group.title && (
+            <div key={gIdx} className={cn("flex flex-col", effectiveCollapsed ? "gap-1.5" : "gap-0.5")}>
+              {!effectiveCollapsed && group.title && (
                 <div className="px-3.5 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
                   {group.title}
                 </div>
@@ -286,7 +330,7 @@ function Shell() {
                     aria-label={label}
                     className={cn(
                       "group relative flex items-center rounded-xl text-sm transition-all duration-200",
-                      collapsed
+                      effectiveCollapsed
                         ? "h-10 w-10 justify-center mx-auto"
                         : "w-full gap-3 px-3.5 py-2",
                       active
@@ -294,7 +338,7 @@ function Shell() {
                         : "text-muted-foreground hover:bg-accent hover:text-foreground",
                     )}
                   >
-                    {!collapsed && active && (
+                    {!effectiveCollapsed && active && (
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 bg-indigo-600 rounded-r-full shadow-[0_0_8px_rgba(79,70,229,0.4)]" />
                     )}
                     <Icon
@@ -305,8 +349,8 @@ function Shell() {
                           : "text-muted-foreground group-hover:text-foreground",
                       )}
                     />
-                    {!collapsed && label}
-                    {collapsed && <SidebarTooltip label={label} />}
+                    {!effectiveCollapsed && label}
+                    {effectiveCollapsed && <SidebarTooltip label={label} />}
                   </button>
                 );
               })}
@@ -322,14 +366,15 @@ function Shell() {
         <div
           className={cn(
             "p-3",
-            collapsed && "flex flex-col items-center gap-1.5",
+            effectiveCollapsed && "flex flex-col items-center gap-1.5",
           )}
         >
-          {collapsed ? (
+          {effectiveCollapsed ? (
             <>
               <div
                 title={user.username}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold uppercase tracking-wide"
+                onClick={() => setTab("profile")}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-700 text-[11px] font-bold uppercase tracking-wide cursor-pointer hover:bg-indigo-500/20 transition-colors"
               >
                 {user.username.slice(0, 2)}
               </div>
@@ -346,7 +391,11 @@ function Shell() {
             </>
           ) : (
             <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl hover:bg-accent/40 border border-transparent transition-colors">
-              <div className="flex items-center gap-2.5">
+              <div 
+                className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-background cursor-pointer transition-colors"
+                onClick={() => setTab("profile")}
+                title={t("settings.accountTitle")}
+              >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-700 text-[11px] font-bold uppercase tracking-wide">
                   {user.username.slice(0, 2)}
                 </div>
@@ -383,16 +432,36 @@ function Shell() {
         {tab === "route-graph" ? (
           <RouteGraphPage />
         ) : (
-          <div className="max-w-6xl mx-auto px-10 py-10">
-            {tab === "dashboard" && <DashboardPage />}
-            {tab === "providers" && <ProvidersPage />}
-            {tab === "routes" && <RoutesPage />}
-            {tab === "virtual-models" && <VirtualModelsPage />}
-            {tab === "regex-routes" && <RegexRoutesPage />}
-            {tab === "resolve-tester" && <ResolveTesterPage />}
-            {tab === "keys" && <KeysPage />}
-            {tab === "usage" && <UsagePage />}
-            {tab === "settings" && <SettingsPage onSignOut={signOut} />}
+          <div className="flex flex-col min-h-full">
+            <div className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 md:px-10 md:py-10 pb-16">
+              {tab === "dashboard" && <DashboardPage />}
+              {tab === "providers" && <ProvidersPage />}
+              {tab === "routes" && <RoutesPage />}
+              {tab === "virtual-models" && <VirtualModelsPage />}
+              {tab === "regex-routes" && <RegexRoutesPage />}
+              {tab === "resolve-tester" && <ResolveTesterPage />}
+              {tab === "keys" && <KeysPage />}
+              {tab === "usage" && <UsagePage />}
+              {tab === "settings" && <SettingsPage />}
+              {tab === "profile" && <ProfilePage onSignOut={signOut} />}
+            </div>
+            
+            {/* Page Footer */}
+            <footer className="mt-auto py-6 text-center text-xs text-muted-foreground/60 border-t border-border/40">
+              <div className="flex flex-wrap justify-center items-center gap-2 max-w-6xl mx-auto px-4">
+                <span>&copy; {new Date().getFullYear()} Fluxa. All rights reserved.</span>
+                <span className="hidden sm:inline opacity-50">|</span>
+                <a 
+                  href="https://github.com/amigoer/fluxa" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+                >
+                  <Github className="h-3.5 w-3.5" />
+                  GitHub Repository
+                </a>
+              </div>
+            </footer>
           </div>
         )}
       </main>

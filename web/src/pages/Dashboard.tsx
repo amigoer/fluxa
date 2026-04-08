@@ -211,7 +211,7 @@ function UsageCard({
 
         {/* Token breakdown: prompt / completion / total. Three columns
             on wide layouts, stacks on narrow. */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <TokenStat
             labelKey="dashboard.promptTokens"
             value={totals?.PromptTokens}
