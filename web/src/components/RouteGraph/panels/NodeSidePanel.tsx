@@ -14,7 +14,7 @@
 //     after the user closes the panel so the body content does not
 //     pop out mid-animation.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Node } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
@@ -172,13 +172,41 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
     }
   })();
 
+  // draftDirtyRef is set by the inner create-mode panels the first
+  // time the operator touches a form field or drops a drag-to-
+  // connect on the canvas. close() checks it and fires a confirm
+  // prompt before throwing the draft away — nobody wants to lose
+  // a half-typed regex because they clicked the wrong X.
+  //
+  // A ref (not state) because we don't need to re-render on dirty
+  // flips; the only read site is the close handler itself.
+  const draftDirtyRef = useRef(false);
+  // Reset the dirty flag whenever a NEW create session starts or
+  // the draft node id changes. We key on draftNodeId so a cancel
+  // + fresh click doesn't carry over the previous session's flag.
+  useEffect(() => {
+    draftDirtyRef.current = false;
+  }, [creatingKind, draftNodeId]);
+
   // close() clears whichever intent is currently open. In edit mode
   // we just drop the selection; in create mode we delegate to the
   // parent's onCancelCreate so it can also remove the draft node
-  // and the source→draft edge from the canvas.
+  // and the source→draft edge from the canvas. If the create form
+  // has unsaved edits we prompt first.
   const close = () => {
-    if (selectedId) selectNode(null);
-    if (creatingKind) onCancelCreate();
+    if (selectedId) {
+      selectNode(null);
+      return;
+    }
+    if (creatingKind) {
+      if (
+        draftDirtyRef.current &&
+        !window.confirm(t("graph.confirm.discardDraft"))
+      ) {
+        return;
+      }
+      onCancelCreate();
+    }
   };
 
   return (
@@ -247,6 +275,9 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
                   ? (draftNode.data as unknown as RegexNodeData).route
                   : undefined
               }
+              onDirty={() => {
+                draftDirtyRef.current = true;
+              }}
               onChange={onChange}
               onClose={close}
             />
@@ -260,6 +291,9 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
                   ? (draftNode.data as unknown as VirtualModelNodeData).model
                   : undefined
               }
+              onDirty={() => {
+                draftDirtyRef.current = true;
+              }}
               onChange={onChange}
               onClose={close}
             />

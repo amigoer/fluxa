@@ -31,8 +31,13 @@ interface Props {
   // stopped accepting input on some renders. Local state is the
   // source of truth; the canvas draft node is a pure placeholder
   // that is replaced by the real saved node on load().
+  //
+  // onDirty fires the first time the operator touches a form field
+  // (or a drag-to-connect intent is applied), so the parent side
+  // panel can prompt before discarding the in-progress draft.
   model?: VirtualModel;
   create?: boolean;
+  onDirty?: () => void;
   onChange: () => void | Promise<void>;
   onClose: () => void;
 }
@@ -72,16 +77,25 @@ const EMPTY_VM: VirtualModel = {
 export function VirtualModelPanel({
   model,
   create,
+  onDirty,
   onChange,
   onClose,
 }: Props) {
   const { t } = useT();
   const isCreate = !!create;
-  const [form, setForm] = useState<VirtualModel>(
+  // rawForm is the real useState; setForm wraps its setter to also
+  // ping the parent's onDirty hook so a close-with-unsaved prompt
+  // can fire. See the matching pattern in RegexRoutePanel.
+  const [rawForm, setRawForm] = useState<VirtualModel>(
     model
       ? { ...model, routes: model.routes.map((r) => ({ ...r })) }
       : { ...EMPTY_VM, routes: EMPTY_VM.routes.map((r) => ({ ...r })) },
   );
+  const form = rawForm;
+  const setForm = (next: VirtualModel) => {
+    onDirty?.();
+    setRawForm(next);
+  };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +110,11 @@ export function VirtualModelPanel({
     if (!draftConnectIntent || !isCreate) return;
     const handleId = draftConnectIntent.sourceHandle ?? "route-0";
     const idx = parseInt(handleId.replace(/^route-/, ""), 10);
-    setForm((prev) => ({
+    // A drag-to-connect counts as a dirty edit. We mark before
+    // mutating so the close confirm fires even if the operator
+    // never touched a form field with the keyboard.
+    onDirty?.();
+    setRawForm((prev) => ({
       ...prev,
       routes: prev.routes.map((r, i) => {
         if (i !== (Number.isFinite(idx) ? idx : 0)) return r;
@@ -109,7 +127,7 @@ export function VirtualModelPanel({
       }),
     }));
     setDraftConnect(null);
-  }, [draftConnectIntent, isCreate, setDraftConnect]);
+  }, [draftConnectIntent, isCreate, setDraftConnect, onDirty]);
 
   const totalWeight = useMemo(
     () => form.routes.reduce((acc, r) => acc + (Number(r.weight) || 0), 0),

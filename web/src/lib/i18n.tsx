@@ -334,6 +334,8 @@ const dict = {
     "graph.dialog.patternPlaceholder": "^gpt-4.*",
     "graph.confirm.deleteRegex": "Delete this regex route?",
     "graph.confirm.deleteVirtual": "Delete virtual model \"{name}\"?",
+    "graph.confirm.discardDraft":
+      "You have unsaved changes. Discard this draft?",
     "graph.live.title": "Live (last 30s)",
     "graph.live.throughput": "Throughput",
     "graph.live.errorRate": "Error rate",
@@ -645,6 +647,7 @@ const dict = {
     "graph.dialog.patternPlaceholder": "^gpt-4.*",
     "graph.confirm.deleteRegex": "确认删除该正则路由？",
     "graph.confirm.deleteVirtual": "确认删除虚拟模型 \"{name}\"？",
+    "graph.confirm.discardDraft": "尚未保存的内容会丢失，确认放弃这个草稿？",
     "graph.live.title": "实时数据（近 30 秒）",
     "graph.live.throughput": "吞吐量",
     "graph.live.errorRate": "错误率",

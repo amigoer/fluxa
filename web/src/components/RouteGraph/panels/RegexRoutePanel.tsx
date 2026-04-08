@@ -22,8 +22,13 @@ interface Props {
   // the shape of `route`. Local state is the sole source of truth
   // for the form fields — the canvas draft node is a placeholder
   // that is replaced by the real saved node on the next load().
+  //
+  // onDirty fires the first time the operator touches a form
+  // field, so the parent side panel can prompt a confirmation
+  // before closing a create flow with unsaved edits.
   route?: RegexRoute;
   create?: boolean;
+  onDirty?: () => void;
   onChange: () => void | Promise<void>;
   onClose: () => void;
 }
@@ -41,12 +46,27 @@ const EMPTY_REGEX_ROUTE: RegexRoute = {
 export function RegexRoutePanel({
   route,
   create,
+  onDirty,
   onChange,
   onClose,
 }: Props) {
   const { t } = useT();
   const isCreate = !!create;
-  const [form, setForm] = useState<RegexRoute>(route ?? EMPTY_REGEX_ROUTE);
+  // rawForm is the real useState; setForm wraps its setter to also
+  // ping the parent's onDirty hook on every mutation, so the parent
+  // can gate the close flow behind a "discard unsaved changes?"
+  // prompt. The dirty signal fires on the first touch and stays
+  // dirty for the rest of the panel's lifetime — there is no
+  // "un-dirty" on reverting a field, which is fine for a confirm
+  // prompt.
+  const [rawForm, setRawForm] = useState<RegexRoute>(
+    route ?? EMPTY_REGEX_ROUTE,
+  );
+  const form = rawForm;
+  const setForm = (next: RegexRoute) => {
+    onDirty?.();
+    setRawForm(next);
+  };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,14 +80,18 @@ export function RegexRoutePanel({
   const setDraftConnect = useRouteGraphStore((s) => s.setDraftConnect);
   useEffect(() => {
     if (!draftConnectIntent || !isCreate) return;
-    setForm((prev) => ({
+    // Dragging to connect counts as a dirty edit — mark before
+    // mutating so the close confirm fires even if the operator
+    // never touched a form field with the keyboard.
+    onDirty?.();
+    setRawForm((prev) => ({
       ...prev,
       target_type: draftConnectIntent.target_type,
       target_model: draftConnectIntent.target_model,
       provider: draftConnectIntent.provider,
     }));
     setDraftConnect(null);
-  }, [draftConnectIntent, isCreate, setDraftConnect]);
+  }, [draftConnectIntent, isCreate, setDraftConnect, onDirty]);
 
   async function save() {
     setSaving(true);
