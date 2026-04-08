@@ -70,7 +70,10 @@ func (a *AdminServer) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /admin/auth/login", a.login)
 	mux.HandleFunc("POST /admin/auth/logout", a.requireAuth(a.logout))
 	mux.HandleFunc("GET /admin/auth/me", a.requireAuth(a.me))
+	mux.HandleFunc("PUT /admin/auth/profile", a.requireAuth(a.updateProfile))
+	mux.HandleFunc("POST /admin/auth/avatar", a.requireAuth(a.uploadAvatar))
 	mux.HandleFunc("POST /admin/auth/password", a.requireAuth(a.changePassword))
+	mux.Handle("GET /admin/avatars/", http.StripPrefix("/admin/avatars/", http.FileServer(http.Dir("./data/avatars"))))
 
 	mux.HandleFunc("GET /admin/providers", a.requireAuth(a.listProviders))
 	mux.HandleFunc("POST /admin/providers", a.requireAuth(a.upsertProvider))

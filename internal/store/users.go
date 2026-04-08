@@ -45,6 +45,9 @@ type AdminUser struct {
 	ID           int64
 	Username     string
 	PasswordHash string
+	Nickname     string
+	Email        string
+	AvatarURL    string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -107,7 +110,7 @@ func (s *Store) CreateAdminUser(ctx context.Context, username, password string) 
 // GetAdminUserByID loads one user row by its primary key.
 func (s *Store) GetAdminUserByID(ctx context.Context, id int64) (AdminUser, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, username, password_hash, created_at, updated_at
+		`SELECT id, username, password_hash, nickname, email, avatar_url, created_at, updated_at
 		 FROM admin_users WHERE id = ?`, id)
 	return scanAdminUser(row)
 }
@@ -116,7 +119,7 @@ func (s *Store) GetAdminUserByID(ctx context.Context, id int64) (AdminUser, erro
 func (s *Store) GetAdminUserByUsername(ctx context.Context, username string) (AdminUser, error) {
 	username = strings.ToLower(strings.TrimSpace(username))
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, username, password_hash, created_at, updated_at
+		`SELECT id, username, password_hash, nickname, email, avatar_url, created_at, updated_at
 		 FROM admin_users WHERE username = ?`, username)
 	return scanAdminUser(row)
 }
@@ -166,6 +169,21 @@ func (s *Store) UpdateAdminPassword(ctx context.Context, userID int64, newPasswo
 	return nil
 }
 
+// UpdateAdminProfile updates the display profile of an existing admin user.
+func (s *Store) UpdateAdminProfile(ctx context.Context, userID int64, nickname, email, avatarURL string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE admin_users SET nickname = ?, email = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		nickname, email, avatarURL, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // CreateSession mints a fresh opaque token for the given user and
 // stores it with an expiry of DefaultSessionTTL from now.
 func (s *Store) CreateSession(ctx context.Context, userID int64) (AdminSession, error) {
@@ -198,7 +216,7 @@ func (s *Store) LookupSession(ctx context.Context, token string) (AdminUser, err
 		return AdminUser{}, ErrInvalidCredentials
 	}
 	row := s.db.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.password_hash, u.created_at, u.updated_at, sess.expires_at
+		SELECT u.id, u.username, u.password_hash, u.nickname, u.email, u.avatar_url, u.created_at, u.updated_at, sess.expires_at
 		FROM admin_sessions sess
 		JOIN admin_users u ON u.id = sess.user_id
 		WHERE sess.token = ?`, token)
@@ -206,7 +224,7 @@ func (s *Store) LookupSession(ctx context.Context, token string) (AdminUser, err
 		user      AdminUser
 		expiresAt time.Time
 	)
-	if err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt, &expiresAt); err != nil {
+	if err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Nickname, &user.Email, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt, &expiresAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return AdminUser{}, ErrInvalidCredentials
 		}
@@ -235,7 +253,7 @@ func (s *Store) PurgeExpiredSessions(ctx context.Context) error {
 
 func scanAdminUser(sc scanner) (AdminUser, error) {
 	var u AdminUser
-	if err := sc.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt); err != nil {
+	if err := sc.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Nickname, &u.Email, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return AdminUser{}, ErrNotFound
 		}

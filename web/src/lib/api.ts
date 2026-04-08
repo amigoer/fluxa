@@ -51,6 +51,9 @@ async function request<T>(
 export interface AdminUser {
   id: number;
   username: string;
+  nickname: string;
+  email: string;
+  avatar_url: string;
   created_at?: string;
 }
 
@@ -91,6 +94,28 @@ export const Auth = {
       old_password: oldPassword,
       new_password: newPassword,
     }),
+  updateProfile: (nickname: string, email: string, avatarURL: string) => 
+    request<void>("PUT", "/admin/auth/profile", {
+      nickname: nickname,
+      email: email,
+      avatar_url: avatarURL,
+    }),
+  uploadAvatar: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    const token = getSessionToken();
+    const res = await fetch("/admin/auth/avatar", {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok) {
+      throw new Error(data?.error?.message ?? res.statusText);
+    }
+    return data.avatar_url;
+  },
 };
 
 // -- provider types + endpoints ----------------------------------------

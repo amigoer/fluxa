@@ -221,6 +221,16 @@ func (s *Store) migrate(ctx context.Context) error {
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 	}
+	
+	// Safe schema upgrades for v2.5
+	upgrades := []string{
+		`ALTER TABLE admin_users ADD COLUMN nickname TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE admin_users ADD COLUMN email TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE admin_users ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''`,
+	}
+	for _, stmt := range upgrades {
+		_, _ = s.db.ExecContext(ctx, stmt) // ignore "duplicate column name" errors
+	}
 	return nil
 }
 

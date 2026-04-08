@@ -242,7 +242,10 @@ function Shell() {
     <div className="h-screen flex flex-col md:flex-row bg-background text-foreground font-[Inter,sans-serif]">
       {/* Mobile Top Header */}
       <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border/40 bg-background shrink-0 shadow-sm z-30">
-        <div className="flex items-center gap-2">
+        <div 
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={() => setTab("dashboard")}
+        >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <Zap className="h-4 w-4" strokeWidth={2.5} />
           </div>
@@ -285,9 +288,10 @@ function Shell() {
             remains, perfectly centered in the narrow column. */}
         <div
           className={cn(
-            "py-5 flex items-center gap-3",
+            "py-5 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity",
             effectiveCollapsed ? "px-0 justify-center" : "px-5",
           )}
+          onClick={() => setTab("dashboard")}
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <Zap className="h-4 w-4" strokeWidth={2.5} />
@@ -334,18 +338,18 @@ function Shell() {
                         ? "h-10 w-10 justify-center mx-auto"
                         : "w-full gap-3 px-3.5 py-2",
                       active
-                        ? "bg-indigo-500/10 text-indigo-700 font-semibold shadow-sm"
+                        ? "bg-accent/70 text-foreground font-medium shadow-sm"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground",
                     )}
                   >
                     {!effectiveCollapsed && active && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 bg-indigo-600 rounded-r-full shadow-[0_0_8px_rgba(79,70,229,0.4)]" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 bg-primary rounded-r-full" />
                     )}
                     <Icon
                       className={cn(
                         "h-[18px] w-[18px] shrink-0 transition-colors",
                         active
-                          ? "text-indigo-600"
+                          ? "text-primary"
                           : "text-muted-foreground group-hover:text-foreground",
                       )}
                     />
@@ -372,11 +376,15 @@ function Shell() {
           {effectiveCollapsed ? (
             <>
               <div
-                title={user.username}
+                title={user.nickname || user.username}
                 onClick={() => setTab("profile")}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-700 text-[11px] font-bold uppercase tracking-wide cursor-pointer hover:bg-indigo-500/20 transition-colors"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-bold uppercase tracking-wide cursor-pointer hover:bg-primary/20 transition-colors overflow-hidden border border-border/50"
               >
-                {user.username.slice(0, 2)}
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  (user.nickname || user.username).slice(0, 2)
+                )}
               </div>
               <SidebarIconAction
                 icon={Languages}
@@ -396,12 +404,16 @@ function Shell() {
                 onClick={() => setTab("profile")}
                 title={t("settings.accountTitle")}
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-700 text-[11px] font-bold uppercase tracking-wide">
-                  {user.username.slice(0, 2)}
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-bold uppercase tracking-wide overflow-hidden border border-border/50">
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                  ) : (
+                    (user.nickname || user.username).slice(0, 2)
+                  )}
                 </div>
                 <div className="min-w-0 leading-tight">
                   <div className="text-sm font-semibold truncate text-foreground">
-                    {user.username}
+                    {user.nickname || user.username}
                   </div>
                   <div className="text-[11px] text-muted-foreground/80 truncate font-medium">
                     {t("nav.account") === "Account" ? "Administrator" : "管理员"}
@@ -443,7 +455,7 @@ function Shell() {
               {tab === "keys" && <KeysPage />}
               {tab === "usage" && <UsagePage />}
               {tab === "settings" && <SettingsPage />}
-              {tab === "profile" && <ProfilePage onSignOut={signOut} />}
+              {tab === "profile" && <ProfilePage user={user} onUserUpdate={setUser} onSignOut={signOut} />}
             </div>
             
             {/* Page Footer */}
@@ -539,27 +551,32 @@ function LoginScreen({ onAuth }: { onAuth: (u: AdminUser) => void }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 relative px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50/50 via-background to-blue-50/30 dark:from-indigo-950/20 dark:via-background dark:to-blue-900/10 relative px-4 overflow-hidden">
+      {/* Decorative ambient blobs */}
+      <div className="absolute top-1/4 -left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
       <button
         onClick={() => setLocale(locale === "en" ? "zh" : "en")}
-        className="absolute top-4 right-4 text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        className="absolute top-6 right-6 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-md border border-border/50 text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 shadow-sm transition-all"
       >
-        <Languages className="h-3 w-3" />
+        <Languages className="h-3.5 w-3.5" />
         {t("lang.toggle")}
       </button>
-      <Card className="w-full max-w-sm shadow-lg">
-        <CardHeader className="space-y-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <Zap className="h-5 w-5" strokeWidth={2.5} />
+
+      <Card className="z-10 w-full max-w-md shadow-2xl bg-background/80 backdrop-blur-xl border-border/40">
+        <CardHeader className="space-y-4 text-center mt-2">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 text-white shadow-lg">
+            <Zap className="h-7 w-7" strokeWidth={2.5} />
           </div>
-          <div className="space-y-1">
-            <CardTitle className="text-xl">{t("login.title")}</CardTitle>
-            <CardDescription>{t("app.subtitle")}</CardDescription>
+          <div className="space-y-1.5">
+            <CardTitle className="text-2xl tracking-tight font-semibold">{t("login.title")}</CardTitle>
+            <CardDescription className="text-[13px]">{t("app.subtitle")}</CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
+        <CardContent className="px-8 pb-8 pt-4">
+          <form onSubmit={submit} className="space-y-5">
+            <div className="space-y-2.5">
               <Label htmlFor="username">{t("login.username")}</Label>
               <Input
                 id="username"
@@ -568,9 +585,10 @@ function LoginScreen({ onAuth }: { onAuth: (u: AdminUser) => void }) {
                 placeholder={t("login.placeholderUser")}
                 autoFocus
                 autoComplete="username"
+                className="h-10 border-border/50 bg-background/50 focus-visible:ring-indigo-500/30"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <Label htmlFor="password">{t("login.password")}</Label>
               <Input
                 id="password"
@@ -579,13 +597,16 @@ function LoginScreen({ onAuth }: { onAuth: (u: AdminUser) => void }) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("login.placeholderPass")}
                 autoComplete="current-password"
+                className="h-10 border-border/50 bg-background/50 focus-visible:ring-indigo-500/30"
               />
-              {error && <p className="text-xs text-destructive">{error}</p>}
+              {error && <p className="text-[13px] text-destructive pt-1 font-medium">{error}</p>}
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t("login.checking") : t("login.submit")}
-            </Button>
-            <p className="text-xs text-muted-foreground">
+            <div className="pt-2">
+              <Button type="submit" className="w-full h-10 shadow-md transition-all active:scale-[0.98]" disabled={loading}>
+                {loading ? t("login.checking") : t("login.submit")}
+              </Button>
+            </div>
+            <p className="text-center text-xs text-muted-foreground/80 mt-6">
               {t("login.firstRunHint")}
             </p>
           </form>

@@ -17,7 +17,11 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/amigoer/fluxa/internal/store"
@@ -42,6 +46,9 @@ type loginResponse struct {
 type userDTO struct {
 	ID        int64  `json:"id"`
 	Username  string `json:"username"`
+	Nickname  string `json:"nickname"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
 	CreatedAt string `json:"created_at,omitempty"`
 }
 
@@ -49,6 +56,9 @@ func toUserDTO(u store.AdminUser) userDTO {
 	return userDTO{
 		ID:        u.ID,
 		Username:  u.Username,
+		Nickname:  u.Nickname,
+		Email:     u.Email,
+		AvatarURL: u.AvatarURL,
 		CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
@@ -145,4 +155,90 @@ func bearerToken(r *http.Request) string {
 		return ""
 	}
 	return strings.TrimPrefix(h, "Bearer ")
+}
+
+// updateProfileRequest is the JSON shape posted to /admin/auth/profile.
+type updateProfileRequest struct {
+	Nickname  string `json:"nickname"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+}
+
+// updateProfile saves changes to the caller's profile.
+func (a *AdminServer) updateProfile(w http.ResponseWriter, r *http.Request) {
+	user, ok := userFromContext(r)
+	if !ok {
+		writeAdminError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	var req updateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAdminError(w, http.StatusBadRequest, "invalid json: "+err.Error())
+		return
+	}
+	if err := a.store.UpdateAdminProfile(r.Context(), user.ID, req.Nickname, req.Email, req.AvatarURL); err != nil {
+		writeAdminError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	a.logger.Info("admin profile updated", "user", user.Username)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// uploadAvatar receives a multipart/form-data upload, saves the file to
+// disk, and returns the path so the caller can set it as their avatar_url.
+func (a *AdminServer) uploadAvatar(w http.ResponseWriter, r *http.Request) {
+	user, ok := userFromContext(r)
+	if !ok {
+		writeAdminError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+
+	// 5MB limit for avatar images
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		writeAdminError(w, http.StatusBadRequest, "failed to parse upload: "+err.Error())
+		return
+	}
+	
+	file, header, err := r.FormFile("avatar")
+	if err != nil {
+		writeAdminError(w, http.StatusBadRequest, "missing 'avatar' field in form")
+		return
+	}
+	defer file.Close()
+
+	// Ensure target directory exists natively without needing external scripts
+	dir := "./data/avatars"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		writeAdminError(w, http.StatusInternalServerError, "failed to configure upload directory")
+		return
+	}
+
+	// Make the filename secure but deterministic based on user ID.
+	// That way uploading a new avatar naturally overwrites the old one
+	// without accumulating unbounded disk bytes.
+	ext := ".png"
+	if strings.HasSuffix(strings.ToLower(header.Filename), ".jpg") || strings.HasSuffix(strings.ToLower(header.Filename), ".jpeg") {
+		ext = ".jpg"
+	} else if strings.HasSuffix(strings.ToLower(header.Filename), ".webp") {
+		ext = ".webp"
+	} else if strings.HasSuffix(strings.ToLower(header.Filename), ".gif") {
+		ext = ".gif"
+	}
+	filename := fmt.Sprintf("user_%d%s", user.ID, ext)
+	outPath := filepath.Join(dir, filename)
+
+	out, err := os.Create(outPath)
+	if err != nil {
+		writeAdminError(w, http.StatusInternalServerError, "failed to write file")
+		return
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, file); err != nil {
+		writeAdminError(w, http.StatusInternalServerError, "failed to write file blobs")
+		return
+	}
+
+	publicURL := "/admin/avatars/" + filename
+	writeJSON(w, http.StatusOK, map[string]string{"avatar_url": publicURL})
 }
