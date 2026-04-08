@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { RegexRoutePanel } from "./RegexRoutePanel";
 import { VirtualModelPanel } from "./VirtualModelPanel";
 import { ProviderPanel } from "./ProviderPanel";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type {
   ProviderNodeData,
   RegexNodeData,
@@ -175,7 +176,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
   // draftDirtyRef is set by the inner create-mode panels the first
   // time the operator touches a form field or drops a drag-to-
   // connect on the canvas. close() checks it and fires a confirm
-  // prompt before throwing the draft away — nobody wants to lose
+  // dialog before throwing the draft away — nobody wants to lose
   // a half-typed regex because they clicked the wrong X.
   //
   // A ref (not state) because we don't need to re-render on dirty
@@ -188,25 +189,34 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
     draftDirtyRef.current = false;
   }, [creatingKind, draftNodeId]);
 
+  // discardOpen controls the shadcn ConfirmDialog that asks the
+  // operator whether they really want to throw away an unsaved
+  // draft. Managed as state (not a ref) because the dialog needs
+  // to re-render when it opens and closes.
+  const [discardOpen, setDiscardOpen] = useState(false);
+
   // close() clears whichever intent is currently open. In edit mode
   // we just drop the selection; in create mode we delegate to the
   // parent's onCancelCreate so it can also remove the draft node
   // and the source→draft edge from the canvas. If the create form
-  // has unsaved edits we prompt first.
+  // has unsaved edits we pop the ConfirmDialog first — the actual
+  // teardown happens in onDiscardConfirm below.
   const close = () => {
     if (selectedId) {
       selectNode(null);
       return;
     }
     if (creatingKind) {
-      if (
-        draftDirtyRef.current &&
-        !window.confirm(t("graph.confirm.discardDraft"))
-      ) {
+      if (draftDirtyRef.current) {
+        setDiscardOpen(true);
         return;
       }
       onCancelCreate();
     }
+  };
+
+  const onDiscardConfirm = () => {
+    onCancelCreate();
   };
 
   return (
@@ -328,6 +338,15 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
             )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={discardOpen}
+        onOpenChange={setDiscardOpen}
+        title={t("graph.confirm.titleDiscard")}
+        description={t("graph.confirm.discardDraft")}
+        destructive
+        onConfirm={onDiscardConfirm}
+      />
     </div>
   );
 }

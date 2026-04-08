@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface Props {
   // create  : model is the empty draft payload, name field editable,
@@ -98,6 +99,9 @@ export function VirtualModelPanel({
   };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // deleteOpen drives the shadcn ConfirmDialog for the
+  // destructive DELETE /admin/virtual-models/:name path.
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // draftConnectIntent is the one-shot signal from the canvas
   // onConnect handler when the operator drags from this draft's
@@ -170,8 +174,10 @@ export function VirtualModelPanel({
     }
   }
 
+  // remove() performs the actual DELETE. The Delete button opens
+  // the ConfirmDialog; the dialog's onConfirm calls this function
+  // after the operator approves.
   async function remove() {
-    if (!confirm(t("graph.confirm.deleteVirtual", { name: form.name }))) return;
     setSaving(true);
     setError(null);
     try {
@@ -318,7 +324,7 @@ export function VirtualModelPanel({
         </Button>
         {!isCreate && (
           <Button
-            onClick={remove}
+            onClick={() => setDeleteOpen(true)}
             disabled={saving}
             size="sm"
             variant="destructive"
@@ -327,6 +333,15 @@ export function VirtualModelPanel({
           </Button>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t("graph.confirm.titleDelete")}
+        description={t("graph.confirm.deleteVirtual", { name: form.name })}
+        destructive
+        onConfirm={remove}
+      />
     </div>
   );
 }

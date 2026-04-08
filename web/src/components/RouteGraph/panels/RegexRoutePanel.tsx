@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RegexRoutes, type RegexRoute } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface Props {
   // create  : route is the empty draft payload, Save POSTs a new
@@ -69,6 +70,11 @@ export function RegexRoutePanel({
   };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // deleteOpen drives the shadcn ConfirmDialog we pop before
+  // actually hitting DELETE /admin/regex-routes/:id. We manage it
+  // as local state because it is purely a panel-level affordance
+  // and does not need to survive across sessions.
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // draftConnectIntent is the one-shot signal from canvas
   // onConnect when the operator drags from this draft's output
@@ -122,9 +128,11 @@ export function RegexRoutePanel({
     }
   }
 
+  // remove() is split from the confirm step so the dialog's
+  // onConfirm can fire the actual DELETE. The Delete button just
+  // opens the dialog; the dialog then calls remove() on approval.
   async function remove() {
     if (!form.id) return;
-    if (!confirm(t("graph.confirm.deleteRegex"))) return;
     setSaving(true);
     setError(null);
     try {
@@ -225,7 +233,7 @@ export function RegexRoutePanel({
         </Button>
         {!isCreate && (
           <Button
-            onClick={remove}
+            onClick={() => setDeleteOpen(true)}
             disabled={saving}
             size="sm"
             variant="destructive"
@@ -234,6 +242,15 @@ export function RegexRoutePanel({
           </Button>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t("graph.confirm.titleDelete")}
+        description={t("graph.confirm.deleteRegex")}
+        destructive
+        onConfirm={remove}
+      />
     </div>
   );
 }

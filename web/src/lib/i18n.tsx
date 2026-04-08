@@ -321,6 +321,7 @@ const dict = {
     "graph.action.delete": "Delete",
     "graph.action.create": "Create",
     "graph.action.cancel": "Cancel",
+    "graph.action.confirm": "Confirm",
     "graph.action.saving": "Saving…",
     "graph.weights.warning":
       "Weights must sum to 100; current total is {total}.",
@@ -336,6 +337,8 @@ const dict = {
     "graph.confirm.deleteVirtual": "Delete virtual model \"{name}\"?",
     "graph.confirm.discardDraft":
       "You have unsaved changes. Discard this draft?",
+    "graph.confirm.titleDelete": "Confirm deletion",
+    "graph.confirm.titleDiscard": "Discard draft?",
     "graph.live.title": "Live (last 30s)",
     "graph.live.throughput": "Throughput",
     "graph.live.errorRate": "Error rate",
@@ -634,6 +637,7 @@ const dict = {
     "graph.action.delete": "删除",
     "graph.action.create": "创建",
     "graph.action.cancel": "取消",
+    "graph.action.confirm": "确定",
     "graph.action.saving": "保存中…",
     "graph.weights.warning":
       "权重之和必须等于 100，当前为 {total}",
@@ -648,6 +652,8 @@ const dict = {
     "graph.confirm.deleteRegex": "确认删除该正则路由？",
     "graph.confirm.deleteVirtual": "确认删除虚拟模型 \"{name}\"？",
     "graph.confirm.discardDraft": "尚未保存的内容会丢失，确认放弃这个草稿？",
+    "graph.confirm.titleDelete": "确认删除",
+    "graph.confirm.titleDiscard": "放弃草稿？",
     "graph.live.title": "实时数据（近 30 秒）",
     "graph.live.throughput": "吞吐量",
     "graph.live.errorRate": "错误率",
