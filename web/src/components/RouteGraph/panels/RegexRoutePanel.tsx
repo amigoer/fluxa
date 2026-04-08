@@ -3,13 +3,14 @@
 // Both trigger an onChange callback so the parent can re-fetch and
 // rebuild the graph after a successful mutation.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RegexRoutes, type RegexRoute } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { useRouteGraphStore } from "@/store/routeGraphStore";
 
 interface Props {
   // create  : route is the empty draft payload, Save POSTs a new
@@ -48,6 +49,25 @@ export function RegexRoutePanel({
   const [form, setForm] = useState<RegexRoute>(route ?? EMPTY_REGEX_ROUTE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // draftConnectIntent is the one-shot signal from canvas
+  // onConnect when the operator drags from this draft's output
+  // handle to a provider / VM. Regex rules have a single target
+  // slot so the merge is straightforward — overwrite target_type /
+  // target_model / provider with the dropped values, then clear
+  // the intent.
+  const draftConnectIntent = useRouteGraphStore((s) => s.draftConnectIntent);
+  const setDraftConnect = useRouteGraphStore((s) => s.setDraftConnect);
+  useEffect(() => {
+    if (!draftConnectIntent || !isCreate) return;
+    setForm((prev) => ({
+      ...prev,
+      target_type: draftConnectIntent.target_type,
+      target_model: draftConnectIntent.target_model,
+      provider: draftConnectIntent.provider,
+    }));
+    setDraftConnect(null);
+  }, [draftConnectIntent, isCreate, setDraftConnect]);
 
   async function save() {
     setSaving(true);

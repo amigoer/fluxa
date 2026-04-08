@@ -5,7 +5,7 @@
 // instead and let the operator fix it themselves so the saved
 // configuration always matches what they typed.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import {
   type VirtualModelRoute,
 } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { useRouteGraphStore } from "@/store/routeGraphStore";
 
 interface Props {
   // create  : model is the empty draft payload, name field editable,
@@ -83,6 +84,32 @@ export function VirtualModelPanel({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // draftConnectIntent is the one-shot signal from the canvas
+  // onConnect handler when the operator drags from this draft's
+  // output handle to a provider / VM. We merge the dropped target
+  // into the matching route's target fields, then clear the intent
+  // so subsequent unrelated renders don't re-apply it.
+  const draftConnectIntent = useRouteGraphStore((s) => s.draftConnectIntent);
+  const setDraftConnect = useRouteGraphStore((s) => s.setDraftConnect);
+  useEffect(() => {
+    if (!draftConnectIntent || !isCreate) return;
+    const handleId = draftConnectIntent.sourceHandle ?? "route-0";
+    const idx = parseInt(handleId.replace(/^route-/, ""), 10);
+    setForm((prev) => ({
+      ...prev,
+      routes: prev.routes.map((r, i) => {
+        if (i !== (Number.isFinite(idx) ? idx : 0)) return r;
+        return {
+          ...r,
+          target_type: draftConnectIntent.target_type,
+          target_model: draftConnectIntent.target_model,
+          provider: draftConnectIntent.provider,
+        };
+      }),
+    }));
+    setDraftConnect(null);
+  }, [draftConnectIntent, isCreate, setDraftConnect]);
 
   const totalWeight = useMemo(
     () => form.routes.reduce((acc, r) => acc + (Number(r.weight) || 0), 0),

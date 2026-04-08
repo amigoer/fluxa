@@ -30,6 +30,25 @@ export interface EdgeStat {
 // type when this is set, and the toolbar's "+" buttons set it.
 export type CreatingKind = "regexRoute" | "virtualModel" | null;
 
+// DraftConnectIntent is a one-shot signal from onConnect (in the
+// canvas) to the currently open create-mode side panel form. The
+// panel uses pure local useState for form fields — so we cannot
+// mutate it from outside. Instead, onConnect writes an intent
+// object here, the panel's useEffect picks it up, merges the
+// target fields into its local form state, and then calls
+// clearDraftConnect so the same intent is not reapplied on
+// subsequent renders.
+//
+// sourceHandle encodes which VM route to update (route-0, route-1,
+// ...) in the virtual model create flow. It is null / undefined
+// for the regex create flow where there is only one target field.
+export interface DraftConnectIntent {
+  sourceHandle?: string | null;
+  target_type: "real" | "virtual";
+  target_model: string;
+  provider: string;
+}
+
 interface RouteGraphState {
   nodes: Node[];
   edges: Edge[];
@@ -47,6 +66,10 @@ interface RouteGraphState {
   // a visual placeholder and is replaced on save when load()
   // rebuilds the graph from the server.
   draftNodeId: string | null;
+  // draftConnectIntent is the one-shot "the canvas just connected
+  // the draft to a new target" signal consumed by the create-mode
+  // side panel. See the interface comment above.
+  draftConnectIntent: DraftConnectIntent | null;
   liveMode: boolean;
   // liveStats is keyed by edge id so the WeightedEdge / RouteEdge
   // components can do an O(1) lookup during render. Provider node
@@ -62,6 +85,7 @@ interface RouteGraphState {
   // the draft node the caller already inserted into the canvas. Pass
   // null to clear without touching the nodes array.
   startCreate: (kind: CreatingKind, draftNodeId?: string | null) => void;
+  setDraftConnect: (intent: DraftConnectIntent | null) => void;
   toggleLiveMode: () => void;
   updateLiveStats: (stats: Record<string, EdgeStat>) => void;
 }
@@ -72,6 +96,7 @@ export const useRouteGraphStore = create<RouteGraphState>((set) => ({
   selectedNodeId: null,
   creatingKind: null,
   draftNodeId: null,
+  draftConnectIntent: null,
   // Live mode is on by default so the canvas immediately shows
   // animated traffic flow when an operator opens the page. Without
   // this the page would look static and the routing topology would
@@ -88,7 +113,16 @@ export const useRouteGraphStore = create<RouteGraphState>((set) => ({
   // intents at once.
   selectNode: (id) => set({ selectedNodeId: id, creatingKind: null }),
   startCreate: (kind, draftNodeId = null) =>
-    set({ creatingKind: kind, draftNodeId, selectedNodeId: null }),
+    set({
+      creatingKind: kind,
+      draftNodeId,
+      selectedNodeId: null,
+      // Starting a fresh create flow clears any stale connect
+      // intent from a previous session so the new panel does not
+      // instantly gobble up a dragged target from before.
+      draftConnectIntent: null,
+    }),
+  setDraftConnect: (intent) => set({ draftConnectIntent: intent }),
   toggleLiveMode: () => set((s) => ({ liveMode: !s.liveMode })),
   updateLiveStats: (stats) => set({ liveStats: stats }),
 }));

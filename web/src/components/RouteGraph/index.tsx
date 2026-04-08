@@ -96,6 +96,7 @@ function RouteGraphInner() {
   const liveMode = useRouteGraphStore((s) => s.liveMode);
   const updateLiveStats = useRouteGraphStore((s) => s.updateLiveStats);
   const startCreate = useRouteGraphStore((s) => s.startCreate);
+  const setDraftConnect = useRouteGraphStore((s) => s.setDraftConnect);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -397,12 +398,90 @@ function RouteGraphInner() {
         return; // dropping on source / fallback / regex is meaningless
       }
 
-      // Drag originating from a draft is a no-op at the API layer:
-      // the form on the side panel owns the target fields and we
-      // can't write into its local state from here. The draft's
-      // outgoing edge (if any) is built by buildGraph on the next
-      // reload from the saved payload.
-      if (sourceNode.id.startsWith("draft-")) return;
+      // Drag originating from a draft node: the draft has no
+      // backend row yet, so we can't POST anything. Instead we do
+      // two things:
+      //   1. Add a visual edge so the operator sees their drag
+      //      stick on the canvas.
+      //   2. Fire a one-shot draftConnectIntent on the store; the
+      //      create-mode side panel watches this and merges the
+      //      dropped target into its local form state, so when the
+      //      operator hits Save the POST payload already has the
+      //      target filled in.
+      //
+      // Self-loop guard: a draft VM dragging onto itself (once the
+      // operator has typed the same name) would create a runtime
+      // cycle. Reject it up front.
+      //
+      // Duplicate / replace guard: if the same sourceHandle already
+      // has an edge elsewhere we REPLACE it — only one outgoing
+      // edge per handle at a time — so the form always reflects
+      // the most recent drag.
+      if (sourceNode.id.startsWith("draft-")) {
+        if (
+          sourceNode.type !== "virtualModel" &&
+          sourceNode.type !== "regexRoute"
+        ) {
+          return;
+        }
+        if (
+          sourceNode.type === "virtualModel" &&
+          newTarget.target_type === "virtual"
+        ) {
+          const draftVM = (sourceNode.data as unknown as VirtualModelNodeData)
+            .model;
+          if (newTarget.target_model === draftVM.name) return;
+        }
+
+        // Strip any previous manual edge from this same handle on
+        // the draft so repeated drags don't pile up stale lines.
+        const keepEdges = currentEdges.filter((e) => {
+          if (e.source !== sourceNode.id) return true;
+          if (sourceNode.type === "virtualModel") {
+            // VM drafts have per-route handles; only drop the edge
+            // whose sourceHandle matches the one we're about to
+            // re-issue.
+            return e.sourceHandle !== (conn.sourceHandle ?? null);
+          }
+          // Regex drafts have a single source handle, so any prior
+          // edge from this draft is a stale target pick.
+          return false;
+        });
+
+        const manualEdge: Edge =
+          sourceNode.type === "virtualModel"
+            ? {
+                id: `e:${sourceNode.id}->${targetNode.id}#manual-${Date.now()}`,
+                source: sourceNode.id,
+                sourceHandle: conn.sourceHandle ?? undefined,
+                target: targetNode.id,
+                type: "weighted",
+                data: { weight: 100, weightPct: 100 },
+              }
+            : {
+                id: `e:${sourceNode.id}->${targetNode.id}#manual-${Date.now()}`,
+                source: sourceNode.id,
+                target: targetNode.id,
+                type: "route",
+                data: { labelKind: "matched" },
+              };
+        setEdges([...keepEdges, manualEdge]);
+
+        // Fire the intent so the open side panel form picks up the
+        // new target fields. sourceHandle is only meaningful for
+        // VM drafts (one route per handle) — for regex drafts it
+        // is null because there is just one target slot.
+        setDraftConnect({
+          sourceHandle:
+            sourceNode.type === "virtualModel"
+              ? (conn.sourceHandle ?? "route-0")
+              : null,
+          target_type: newTarget.target_type,
+          target_model: newTarget.target_model,
+          provider: newTarget.provider,
+        });
+        return;
+      }
 
       try {
         if (sourceNode.type === "virtualModel") {
@@ -449,7 +528,7 @@ function RouteGraphInner() {
         setError(err instanceof Error ? err.message : t("graph.errors.save"));
       }
     },
-    [load, t],
+    [load, t, setEdges, setDraftConnect],
   );
 
   // isValidConnection — runs while the operator is dragging, so
@@ -468,6 +547,16 @@ function RouteGraphInner() {
     // visual edge into the in-flight draft node so the operator can
     // see the wiring they just drew.
     if (s.type === "source" && t.id.startsWith("draft-")) return true;
+    // Draft VM / regex sources are valid if the target is a
+    // provider or another VM. The onConnect handler will reject
+    // self-loops separately (once the operator has typed a name).
+    if (s.id.startsWith("draft-")) {
+      const validSource =
+        s.type === "virtualModel" || s.type === "regexRoute";
+      const validTarget =
+        t.type === "provider" || t.type === "virtualModel";
+      return validSource && validTarget;
+    }
     const validSource = s.type === "virtualModel" || s.type === "regexRoute";
     const validTarget = t.type === "provider" || t.type === "virtualModel";
     return validSource && validTarget;
