@@ -72,7 +72,20 @@ export function ProviderCreatePanel({ onDirty, onChange, onClose }: Props) {
 
   async function save() {
     if (!form.name.trim()) {
-      setError(t("graph.errors.save"));
+      setError(t("graph.errors.providerNoName"));
+      return;
+    }
+    // Models are required when creating from the topology view —
+    // a provider with no advertised models has no (provider, model)
+    // tuple for buildGraph to render, so the new record would
+    // silently disappear after save. Block the save and explain why
+    // instead of letting the operator wonder where the node went.
+    const parsedModels = modelsText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parsedModels.length === 0) {
+      setError(t("graph.errors.providerNoModels"));
       return;
     }
     setSaving(true);
@@ -84,10 +97,7 @@ export function ProviderCreatePanel({ onDirty, onChange, onClose }: Props) {
         kind: form.kind.trim(),
         api_key: form.api_key ?? "",
         base_url: form.base_url?.trim() || undefined,
-        models: modelsText
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        models: parsedModels,
       });
       await onChange();
       onClose();
@@ -152,7 +162,12 @@ export function ProviderCreatePanel({ onDirty, onChange, onClose }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs">{t("graph.field.models")}</Label>
+        <Label className="text-xs flex items-center gap-1">
+          {t("graph.field.models")}
+          <span className="text-destructive" aria-hidden="true">
+            *
+          </span>
+        </Label>
         <Input
           value={modelsText}
           onChange={(e) => {

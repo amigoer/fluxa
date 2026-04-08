@@ -313,6 +313,9 @@ const dict = {
     "graph.field.apiKey": "API key",
     "graph.field.models": "Models",
     "graph.field.modelsHint": "Comma-separated list — each entry becomes a node on the canvas.",
+    "graph.errors.providerNoModels":
+      "Add at least one model — otherwise the provider has no (provider, model) tuple to show on the canvas.",
+    "graph.errors.providerNoName": "Provider name is required.",
     "graph.field.routes": "Routes",
     "graph.field.add": "Add",
     "graph.field.weightPlaceholder": "w",
@@ -636,6 +639,9 @@ const dict = {
     "graph.field.apiKey": "API 密钥",
     "graph.field.models": "模型列表",
     "graph.field.modelsHint": "用逗号分隔，每个条目会在画布上生成一个节点。",
+    "graph.errors.providerNoModels":
+      "至少填写一个模型，否则该供应商在画布上没有任何 (供应商, 模型) 元组可显示。",
+    "graph.errors.providerNoName": "供应商名称是必填项。",
     "graph.field.routes": "目标列表",
     "graph.field.add": "添加",
     "graph.field.weightPlaceholder": "权重",
