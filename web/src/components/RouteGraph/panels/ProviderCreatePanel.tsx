@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Providers, type Provider } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { useSaveShortcut, SAVE_SHORTCUT_HINT } from "./useSaveShortcut";
 
 interface Props {
   onDirty?: () => void;
@@ -108,6 +109,10 @@ export function ProviderCreatePanel({ onDirty, onChange, onClose }: Props) {
     }
   }
 
+  // Cmd/Ctrl+S triggers Save while this panel is mounted. Disabled
+  // while a save is already in flight to prevent double-submits.
+  useSaveShortcut(save, !saving);
+
   return (
     <div className="space-y-4">
       {error && (
@@ -184,6 +189,9 @@ export function ProviderCreatePanel({ onDirty, onChange, onClose }: Props) {
       <div className="flex gap-2 pt-2">
         <Button onClick={save} disabled={saving} size="sm" className="flex-1">
           {saving ? t("graph.action.saving") : t("graph.action.create")}
+          <span className="ml-1.5 text-[10px] opacity-70 font-mono">
+            {SAVE_SHORTCUT_HINT}
+          </span>
         </Button>
       </div>
     </div>

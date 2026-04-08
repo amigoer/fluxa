@@ -12,6 +12,7 @@ import { RegexRoutes, type RegexRoute } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useSaveShortcut, SAVE_SHORTCUT_HINT } from "./useSaveShortcut";
 
 interface Props {
   // create  : route is the empty draft payload, Save POSTs a new
@@ -146,6 +147,11 @@ export function RegexRoutePanel({
     }
   }
 
+  // Cmd/Ctrl+S triggers Save while this panel is mounted. Disabled
+  // while a save is already in flight so a held-down shortcut does
+  // not double-submit the same form.
+  useSaveShortcut(save, !saving);
+
   return (
     <div className="space-y-4">
       {error && (
@@ -230,6 +236,9 @@ export function RegexRoutePanel({
             : isCreate
               ? t("graph.action.create")
               : t("graph.action.save")}
+          <span className="ml-1.5 text-[10px] opacity-70 font-mono">
+            {SAVE_SHORTCUT_HINT}
+          </span>
         </Button>
         {!isCreate && (
           <Button

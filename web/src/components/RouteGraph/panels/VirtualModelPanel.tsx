@@ -19,6 +19,7 @@ import {
 import { useT } from "@/lib/i18n";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useSaveShortcut, SAVE_SHORTCUT_HINT } from "./useSaveShortcut";
 
 interface Props {
   // create  : model is the empty draft payload, name field editable,
@@ -191,6 +192,10 @@ export function VirtualModelPanel({
     }
   }
 
+  // Cmd/Ctrl+S triggers Save while this panel is mounted. Disabled
+  // while a save is already in flight to prevent double-submits.
+  useSaveShortcut(save, !saving);
+
   return (
     <div className="space-y-4">
       {error && (
@@ -321,6 +326,9 @@ export function VirtualModelPanel({
             : isCreate
               ? t("graph.action.create")
               : t("graph.action.save")}
+          <span className="ml-1.5 text-[10px] opacity-70 font-mono">
+            {SAVE_SHORTCUT_HINT}
+          </span>
         </Button>
         {!isCreate && (
           <Button
