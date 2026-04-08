@@ -19,6 +19,11 @@ export const zh: Record<TranslationKey, string> = {
     "nav.collapse": "收起侧边栏",
     "nav.expand": "展开侧边栏",
 
+    "nav.group.routing": "路由管理",
+    "nav.group.access": "访问控制",
+    "nav.group.monitoring": "监控",
+    "nav.group.system": "系统",
+
     "lang.toggle": "English",
 
     "login.title": "Fluxa 管理后台",

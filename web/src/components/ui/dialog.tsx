@@ -46,8 +46,8 @@ export const DialogContent = React.forwardRef<
       className={cn(
         // Centred card. max-w controls the typical "form modal" width;
         // callers can override via className when they need wider.
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2",
-        "gap-5 rounded-xl border border-border/60 bg-background p-6 shadow-2xl",
+        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2",
+        "gap-4 sm:gap-5 rounded-2xl border border-border/60 bg-background p-5 sm:p-6 shadow-2xl",
         "transition-all duration-150",
         "data-[state=closed]:opacity-0 data-[state=closed]:scale-95",
         "data-[state=open]:opacity-100 data-[state=open]:scale-100",
@@ -85,7 +85,7 @@ export const DialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+      "flex flex-row justify-end gap-2",
       className,
     )}
     {...props}

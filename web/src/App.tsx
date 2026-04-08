@@ -66,17 +66,16 @@ interface NavEntry {
 }
 
 interface NavGroup {
-  title: string;
+  titleKey?: TranslationKey;
   items: NavEntry[];
 }
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    title: "",
     items: [{ id: "dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard }],
   },
   {
-    title: "路由管理",
+    titleKey: "nav.group.routing",
     items: [
       { id: "route-graph", labelKey: "nav.routeGraph", icon: Network },
       { id: "providers", labelKey: "nav.providers", icon: Server },
@@ -86,15 +85,15 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: "访问控制",
+    titleKey: "nav.group.access",
     items: [{ id: "keys", labelKey: "nav.keys", icon: KeyRound }],
   },
   {
-    title: "监控",
+    titleKey: "nav.group.monitoring",
     items: [{ id: "usage", labelKey: "nav.usage", icon: BarChart3 }],
   },
   {
-    title: "系统",
+    titleKey: "nav.group.system",
     items: [{ id: "settings", labelKey: "nav.settings", icon: SettingsIcon }],
   },
 ];
@@ -145,7 +144,7 @@ export default function App() {
 const SIDEBAR_STORAGE = "fluxa-sidebar-collapsed";
 
 function Shell() {
-  const { t, locale, setLocale } = useT();
+  const { t } = useT();
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loadingMe, setLoadingMe] = useState<boolean>(!!getSessionToken());
   // The active tab is derived from the URL pathname so a hard refresh
@@ -318,9 +317,9 @@ function Shell() {
         >
           {NAV_GROUPS.map((group, gIdx) => (
             <div key={gIdx} className={cn("flex flex-col", effectiveCollapsed ? "gap-1.5" : "gap-0.5")}>
-              {!effectiveCollapsed && group.title && (
+              {!effectiveCollapsed && group.titleKey && (
                 <div className="px-3.5 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
-                  {group.title}
+                  {t(group.titleKey)}
                 </div>
               )}
               {group.items.map((n) => {
@@ -387,11 +386,6 @@ function Shell() {
                 )}
               </div>
               <SidebarIconAction
-                icon={Languages}
-                label={t("lang.toggle")}
-                onClick={() => setLocale(locale === "en" ? "zh" : "en")}
-              />
-              <SidebarIconAction
                 icon={LogOut}
                 label={t("nav.signOut")}
                 onClick={signOut}
@@ -422,11 +416,6 @@ function Shell() {
               </div>
               <div className="flex items-center gap-0.5 shrink-0">
                 <SidebarIconAction
-                  icon={Languages}
-                  label={t("lang.toggle")}
-                  onClick={() => setLocale(locale === "en" ? "zh" : "en")}
-                />
-                <SidebarIconAction
                   icon={LogOut}
                   label={t("nav.signOut")}
                   onClick={signOut}
@@ -436,7 +425,7 @@ function Shell() {
           )}
         </div>
       </aside>
-      <main className="flex-1 overflow-auto relative">
+      <main className={`flex-1 relative ${tab === "route-graph" ? "overflow-hidden" : "overflow-auto"}`}>
         {/* The route graph is full-bleed: it owns the entire main
             area so React Flow can size its canvas to the viewport.
             Every other page sits inside the centred max-width

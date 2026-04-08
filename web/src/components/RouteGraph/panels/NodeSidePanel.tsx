@@ -243,7 +243,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
     // drop pointer events so clicks fall through to the canvas.
     <div
       className={cn(
-        "absolute top-3 right-3 bottom-3 w-[340px] z-20 transition-all duration-300 ease-out",
+        "absolute top-3 right-3 bottom-3 w-[calc(100%-1.5rem)] sm:w-[340px] z-20 transition-all duration-300 ease-out",
         open
           ? "translate-x-0 opacity-100"
           : "translate-x-[calc(100%+1rem)] opacity-0 pointer-events-none",

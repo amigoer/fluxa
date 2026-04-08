@@ -17,6 +17,11 @@ export const en = {
     "nav.collapse": "Collapse sidebar",
     "nav.expand": "Expand sidebar",
 
+    "nav.group.routing": "Routing",
+    "nav.group.access": "Access Control",
+    "nav.group.monitoring": "Monitoring",
+    "nav.group.system": "System",
+
     "lang.toggle": "中文",
 
     "login.title": "Fluxa admin",

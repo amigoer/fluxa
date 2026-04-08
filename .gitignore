@@ -12,6 +12,7 @@ plan/
 *.db-wal
 *.db-shm
 fluxa.yaml
+/data/
 
 # Editor
 .vscode/
