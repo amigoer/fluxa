@@ -27,6 +27,12 @@ export function VirtualModelNode({
   const isDraft = !!data.draft;
   const total =
     vm.routes.reduce((acc, r) => acc + (r.weight || 0), 0) || 1;
+  // imbalanced is true when the configured weights do not sum to
+  // 100. We surface this on the card so the operator notices the
+  // problem at a glance — the sum gates correctness and the rest
+  // of the bar still draws because we normalise by total above.
+  const realTotal = vm.routes.reduce((acc, r) => acc + (r.weight || 0), 0);
+  const imbalanced = !isDraft && realTotal !== 100 && vm.routes.length > 0;
 
   return (
     <div
@@ -99,7 +105,10 @@ export function VirtualModelNode({
 
       {/* Inline percentage labels coloured to match each segment.
           We render at most four labels in the body and overflow into
-          a "+N" tail so the node never grows wider than 230px. */}
+          a "+N" tail so the node never grows wider than 230px. The
+          imbalance pill anchors to the right when the operator has
+          weights that do not sum to 100 — quiet enough to not
+          shout, loud enough to be obvious. */}
       <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-semibold">
         {vm.routes.slice(0, 4).map((r, i) => {
           const pct = Math.round(((r.weight || 0) / total) * 100);
@@ -114,6 +123,14 @@ export function VirtualModelNode({
             {t("graph.virtual.more", { count: vm.routes.length - 4 })}
           </span>
         )}
+        {imbalanced && (
+          <span
+            className="ml-auto rounded-full bg-amber-100 text-amber-800 px-1.5 py-px text-[9px] border border-amber-300"
+            title={`weights sum to ${realTotal}, expected 100`}
+          >
+            ≠100
+          </span>
+        )}
       </div>
 
       <Handle
@@ -121,12 +138,14 @@ export function VirtualModelNode({
         position={Position.Left}
         className="!h-3 !w-3 !bg-white !border-2 !border-[#AFA9EC]"
       />
-      {/* One output handle per route, distributed vertically along the
-          right edge so dagre and the edge router can keep the fanout
-          tidy. The id matches what buildGraph emitted as
-          sourceHandle. */}
+      {/* One output handle per route, distributed vertically along
+          the upper 75% of the right edge so dagre and the edge
+          router can keep the fanout tidy. The lower 25% is reserved
+          for the dedicated "+ add-route" handle below — keeping the
+          two zones apart prevents accidental rewires when the
+          operator meant to add a new branch. */}
       {vm.routes.map((_, idx) => {
-        const top = `${((idx + 1) / (vm.routes.length + 1)) * 100}%`;
+        const top = `${((idx + 1) / (vm.routes.length + 1)) * 75}%`;
         return (
           <Handle
             key={idx}
@@ -138,6 +157,25 @@ export function VirtualModelNode({
           />
         );
       })}
+      {/* "+ add route" handle. Dragging from this handle to a
+          provider / VM appends a brand-new route (default weight 0)
+          rather than rewiring an existing one. Visually it has a
+          "+" glyph to telegraph the affordance — operators don't
+          need to read docs to discover it. Hidden in draft mode
+          since the create form panel handles route additions. */}
+      {!isDraft && (
+        <Handle
+          id="add-route"
+          type="source"
+          position={Position.Right}
+          style={{ top: "92%" }}
+          className="!h-4 !w-4 !bg-white !border-2 !border-[#7F77DD] !rounded-full"
+        >
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-bold text-[#7F77DD] leading-none">
+            +
+          </span>
+        </Handle>
+      )}
     </div>
   );
 }

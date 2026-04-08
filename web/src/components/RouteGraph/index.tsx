@@ -53,7 +53,7 @@ import { RegexRouteNode } from "./nodes/RegexRouteNode";
 import { VirtualModelNode } from "./nodes/VirtualModelNode";
 import { ProviderNode } from "./nodes/ProviderNode";
 import { FallbackNode } from "./nodes/FallbackNode";
-import { WeightedEdge } from "./edges/WeightedEdge";
+import { WeightedEdge, type EditWeightDetail } from "./edges/WeightedEdge";
 import { RouteEdge } from "./edges/RouteEdge";
 import { GraphToolbar } from "./toolbar/GraphToolbar";
 import { NodeSidePanel } from "./panels/NodeSidePanel";
@@ -180,6 +180,43 @@ function RouteGraphInner() {
       }
     };
   }, [liveMode, updateLiveStats]);
+
+  // fluxa-edit-weight listener. Fired by WeightedEdge's inline
+  // weight editor when the operator commits a new percentage. We
+  // resolve the edge to its owning VM via the source node id and
+  // its sourceHandle (route-N), patch the route's weight, POST the
+  // VM, and reload the graph. Errors surface via the same setError
+  // banner the rest of the page uses. Custom events keep the edge
+  // component decoupled from the API layer — it has no direct
+  // reference to load() or VirtualModels.upsert.
+  useEffect(() => {
+    async function onEditWeight(ev: Event) {
+      const detail = (ev as CustomEvent<EditWeightDetail>).detail;
+      if (!detail) return;
+      const state = useRouteGraphStore.getState();
+      const edge = state.edges.find((e) => e.id === detail.edgeId);
+      if (!edge) return;
+      const sourceNode = state.nodes.find((n) => n.id === edge.source);
+      if (!sourceNode || sourceNode.type !== "virtualModel") return;
+      const v = sourceNode.data as unknown as VirtualModelNodeData;
+      const idxStr = (edge.sourceHandle ?? "").replace(/^route-/, "");
+      const idx = parseInt(idxStr, 10);
+      if (Number.isNaN(idx) || idx < 0 || idx >= v.model.routes.length) return;
+      try {
+        await VirtualModels.upsert({
+          ...v.model,
+          routes: v.model.routes.map((r, i) =>
+            i === idx ? { ...r, weight: detail.weight } : r,
+          ),
+        });
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("graph.errors.save"));
+      }
+    }
+    window.addEventListener("fluxa-edit-weight", onEditWeight);
+    return () => window.removeEventListener("fluxa-edit-weight", onEditWeight);
+  }, [load, t]);
 
   // React Flow change handlers — we delegate to the helper functions
   // for position / removal updates and write the result straight back
@@ -495,16 +532,7 @@ function RouteGraphInner() {
 
       try {
         if (sourceNode.type === "virtualModel") {
-          // Rewire route N of this VM. The handle id encodes the
-          // route index ("route-2" -> idx 2). If the user dragged
-          // from a non-route handle (defensive — there are no other
-          // source handles on a VM today) we bail.
           const v = sourceNode.data as unknown as VirtualModelNodeData;
-          const idxStr = (conn.sourceHandle ?? "").replace(/^route-/, "");
-          const idx = parseInt(idxStr, 10);
-          if (Number.isNaN(idx) || idx < 0 || idx >= v.model.routes.length) {
-            return;
-          }
           // Reject self-loops: a VM route pointing back at the same VM
           // would create a runtime cycle the resolver caps at depth 5
           // and confusing topology.
@@ -512,6 +540,39 @@ function RouteGraphInner() {
             newTarget.target_type === "virtual" &&
             newTarget.target_model === v.model.name
           ) {
+            return;
+          }
+
+          // The dedicated "+ add-route" handle appends a brand-new
+          // route with weight 0 instead of rewiring an existing
+          // one. The operator then rebalances weights via the side
+          // panel or by clicking the new edge label inline. The
+          // 0% default forces an explicit redistribution rather
+          // than silently shifting traffic away from existing
+          // targets.
+          if (conn.sourceHandle === "add-route") {
+            const updated = {
+              ...v.model,
+              routes: [
+                ...v.model.routes,
+                {
+                  weight: 0,
+                  enabled: true,
+                  ...newTarget,
+                },
+              ],
+            };
+            await VirtualModels.upsert(updated);
+            await load();
+            return;
+          }
+
+          // Rewire route N of this VM. The handle id encodes the
+          // route index ("route-2" -> idx 2). If the user dragged
+          // from a non-route handle we bail.
+          const idxStr = (conn.sourceHandle ?? "").replace(/^route-/, "");
+          const idx = parseInt(idxStr, 10);
+          if (Number.isNaN(idx) || idx < 0 || idx >= v.model.routes.length) {
             return;
           }
           const updated = {
