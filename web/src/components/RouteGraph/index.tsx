@@ -289,22 +289,15 @@ function RouteGraphInner() {
         };
       }
 
-      // The source→draft edge uses the same labelKind we'd assign
-      // after the rule was saved (priority for regex, direct for VM)
-      // so the visual is identical pre/post save — only the dashed
-      // border on the draft card itself signals "unsaved".
-      const draftEdge: Edge = {
-        id: `e:source->${id}`,
-        source: "source",
-        target: id,
-        type: "route",
-        data: {
-          labelKind: kind === "regexRoute" ? "priority" : "direct",
-          priority: 100,
-        },
-      };
-
-      setGraph([...baseNodes, draftNode], [...baseEdges, draftEdge]);
+      // We deliberately do NOT wire a source→draft edge here. The
+      // operator's next move is typically to drag from the draft's
+      // output handle to a target Provider / VM, and the real
+      // source→draft wiring will be materialised by buildGraph on
+      // the next reload (after Save) based on the saved regex
+      // priority or the VM's direct-name semantics. Pre-drawing the
+      // edge would also leave a stale gray stub on screen if the
+      // operator cancels.
+      setGraph([...baseNodes, draftNode], baseEdges);
       startCreate(kind, id);
     },
     [nodes, edges, setGraph, startCreate],
