@@ -220,7 +220,7 @@ function RouteGraphInner() {
   // Save the API call + load() replaces the draft with the real
   // server-derived node.
   const onStartCreate = useCallback(
-    (kind: "regexRoute" | "virtualModel") => {
+    (kind: "regexRoute" | "virtualModel" | "provider") => {
       // Clean up any previous draft so consecutive clicks of the
       // toolbar buttons swap drafts cleanly instead of stacking.
       const prior = useRouteGraphStore.getState().draftNodeId;
@@ -230,6 +230,16 @@ function RouteGraphInner() {
       const baseEdges = prior
         ? edges.filter((e) => e.source !== prior && e.target !== prior)
         : edges;
+
+      // Provider creation has no canvas draft — providers are
+      // config blobs, not (provider, model) tuples. Just open the
+      // side panel and let buildGraph materialise the new provider
+      // nodes on the next load() via the provider-models loop.
+      if (kind === "provider") {
+        if (prior) setGraph(baseNodes, baseEdges);
+        startCreate("provider", null);
+        return;
+      }
 
       // Pick a spot offset from the source node. Falls back to the
       // origin if there is no source node yet (shouldn't happen but

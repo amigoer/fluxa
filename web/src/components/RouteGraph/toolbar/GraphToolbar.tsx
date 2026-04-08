@@ -10,6 +10,7 @@ import {
   RefreshCw,
   GitBranch,
   Regex as RegexIcon,
+  Server,
 } from "lucide-react";
 import { useReactFlow } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
@@ -23,10 +24,12 @@ interface Props {
   // the parent's wiring stays the same — easier to add new toolbar
   // actions later that *do* need a refresh hook.
   onChange?: () => void | Promise<void>;
-  // onStartCreate inserts a draft node into the canvas + opens the
-  // side panel bound to it. The toolbar dispatches but the parent
-  // owns the actual node insertion (it has the position context).
-  onStartCreate: (kind: "regexRoute" | "virtualModel") => void;
+  // onStartCreate opens the side panel in create mode for the
+  // given kind. For regex/virtual it also inserts a draft node
+  // on the canvas; for provider there is no draft node (providers
+  // are config blobs, not (provider, model) tuples). The parent
+  // owns the node insertion because it has the position context.
+  onStartCreate: (kind: "regexRoute" | "virtualModel" | "provider") => void;
 }
 
 export function GraphToolbar({ onLayout, onStartCreate }: Props) {
@@ -58,6 +61,13 @@ export function GraphToolbar({ onLayout, onStartCreate }: Props) {
         >
           <GitBranch className="h-3.5 w-3.5" />
           {t("graph.toolbar.virtual")}
+        </button>
+        <button
+          onClick={() => onStartCreate("provider")}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-foreground hover:bg-muted transition-colors"
+        >
+          <Server className="h-3.5 w-3.5" />
+          {t("graph.toolbar.provider")}
         </button>
         <div className="h-4 w-px bg-border mx-0.5" />
         <button

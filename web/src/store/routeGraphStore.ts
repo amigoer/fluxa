@@ -28,7 +28,18 @@ export interface EdgeStat {
 // CreatingKind tags which create-flow the side panel is currently
 // hosting. The side panel renders an empty form for the matching
 // type when this is set, and the toolbar's "+" buttons set it.
-export type CreatingKind = "regexRoute" | "virtualModel" | null;
+//
+// "provider" is a special case: unlike regex/virtual, the provider
+// create flow does not insert a draft node on the canvas (a
+// provider record is a config object, not a (provider, model)
+// tuple). The side panel opens with an empty form and the canvas
+// only updates on save, via load() picking up the new provider
+// via buildGraph's provider-models loop.
+export type CreatingKind =
+  | "regexRoute"
+  | "virtualModel"
+  | "provider"
+  | null;
 
 // DraftConnectIntent is a one-shot signal from onConnect (in the
 // canvas) to the currently open create-mode side panel form. The

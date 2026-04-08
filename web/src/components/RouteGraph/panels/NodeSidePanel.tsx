@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { RegexRoutePanel } from "./RegexRoutePanel";
 import { VirtualModelPanel } from "./VirtualModelPanel";
 import { ProviderPanel } from "./ProviderPanel";
+import { ProviderCreatePanel } from "./ProviderCreatePanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import type {
   ProviderNodeData,
@@ -102,7 +103,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
   const [displayed, setDisplayed] = useState<{
     kind: "edit" | "create";
     node?: Node;
-    creatingKind?: "regexRoute" | "virtualModel";
+    creatingKind?: "regexRoute" | "virtualModel" | "provider";
   } | null>(null);
 
   useEffect(() => {
@@ -155,8 +156,12 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
         };
       case "provider":
         return {
-          typeLabel: t("graph.panel.providerTitle"),
-          subtitle: t("graph.panel.providerSubtitle"),
+          typeLabel: isCreate
+            ? t("graph.dialog.newProvider")
+            : t("graph.panel.providerTitle"),
+          subtitle: isCreate
+            ? t("graph.dialog.providerHint")
+            : t("graph.panel.providerSubtitle"),
         };
       case "source":
         return {
@@ -301,6 +306,20 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
                   ? (draftNode.data as unknown as VirtualModelNodeData).model
                   : undefined
               }
+              onDirty={() => {
+                draftDirtyRef.current = true;
+              }}
+              onChange={onChange}
+              onClose={close}
+            />
+          )}
+          {isCreate && resolvedType === "provider" && (
+            <ProviderCreatePanel
+              // No draftNodeId to key against (provider creation
+              // does not materialise a draft node), so we key the
+              // component by creatingKind so the form is freshly
+              // mounted each time the operator opens it.
+              key={`create-provider-${creatingKind}`}
               onDirty={() => {
                 draftDirtyRef.current = true;
               }}

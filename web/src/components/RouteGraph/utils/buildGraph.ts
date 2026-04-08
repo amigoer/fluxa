@@ -308,5 +308,20 @@ export function buildGraph(
     });
   }
 
+  // 7. Standalone ProviderNodes — one per (provider, model) tuple
+  //    declared in each provider's advertised `models` list. This
+  //    makes newly-created providers immediately visible on the
+  //    canvas even before any route targets them, so the operator
+  //    can drag a VM route handle or regex onto them right after
+  //    creating the provider. ensureProviderNode is idempotent, so
+  //    already-rendered (referenced) nodes are not duplicated.
+  for (const p of providers) {
+    if (p.enabled === false) continue;
+    for (const model of p.models ?? []) {
+      if (!model) continue;
+      ensureProviderNode(p.name, model);
+    }
+  }
+
   return { nodes, edges };
 }
