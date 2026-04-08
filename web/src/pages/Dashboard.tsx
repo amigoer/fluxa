@@ -63,11 +63,11 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
+      <header className="space-y-1.5 pb-2">
+        <h1 className="text-[28px] font-semibold tracking-tight text-foreground">
           {t("dashboard.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[15px] text-muted-foreground">
           {t("dashboard.subtitle")}
         </p>
       </header>
@@ -133,20 +133,20 @@ function Stat({
 }) {
   const { t } = useT();
   return (
-    <Card className="hover:shadow-md">
+    <Card className="overflow-hidden border border-border/40 shadow-sm transition-all hover:shadow-md hover:border-border/80 group">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors duration-300">
           {t(labelKey)}
         </CardTitle>
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          <Icon className="h-4 w-4" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground group-hover:bg-foreground group-hover:text-background transition-colors duration-300">
+          <Icon className="h-[18px] w-[18px]" />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-2">
         {value === undefined ? (
-          <Skeleton className="h-9 w-16" />
+          <Skeleton className="h-10 w-20" />
         ) : (
-          <div className="text-3xl font-semibold tabular-nums tracking-tight">
+          <div className="text-4xl font-semibold tabular-nums tracking-tight text-foreground">
             {value}
           </div>
         )}
@@ -172,17 +172,17 @@ function UsageCard({
 }) {
   const { t } = useT();
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+    <Card className="border border-border/40 shadow-sm transition-all hover:shadow-md group">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-6">
         <div className="space-y-1">
-          <CardTitle className="text-base">{t(titleKey)}</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg font-medium tracking-tight text-foreground">{t(titleKey)}</CardTitle>
+          <CardDescription className="text-[13px]">
             {t("dashboard.requests")} · {t("dashboard.totalTokens")} ·{" "}
             {t("dashboard.costUSD")}
           </CardDescription>
         </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          <Icon className="h-4 w-4" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground group-hover:bg-foreground group-hover:text-background transition-colors duration-300">
+          <Icon className="h-[18px] w-[18px]" />
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -246,15 +246,15 @@ function Headline({
 }) {
   const { t } = useT();
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         {t(labelKey)}
       </div>
       {value === undefined ? (
-        <Skeleton className="h-7 w-24" />
+        <Skeleton className="h-8 w-28" />
       ) : (
-        <div className="text-2xl font-semibold tabular-nums tracking-tight">
+        <div className="text-[28px] font-semibold tabular-nums tracking-tight text-foreground">
           {value}
         </div>
       )}
@@ -276,15 +276,15 @@ function TokenStat({
 }) {
   const { t } = useT();
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {Icon && <Icon className="h-3 w-3" />}
         {t(labelKey)}
       </div>
       {loading ? (
-        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-6 w-20" />
       ) : (
-        <div className="text-base font-medium tabular-nums">
+        <div className="text-lg font-medium tabular-nums text-foreground/90">
           {(value ?? 0).toLocaleString()}
         </div>
       )}

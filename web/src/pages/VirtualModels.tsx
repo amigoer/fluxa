@@ -177,7 +177,7 @@ export function VirtualModelsPage() {
                       .join(", ")}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={vm.enabled ? "default" : "outline"}>
+                    <Badge variant={vm.enabled ? "success" : "muted"}>
                       {vm.enabled
                         ? t("providers.statusEnabled")
                         : t("providers.statusDisabled")}

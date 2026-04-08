@@ -151,7 +151,7 @@ export function RegexRoutesPage() {
                     {r.description || "—"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={r.enabled ? "default" : "outline"}>
+                    <Badge variant={r.enabled ? "success" : "muted"}>
                       {r.enabled
                         ? t("providers.statusEnabled")
                         : t("providers.statusDisabled")}

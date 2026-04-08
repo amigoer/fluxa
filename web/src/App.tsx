@@ -9,12 +9,11 @@ import {
   LogOut,
   Languages,
   Zap,
-  PanelLeftClose,
-  PanelLeftOpen,
   GitBranch,
-  Regex,
-  TestTube2,
+  Code2,
   Network,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,22 +61,53 @@ interface NavEntry {
   icon: typeof LayoutDashboard;
 }
 
-const NAV: NavEntry[] = [
-  { id: "dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
-  { id: "providers", labelKey: "nav.providers", icon: Server },
-  { id: "routes", labelKey: "nav.routes", icon: Waypoints },
-  { id: "virtual-models", labelKey: "nav.virtualModels", icon: GitBranch },
-  { id: "regex-routes", labelKey: "nav.regexRoutes", icon: Regex },
-  { id: "resolve-tester", labelKey: "nav.resolveTester", icon: TestTube2 },
-  { id: "route-graph", labelKey: "nav.routeGraph", icon: Network },
-  { id: "keys", labelKey: "nav.keys", icon: KeyRound },
-  { id: "usage", labelKey: "nav.usage", icon: BarChart3 },
-  { id: "settings", labelKey: "nav.settings", icon: SettingsIcon },
+interface NavGroup {
+  title: string;
+  items: NavEntry[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    title: "",
+    items: [{ id: "dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard }],
+  },
+  {
+    title: "路由管理",
+    items: [
+      { id: "route-graph", labelKey: "nav.routeGraph", icon: Network },
+      { id: "providers", labelKey: "nav.providers", icon: Server },
+      { id: "routes", labelKey: "nav.routes", icon: Waypoints },
+      { id: "virtual-models", labelKey: "nav.virtualModels", icon: GitBranch },
+      { id: "regex-routes", labelKey: "nav.regexRoutes", icon: Code2 },
+    ],
+  },
+  {
+    title: "访问控制",
+    items: [{ id: "keys", labelKey: "nav.keys", icon: KeyRound }],
+  },
+  {
+    title: "监控",
+    items: [{ id: "usage", labelKey: "nav.usage", icon: BarChart3 }],
+  },
+  {
+    title: "系统",
+    items: [{ id: "settings", labelKey: "nav.settings", icon: SettingsIcon }],
+  },
 ];
 
-// Set of valid tab ids, derived once from NAV so the URL-routing
-// helpers below cannot drift out of sync with the navigation list.
-const TAB_IDS = new Set<Tab>(NAV.map((n) => n.id));
+// Set of valid tab ids
+const TAB_IDS = new Set<Tab>([
+  "dashboard",
+  "providers",
+  "routes",
+  "virtual-models",
+  "regex-routes",
+  "resolve-tester", // Kept in tabs, but removed from sidebar
+  "route-graph",
+  "keys",
+  "usage",
+  "settings",
+]);
 
 // pathToTab maps a pathname like "/providers" or "/" to a Tab id.
 // Anything we do not recognise (including "/") falls back to the
@@ -192,17 +222,20 @@ function Shell() {
     // stays anchored even when the active page is taller than the
     // window. With min-h-screen the aside would grow with the document
     // and its footer would scroll out of sight along with the page.
-    <div className="h-screen flex bg-muted/30 text-foreground">
+    <div className="h-screen flex bg-background text-foreground font-[Inter,sans-serif]">
       <aside
         className={cn(
-          // The width is the only thing that animates on collapse — all
-          // child rows switch to icon-only layouts via the `collapsed`
-          // prop, which keeps the transition cheap and avoids reflow
-          // jitter on the main content area.
-          "shrink-0 border-r border-border/60 bg-background flex flex-col transition-[width] duration-200 ease-in-out",
+          "relative shrink-0 border-r border-border/40 bg-background/95 backdrop-blur flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] z-20",
           collapsed ? "w-[68px]" : "w-64",
         )}
       >
+        <button
+          onClick={toggleCollapsed}
+          className="absolute -right-3.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground transition-all duration-200 z-50"
+          title={collapsed ? t("nav.expand") : t("nav.collapse")}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
         {/* Brand block: a tiny logomark + wordmark. The wordmark hides
             when the sidebar is collapsed so only the logo square
             remains, perfectly centered in the narrow column. */}
@@ -229,61 +262,56 @@ function Shell() {
         <Separator />
         <nav
           className={cn(
-            "flex-1 py-3",
+            "flex-1 overflow-y-auto py-2",
             collapsed
-              ? "flex flex-col items-center gap-1 px-0"
-              : "px-3 space-y-0.5",
+              ? "flex flex-col items-center gap-1.5 px-0"
+              : "px-2 space-y-4",
           )}
         >
-          {NAV.map((n) => {
-            const Icon = n.icon;
-            const active = tab === n.id;
-            const label = t(n.labelKey);
-            return (
-              <button
-                key={n.id}
-                onClick={() => setTab(n.id)}
-                aria-label={label}
-                className={cn(
-                  "group relative flex items-center rounded-md text-sm transition-colors",
-                  collapsed
-                    ? "h-9 w-9 justify-center"
-                    : "w-full gap-2.5 px-3 py-2",
-                  active
-                    ? "bg-accent text-accent-foreground font-medium"
-                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-                )}
-              >
-                {/* The left "you-are-here" indicator stays in expanded
-                    mode but is hidden when collapsed — at icon-only
-                    width the filled background already does the job
-                    and a 2px bar would look squashed. */}
-                {!collapsed && (
-                  <span
+          {NAV_GROUPS.map((group, gIdx) => (
+            <div key={gIdx} className={cn("flex flex-col", collapsed ? "gap-1.5" : "gap-0.5")}>
+              {!collapsed && group.title && (
+                <div className="px-3.5 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
+                  {group.title}
+                </div>
+              )}
+              {group.items.map((n) => {
+                const Icon = n.icon;
+                const active = tab === n.id;
+                const label = t(n.labelKey);
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => setTab(n.id)}
+                    aria-label={label}
                     className={cn(
-                      "absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full transition-colors",
-                      active ? "bg-foreground" : "bg-transparent",
+                      "group relative flex items-center rounded-xl text-sm transition-all duration-200",
+                      collapsed
+                        ? "h-10 w-10 justify-center mx-auto"
+                        : "w-full gap-3 px-3.5 py-2",
+                      active
+                        ? "bg-indigo-500/10 text-indigo-700 font-semibold shadow-sm"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
                     )}
-                  />
-                )}
-                <Icon
-                  className={cn(
-                    "h-4 w-4 shrink-0 transition-colors",
-                    active
-                      ? "text-foreground"
-                      : "text-muted-foreground group-hover:text-foreground",
-                  )}
-                />
-                {!collapsed && label}
-                {/* Hover tooltip — only meaningful in collapsed mode
-                    where the label would otherwise be invisible. The
-                    span is absolutely positioned so it escapes the
-                    9x9 button box and renders to the right of the
-                    sidebar without disturbing layout. */}
-                {collapsed && <SidebarTooltip label={label} />}
-              </button>
-            );
-          })}
+                  >
+                    {!collapsed && active && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 bg-indigo-600 rounded-r-full shadow-[0_0_8px_rgba(79,70,229,0.4)]" />
+                    )}
+                    <Icon
+                      className={cn(
+                        "h-[18px] w-[18px] shrink-0 transition-colors",
+                        active
+                          ? "text-indigo-600"
+                          : "text-muted-foreground group-hover:text-foreground",
+                      )}
+                    />
+                    {!collapsed && label}
+                    {collapsed && <SidebarTooltip label={label} />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
         {/* Footer block. Expanded layout is a single rounded "user
             card" — avatar + username on top, a row of three icon
@@ -315,28 +343,23 @@ function Shell() {
                 label={t("nav.signOut")}
                 onClick={signOut}
               />
-              <SidebarIconAction
-                icon={PanelLeftOpen}
-                label={t("nav.expand")}
-                onClick={toggleCollapsed}
-              />
             </>
           ) : (
-            <div className="rounded-xl border border-border/60 bg-muted/40 p-2.5 space-y-2">
-              <div className="flex items-center gap-2.5 px-1">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-[11px] font-semibold uppercase tracking-wide shadow-sm border border-border/60">
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl hover:bg-accent/40 border border-transparent transition-colors">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-700 text-[11px] font-bold uppercase tracking-wide">
                   {user.username.slice(0, 2)}
                 </div>
                 <div className="min-w-0 leading-tight">
-                  <div className="text-sm font-medium truncate">
+                  <div className="text-sm font-semibold truncate text-foreground">
                     {user.username}
                   </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
-                    {t("nav.account")}
+                  <div className="text-[11px] text-muted-foreground/80 truncate font-medium">
+                    {t("nav.account") === "Account" ? "Administrator" : "管理员"}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-1 border-t border-border/60 pt-2">
+              <div className="flex items-center gap-0.5 shrink-0">
                 <SidebarIconAction
                   icon={Languages}
                   label={t("lang.toggle")}
@@ -346,11 +369,6 @@ function Shell() {
                   icon={LogOut}
                   label={t("nav.signOut")}
                   onClick={signOut}
-                />
-                <SidebarIconAction
-                  icon={PanelLeftClose}
-                  label={t("nav.collapse")}
-                  onClick={toggleCollapsed}
                 />
               </div>
             </div>
@@ -398,11 +416,12 @@ function SidebarIconAction({
   return (
     <button
       type="button"
+      title={label}
       aria-label={label}
       onClick={onClick}
-      className="group relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className="group relative inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground"
     >
-      <Icon className="h-4 w-4" />
+      <Icon className="h-[18px] w-[18px]" />
       <SidebarTooltip label={label} />
     </button>
   );
