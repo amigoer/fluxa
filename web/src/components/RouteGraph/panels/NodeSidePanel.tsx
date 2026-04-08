@@ -200,13 +200,25 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
   // to re-render when it opens and closes.
   const [discardOpen, setDiscardOpen] = useState(false);
 
-  // close() clears whichever intent is currently open. In edit mode
-  // we just drop the selection; in create mode we delegate to the
-  // parent's onCancelCreate so it can also remove the draft node
-  // and the source→draft edge from the canvas. If the create form
-  // has unsaved edits we pop the ConfirmDialog first — the actual
-  // teardown happens in onDiscardConfirm below.
-  const close = () => {
+  // closeImmediate tears the panel down without any dirty check.
+  // Used by every success path — Save / Delete inside the child
+  // panels — because the operation the dirty flag was guarding
+  // has already succeeded, so there is nothing to lose.
+  const closeImmediate = () => {
+    if (selectedId) {
+      selectNode(null);
+      return;
+    }
+    if (creatingKind) {
+      onCancelCreate();
+    }
+  };
+
+  // closeWithConfirm is the X-button handler. Edit mode drops the
+  // selection straight away; create mode checks the dirty ref and
+  // pops the ConfirmDialog first so the operator does not lose a
+  // half-typed draft on an accidental click.
+  const closeWithConfirm = () => {
     if (selectedId) {
       selectNode(null);
       return;
@@ -263,7 +275,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
             )}
           </div>
           <button
-            onClick={close}
+            onClick={closeWithConfirm}
             className="h-7 w-7 shrink-0 rounded-md inline-flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             aria-label="close"
           >
@@ -294,7 +306,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
                 draftDirtyRef.current = true;
               }}
               onChange={onChange}
-              onClose={close}
+              onClose={closeImmediate}
             />
           )}
           {isCreate && resolvedType === "virtualModel" && (
@@ -310,7 +322,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
                 draftDirtyRef.current = true;
               }}
               onChange={onChange}
-              onClose={close}
+              onClose={closeImmediate}
             />
           )}
           {isCreate && resolvedType === "provider" && (
@@ -324,7 +336,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
                 draftDirtyRef.current = true;
               }}
               onChange={onChange}
-              onClose={close}
+              onClose={closeImmediate}
             />
           )}
           {!isCreate && node?.type === "regexRoute" && (
@@ -332,7 +344,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
               key={`edit-${node.id}`}
               route={(node.data as unknown as RegexNodeData).route}
               onChange={onChange}
-              onClose={close}
+              onClose={closeImmediate}
             />
           )}
           {!isCreate && node?.type === "virtualModel" && (
@@ -340,7 +352,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
               key={`edit-${node.id}`}
               model={(node.data as unknown as VirtualModelNodeData).model}
               onChange={onChange}
-              onClose={close}
+              onClose={closeImmediate}
             />
           )}
           {!isCreate && node?.type === "provider" && (
