@@ -19,24 +19,19 @@ import {
 import { useT } from "@/lib/i18n";
 
 interface Props {
-  // model + onUpdate describe two modes:
+  // create  : model is the empty draft payload, name field editable,
+  //           Save POSTs a new record.
+  // edit    : model is the saved row, name is read-only, Save PUTs.
   //
-  //   1. Edit mode  : model has an id (or at least came from the
-  //                   server), onUpdate is undefined. The form keeps
-  //                   its own local state, only touches the server
-  //                   on Save (POST upsert).
-  //
-  //   2. Create mode: model is the in-progress draft sitting on the
-  //                   canvas, onUpdate is the write-through hook.
-  //                   The form is a *controlled* component so the
-  //                   canvas card visually mirrors what the operator
-  //                   types — and so drag-to-connect updates from
-  //                   onConnect propagate back into the form.
-  //
-  // We use the presence of onUpdate to discriminate (rather than
-  // model.id, which is not always populated by the API).
+  // We discriminate by an explicit flag rather than guessing from
+  // the shape of `model` — the previous heuristic (isControlled =
+  // !!onUpdate) ended up making the input's controlled value flicker
+  // against the Zustand store on every keystroke and the name field
+  // stopped accepting input on some renders. Local state is the
+  // source of truth; the canvas draft node is a pure placeholder
+  // that is replaced by the real saved node on load().
   model?: VirtualModel;
-  onUpdate?: (model: VirtualModel) => void;
+  create?: boolean;
   onChange: () => void | Promise<void>;
   onClose: () => void;
 }
@@ -75,25 +70,17 @@ const EMPTY_VM: VirtualModel = {
 
 export function VirtualModelPanel({
   model,
-  onUpdate,
+  create,
   onChange,
   onClose,
 }: Props) {
   const { t } = useT();
-  const isControlled = !!onUpdate;
-  const isCreate = isControlled || !model;
-  const [localForm, setLocalForm] = useState<VirtualModel>(
+  const isCreate = !!create;
+  const [form, setForm] = useState<VirtualModel>(
     model
       ? { ...model, routes: model.routes.map((r) => ({ ...r })) }
       : { ...EMPTY_VM, routes: EMPTY_VM.routes.map((r) => ({ ...r })) },
   );
-  const form: VirtualModel = isControlled
-    ? (model ?? EMPTY_VM)
-    : localForm;
-  const setForm = (next: VirtualModel) => {
-    if (isControlled) onUpdate!(next);
-    else setLocalForm(next);
-  };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -12,24 +12,17 @@ import { RegexRoutes, type RegexRoute } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 
 interface Props {
-  // route + onUpdate together describe two modes:
+  // create  : route is the empty draft payload, Save POSTs a new
+  //           record, no Delete button.
+  // edit    : route is the saved row, Save PUTs, Delete button
+  //           visible.
   //
-  //   1. Edit mode  : route has an id, onUpdate is undefined.
-  //                   The form keeps its own local state and only
-  //                   touches the server on Save (PUT).
-  //
-  //   2. Create mode: route has no id (it's the in-progress draft
-  //                   sitting on the canvas), onUpdate is the
-  //                   "write through to the canvas" hook. The form
-  //                   becomes a *controlled* component — every
-  //                   keystroke flows through onUpdate so the
-  //                   canvas card visually mirrors the typed data.
-  //                   On Save we POST a brand-new row.
-  //
-  // We branch on `route?.id` rather than the presence of route so a
-  // draft route with no id correctly enters create mode.
+  // We pass an explicit `create` flag rather than guessing from
+  // the shape of `route`. Local state is the sole source of truth
+  // for the form fields — the canvas draft node is a placeholder
+  // that is replaced by the real saved node on the next load().
   route?: RegexRoute;
-  onUpdate?: (route: RegexRoute) => void;
+  create?: boolean;
   onChange: () => void | Promise<void>;
   onClose: () => void;
 }
@@ -46,26 +39,13 @@ const EMPTY_REGEX_ROUTE: RegexRoute = {
 
 export function RegexRoutePanel({
   route,
-  onUpdate,
+  create,
   onChange,
   onClose,
 }: Props) {
   const { t } = useT();
-  const isCreate = !route?.id;
-  const isControlled = !!onUpdate;
-  // Local fallback used only in edit mode. In create mode the parent
-  // owns the source of truth (and re-renders us when drag-to-connect
-  // mutates the draft), so we read from `route` directly.
-  const [localForm, setLocalForm] = useState<RegexRoute>(
-    route ?? EMPTY_REGEX_ROUTE,
-  );
-  const form: RegexRoute = isControlled
-    ? (route ?? EMPTY_REGEX_ROUTE)
-    : localForm;
-  const setForm = (next: RegexRoute) => {
-    if (isControlled) onUpdate!(next);
-    else setLocalForm(next);
-  };
+  const isCreate = !!create;
+  const [form, setForm] = useState<RegexRoute>(route ?? EMPTY_REGEX_ROUTE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

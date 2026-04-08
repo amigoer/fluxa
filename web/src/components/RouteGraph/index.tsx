@@ -96,8 +96,6 @@ function RouteGraphInner() {
   const liveMode = useRouteGraphStore((s) => s.liveMode);
   const updateLiveStats = useRouteGraphStore((s) => s.updateLiveStats);
   const startCreate = useRouteGraphStore((s) => s.startCreate);
-  const updateDraftRegex = useRouteGraphStore((s) => s.updateDraftRegex);
-  const updateDraftVirtual = useRouteGraphStore((s) => s.updateDraftVirtual);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -215,11 +213,11 @@ function RouteGraphInner() {
   // onStartCreate — toolbar entry point. Inserts a draft node onto
   // the canvas (positioned a comfortable offset from the source so
   // it lands somewhere visible without disturbing the existing
-  // layout) and wires a source→draft edge so the new card is part
-  // of the topology from the moment it appears. Then it pings
-  // store.startCreate so the side panel knows to render the create
-  // form bound to this draft. The form mutates the draft node's
-  // data live via updateDraftRegex / updateDraftVirtual.
+  // layout), then pings store.startCreate so the side panel opens
+  // its create form. The draft node is a pure visual placeholder;
+  // the side panel owns the form state with local useState, and on
+  // Save the API call + load() replaces the draft with the real
+  // server-derived node.
   const onStartCreate = useCallback(
     (kind: "regexRoute" | "virtualModel") => {
       // Clean up any previous draft so consecutive clicks of the
@@ -371,53 +369,12 @@ function RouteGraphInner() {
         return; // dropping on source / fallback / regex is meaningless
       }
 
-      // Drafts are intercepted before any network call: dragging
-      // from a not-yet-saved draft node should mutate the *form*
-      // bound to that draft, not POST half-built data to the
-      // server. The side panel observes the same store update and
-      // re-renders the input fields with the dropped target.
-      const isDraft = sourceNode.id.startsWith("draft-");
-      if (isDraft) {
-        if (sourceNode.type === "virtualModel") {
-          const v = sourceNode.data as unknown as VirtualModelNodeData;
-          // Reject the same self-loop as the persisted-edit branch.
-          if (
-            newTarget.target_type === "virtual" &&
-            newTarget.target_model === v.model.name
-          ) {
-            return;
-          }
-          // Idx defaults to 0 because a brand-new draft VM has
-          // exactly one seeded route. If the operator has already
-          // added more routes via the form they can drop into the
-          // matching handle and we honour the route-N convention.
-          const idxStr = (conn.sourceHandle ?? "route-0").replace(
-            /^route-/,
-            "",
-          );
-          const idx = parseInt(idxStr, 10);
-          if (Number.isNaN(idx) || idx < 0 || idx >= v.model.routes.length) {
-            return;
-          }
-          updateDraftVirtual({
-            ...v.model,
-            routes: v.model.routes.map((r, i) =>
-              i === idx ? { ...r, ...newTarget } : r,
-            ),
-          });
-          return;
-        }
-        if (sourceNode.type === "regexRoute") {
-          const r = (sourceNode.data as unknown as RegexNodeData).route;
-          updateDraftRegex({
-            ...r,
-            target_type: newTarget.target_type,
-            target_model: newTarget.target_model,
-            provider: newTarget.provider,
-          });
-          return;
-        }
-      }
+      // Draft nodes (id starts with "draft-") are placeholder cards
+      // for the in-progress create flow — they have no backend row
+      // yet and form state is owned by the side panel. Silently
+      // ignore drags originating from them; the operator fills in
+      // the target via the form inputs instead.
+      if (sourceNode.id.startsWith("draft-")) return;
 
       try {
         if (sourceNode.type === "virtualModel") {
@@ -464,7 +421,7 @@ function RouteGraphInner() {
         setError(err instanceof Error ? err.message : t("graph.errors.save"));
       }
     },
-    [load, t, updateDraftRegex, updateDraftVirtual],
+    [load, t],
   );
 
   // isValidConnection — runs while the operator is dragging, so

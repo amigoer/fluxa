@@ -84,8 +84,6 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
   const draftNodeId = useRouteGraphStore((s) => s.draftNodeId);
   const nodes = useRouteGraphStore((s) => s.nodes);
   const selectNode = useRouteGraphStore((s) => s.selectNode);
-  const updateDraftRegex = useRouteGraphStore((s) => s.updateDraftRegex);
-  const updateDraftVirtual = useRouteGraphStore((s) => s.updateDraftVirtual);
 
   // The currently mounted draft node — read fresh from the nodes
   // array on every render so the panel reacts when onConnect or
@@ -243,12 +241,12 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
               // cancel + new click) gets a fresh component mount
               // and the local UI state is reset cleanly.
               key={`create-regex-${draftNodeId}`}
+              create
               route={
                 draftNode
                   ? (draftNode.data as unknown as RegexNodeData).route
                   : undefined
               }
-              onUpdate={updateDraftRegex}
               onChange={onChange}
               onClose={close}
             />
@@ -256,12 +254,12 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
           {isCreate && resolvedType === "virtualModel" && (
             <VirtualModelPanel
               key={`create-virtual-${draftNodeId}`}
+              create
               model={
                 draftNode
                   ? (draftNode.data as unknown as VirtualModelNodeData).model
                   : undefined
               }
-              onUpdate={updateDraftVirtual}
               onChange={onChange}
               onClose={close}
             />
