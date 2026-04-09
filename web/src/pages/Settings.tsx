@@ -30,7 +30,7 @@ function SegmentedControl<T extends string>({
   onChange: (val: T) => void;
 }) {
   return (
-    <div className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground w-full sm:w-auto">
+    <div className="flex w-full sm:w-auto items-center p-1 rounded-xl bg-accent/50 text-muted-foreground border border-border/40">
       {options.map((opt) => {
         const isActive = value === opt.value;
         return (
@@ -38,13 +38,13 @@ function SegmentedControl<T extends string>({
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all ${
+            className={`flex flex-1 sm:flex-initial items-center justify-center whitespace-nowrap rounded-lg px-4 py-1.5 text-[13px] font-medium transition-all duration-300 ${
               isActive
-                ? "bg-background text-foreground shadow-sm"
-                : "hover:bg-background/50 hover:text-foreground"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-border/20 scale-[0.98] sm:scale-100"
+                : "hover:text-foreground opacity-80 hover:opacity-100 hover:bg-background/40"
             }`}
           >
-            {opt.icon && <span className="mr-2">{opt.icon}</span>}
+            {opt.icon && <span className="mr-1.5 shrink-0">{opt.icon}</span>}
             {opt.label}
           </button>
         );

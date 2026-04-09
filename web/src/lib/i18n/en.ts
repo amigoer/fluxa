@@ -206,7 +206,7 @@ export const en = {
 
     "settings.title": "Settings",
     "settings.subtitle":
-      "Snapshot the full provider + route state as YAML, or bulk-restore a saved bundle. Same format as legacy v1.x fluxa.yaml — imports round-trip cleanly.",
+      "Global appearance preferences and gateway configuration backups.",
 
     "settings.appearanceTitle": "Appearance & Behavior",
     "settings.appearanceSubtitle": "Customize how Fluxa looks and feels on this device.",

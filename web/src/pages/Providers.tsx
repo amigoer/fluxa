@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Plus, Trash2, Pencil } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Plus, Trash2, Pencil, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Providers, type Provider } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { ProviderIcon } from "@/components/provider-icon";
 
 // FormState is the in-flight provider draft. We carry the structured
 // fields plus a few "text-buffer" siblings (modelsText, headersText,
@@ -208,7 +209,14 @@ export function ProvidersPage() {
               {rows.map((p) => (
                 <TableRow key={p.name}>
                   <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell>{p.kind}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-[22px] w-[22px] items-center justify-center rounded-[5px] bg-accent text-accent-foreground shadow-sm ring-1 ring-border/50">
+                        <ProviderIcon kind={p.kind} className="h-3.5 w-3.5" />
+                      </div>
+                      {p.kind}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">
                     {p.base_url || "—"}
                   </TableCell>
@@ -299,13 +307,9 @@ export function ProvidersPage() {
                     />
                   </Field>
                   <Field label={t("providers.fieldKind")}>
-                    <Input
-                      value={form.kind}
-                      onChange={(e) =>
-                        setForm({ ...form, kind: e.target.value })
-                      }
-                      placeholder="openai | anthropic | azure | bedrock | gemini | deepseek | ..."
-                      required
+                    <ProviderSelect 
+                      value={form.kind} 
+                      onChange={(v) => setForm({ ...form, kind: v })} 
                     />
                   </Field>
                 </div>
@@ -585,4 +589,101 @@ function serializeDeployments(d?: Record<string, string>): string {
   return Object.entries(d)
     .map(([k, v]) => `${k}=${v}`)
     .join("\n");
+}
+
+function ProviderSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  // `value` is the backend provider kind (must match
+  // internal/router/router.go). `label` is the brand-facing display
+  // name — we prefer the product name over the parent company where
+  // the product is more recognizable (e.g. "Gemini" not "google",
+  // "Kimi" not "moonshot", "Grok" not "xai").
+  const options = [
+    { value: "openai", label: "OpenAI" },
+    { value: "anthropic", label: "Claude" },
+    { value: "azure", label: "Azure OpenAI" },
+    { value: "bedrock", label: "AWS Bedrock" },
+    { value: "gemini", label: "Gemini" },
+    { value: "deepseek", label: "DeepSeek" },
+    { value: "qwen", label: "Qwen" },
+    { value: "ollama", label: "Ollama" },
+    { value: "moonshot", label: "Kimi" },
+    { value: "zhipu", label: "GLM" },
+    { value: "doubao", label: "Doubao" },
+    { value: "ernie", label: "Wenxin" },
+    { value: "mistral", label: "Mistral" },
+    { value: "groq", label: "Groq" },
+    { value: "xai", label: "Grok" },
+    { value: "perplexity", label: "Perplexity" },
+    { value: "together", label: "Together AI" },
+    { value: "fireworks", label: "Fireworks AI" },
+    { value: "openrouter", label: "OpenRouter" },
+    { value: "cohere", label: "Cohere" },
+    { value: "nvidia", label: "NVIDIA" },
+    { value: "siliconflow", label: "SiliconCloud" },
+    { value: "minimax", label: "MiniMax" },
+    { value: "baichuan", label: "Baichuan" },
+    { value: "stepfun", label: "Step" },
+    { value: "spark", label: "Spark" },
+    { value: "zero-one", label: "Yi" },
+    { value: "tencent", label: "Hunyuan" },
+  ];
+  const selectedLabel = options.find((o) => o.value === value)?.label || value;
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex h-[38px] w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <div className="flex items-center gap-2.5 text-foreground/90">
+           <div className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-[4px] bg-accent/80 text-foreground shadow-sm ring-1 ring-border/50">
+             <ProviderIcon kind={value} className="h-3.5 w-3.5" />
+           </div>
+           <span className="truncate">{selectedLabel}</span>
+        </div>
+        <ChevronDown className={`h-4 w-4 shrink-0 opacity-50 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-[calc(100%+6px)] z-[100] w-full overflow-hidden rounded-lg border border-border bg-background shadow-xl animate-in fade-in-0 zoom-in-95 backdrop-blur-xl">
+          <div className="max-h-[16rem] overflow-y-auto p-1.5 space-y-0.5">
+            {options.map((o) => (
+              <div
+                key={o.value}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full cursor-pointer items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors hover:bg-accent/70 hover:text-accent-foreground ${
+                  value === o.value ? "bg-accent text-foreground font-medium" : "text-muted-foreground"
+                }`}
+              >
+                <div className={`flex h-[24px] w-[24px] shrink-0 flex-none items-center justify-center rounded-[5px] shadow-sm ring-1 ring-border/40 ${
+                  value === o.value ? "bg-background" : "bg-card"
+                }`}>
+                  <ProviderIcon kind={o.value} className="h-4 w-4 text-foreground/80" />
+                </div>
+                {o.label}
+                {value === o.value && <Check className="ml-auto h-4 w-4 text-primary" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

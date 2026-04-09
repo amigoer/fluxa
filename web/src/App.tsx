@@ -23,9 +23,6 @@ import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -241,7 +238,7 @@ function Shell() {
     <div className="h-screen flex flex-col md:flex-row bg-background text-foreground font-[Inter,sans-serif]">
       {/* Mobile Top Header */}
       <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border/40 bg-background shrink-0 shadow-sm z-30">
-        <div 
+        <div
           className="flex items-center gap-2 cursor-pointer"
           onClick={() => setTab("dashboard")}
         >
@@ -261,9 +258,9 @@ function Shell() {
 
       {/* Mobile Sidebar Overlay */}
       {mobileOpen && (
-        <div 
-          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 md:hidden transition-opacity" 
-          onClick={() => setMobileOpen(false)} 
+        <div
+          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={() => setMobileOpen(false)}
         />
       )}
 
@@ -393,7 +390,7 @@ function Shell() {
             </>
           ) : (
             <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl hover:bg-accent/40 border border-transparent transition-colors">
-              <div 
+              <div
                 className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-background cursor-pointer transition-colors"
                 onClick={() => setTab("profile")}
                 title={t("settings.accountTitle")}
@@ -446,15 +443,15 @@ function Shell() {
               {tab === "settings" && <SettingsPage />}
               {tab === "profile" && <ProfilePage user={user} onUserUpdate={setUser} onSignOut={signOut} />}
             </div>
-            
+
             {/* Page Footer */}
             <footer className="mt-auto py-6 text-center text-xs text-muted-foreground/60 border-t border-border/40">
               <div className="flex flex-wrap justify-center items-center gap-2 max-w-6xl mx-auto px-4">
                 <span>&copy; {new Date().getFullYear()} Fluxa. All rights reserved.</span>
                 <span className="hidden sm:inline opacity-50">|</span>
-                <a 
-                  href="https://github.com/amigoer/fluxa" 
-                  target="_blank" 
+                <a
+                  href="https://github.com/amigoer/fluxa"
+                  target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
                 >
@@ -540,67 +537,87 @@ function LoginScreen({ onAuth }: { onAuth: (u: AdminUser) => void }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50/50 via-background to-blue-50/30 dark:from-indigo-950/20 dark:via-background dark:to-blue-900/10 relative px-4 overflow-hidden">
-      {/* Decorative ambient blobs */}
-      <div className="absolute top-1/4 -left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background relative px-4 overflow-hidden">
+      {/* Decorative subtle background pattern / elements */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-muted/50 via-background to-background pointer-events-none" />
 
       <button
         onClick={() => setLocale(locale === "en" ? "zh" : "en")}
-        className="absolute top-6 right-6 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-md border border-border/50 text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 shadow-sm transition-all"
+        className="absolute top-6 right-6 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-sm border border-border text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center gap-1.5 shadow-sm transition-all z-20"
       >
         <Languages className="h-3.5 w-3.5" />
         {t("lang.toggle")}
       </button>
 
-      <Card className="z-10 w-full max-w-md shadow-2xl bg-background/80 backdrop-blur-xl border-border/40">
-        <CardHeader className="space-y-4 text-center mt-2">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 text-white shadow-lg">
-            <Zap className="h-7 w-7" strokeWidth={2.5} />
+      {/* Main Login Card */}
+      <div className="w-full max-w-[380px] z-10 space-y-8 mt-[-5%]">
+        <div className="flex flex-col items-center space-y-5 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm ring-1 ring-border/10">
+            <Zap className="h-8 w-8" strokeWidth={2} />
           </div>
           <div className="space-y-1.5">
-            <CardTitle className="text-2xl tracking-tight font-semibold">{t("login.title")}</CardTitle>
-            <CardDescription className="text-[13px]">{t("app.subtitle")}</CardDescription>
+            <h1 className="text-[26px] font-semibold tracking-tight">{t("login.title")}</h1>
+            <p className="text-[14px] text-muted-foreground font-medium">{t("app.subtitle")}</p>
           </div>
-        </CardHeader>
-        <CardContent className="px-8 pb-8 pt-4">
-          <form onSubmit={submit} className="space-y-5">
-            <div className="space-y-2.5">
-              <Label htmlFor="username">{t("login.username")}</Label>
-              <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder={t("login.placeholderUser")}
-                autoFocus
-                autoComplete="username"
-                className="h-10 border-border/50 bg-background/50 focus-visible:ring-indigo-500/30"
-              />
-            </div>
-            <div className="space-y-2.5">
-              <Label htmlFor="password">{t("login.password")}</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t("login.placeholderPass")}
-                autoComplete="current-password"
-                className="h-10 border-border/50 bg-background/50 focus-visible:ring-indigo-500/30"
-              />
-              {error && <p className="text-[13px] text-destructive pt-1 font-medium">{error}</p>}
-            </div>
-            <div className="pt-2">
-              <Button type="submit" className="w-full h-10 shadow-md transition-all active:scale-[0.98]" disabled={loading}>
-                {loading ? t("login.checking") : t("login.submit")}
-              </Button>
-            </div>
-            <p className="text-center text-xs text-muted-foreground/80 mt-6">
-              {t("login.firstRunHint")}
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+        </div>
+
+        <Card className="border-border/60 shadow-xl shadow-black/[0.03] bg-card/80 backdrop-blur-xl">
+          <CardContent className="p-7 md:p-8">
+            <form onSubmit={submit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="username" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">{t("login.username")}</Label>
+                <Input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={t("login.placeholderUser")}
+                  autoFocus
+                  autoComplete="username"
+                  className="h-11 bg-background/50 focus-visible:bg-background"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">{t("login.password")}</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t("login.placeholderPass")}
+                  autoComplete="current-password"
+                  className="h-11 bg-background/50 focus-visible:bg-background"
+                />
+                {error && <p className="text-[13px] text-destructive pt-1.5 font-medium">{error}</p>}
+              </div>
+              <div className="pt-3">
+                <Button type="submit" className="w-full h-11 text-[15px] font-medium transition-all active:scale-[0.98]" disabled={loading}>
+                  {loading ? t("login.checking") : t("login.submit")}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-[13px] text-muted-foreground/80 px-4 leading-relaxed">
+          {t("login.firstRunHint")}
+        </p>
+      </div>
+
+      <footer className="absolute bottom-6 w-full text-center text-[13px] text-muted-foreground/60 z-10 px-4">
+        <div className="flex flex-wrap justify-center items-center gap-2">
+          <span>&copy; {new Date().getFullYear()} Fluxa. All rights reserved.</span>
+          <span className="hidden sm:inline opacity-50">|</span>
+          <a
+            href="https://github.com/amigoer/fluxa"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            <Github className="h-3.5 w-3.5" />
+            GitHub Repository
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
