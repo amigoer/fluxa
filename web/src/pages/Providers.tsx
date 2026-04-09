@@ -273,7 +273,12 @@ export function ProvidersPage() {
           if (!open) setForm(null);
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* The dialog itself is a flex column so the form body can
+            scroll independently while the footer stays pinned — with
+            the previous single-overflow layout, selecting Bedrock (or
+            just adding enough Advanced fields) pushed the Save/Cancel
+            buttons below the fold. */}
+        <DialogContent className="!flex max-h-[90vh] max-w-2xl !flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               {form?.mode === "edit"
@@ -288,8 +293,9 @@ export function ProvidersPage() {
                 e.preventDefault();
                 void save();
               }}
-              className="space-y-5"
+              className="flex min-h-0 flex-1 flex-col"
             >
+              <div className="-mx-1 flex-1 space-y-5 overflow-y-auto px-1 pb-2">
               <Section title={t("providers.sectionConnection")}>
                 <div className="grid grid-cols-2 gap-4">
                   <Field label={t("providers.fieldName")}>
@@ -352,31 +358,38 @@ export function ProvidersPage() {
                 </div>
               </Section>
 
-              <Section title={t("providers.sectionAzure")}>
-                <Field label={t("providers.fieldAPIVersion")}>
-                  <Input
-                    value={form.api_version}
-                    onChange={(e) =>
-                      setForm({ ...form, api_version: e.target.value })
-                    }
-                    placeholder="2024-02-15-preview"
-                  />
-                </Field>
-                <Field
-                  label={t("providers.fieldDeployments")}
-                  hint={t("providers.fieldDeploymentsHint")}
-                >
-                  <Textarea
-                    value={form.deploymentsText}
-                    onChange={(e) =>
-                      setForm({ ...form, deploymentsText: e.target.value })
-                    }
-                    placeholder={"gpt-4o=my-gpt4o-deployment\ngpt-4o-mini=my-mini"}
-                    rows={3}
-                  />
-                </Field>
-              </Section>
+              {/* Cloud-specific sections only render for the kind that
+                  actually uses them. Showing an empty Azure section for
+                  an OpenAI or Bedrock provider just wastes vertical
+                  space and pushes the footer below the fold. */}
+              {form.kind === "azure" && (
+                <Section title={t("providers.sectionAzure")}>
+                  <Field label={t("providers.fieldAPIVersion")}>
+                    <Input
+                      value={form.api_version}
+                      onChange={(e) =>
+                        setForm({ ...form, api_version: e.target.value })
+                      }
+                      placeholder="2024-02-15-preview"
+                    />
+                  </Field>
+                  <Field
+                    label={t("providers.fieldDeployments")}
+                    hint={t("providers.fieldDeploymentsHint")}
+                  >
+                    <Textarea
+                      value={form.deploymentsText}
+                      onChange={(e) =>
+                        setForm({ ...form, deploymentsText: e.target.value })
+                      }
+                      placeholder={"gpt-4o=my-gpt4o-deployment\ngpt-4o-mini=my-mini"}
+                      rows={3}
+                    />
+                  </Field>
+                </Section>
+              )}
 
+              {form.kind === "bedrock" && (
               <Section title={t("providers.sectionBedrock")}>
                 <Field label={t("providers.fieldRegion")}>
                   <Input
@@ -432,6 +445,7 @@ export function ProvidersPage() {
                   />
                 </Field>
               </Section>
+              )}
 
               <Section title={t("providers.sectionAdvanced")}>
                 <Field
@@ -474,8 +488,9 @@ export function ProvidersPage() {
                   />
                 </Field>
               </Section>
+              </div>
 
-              <DialogFooter>
+              <DialogFooter className="mt-4 border-t border-border/60 pt-4">
                 <DialogClose asChild>
                   <Button type="button" variant="outline">
                     {t("common.cancel")}
