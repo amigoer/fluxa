@@ -48,6 +48,7 @@ import { useT } from "@/lib/i18n";
 import { ProviderPicker } from "@/components/provider-picker";
 import { VirtualModelPicker } from "@/components/virtual-model-picker";
 import { ProviderPill } from "@/components/provider-pill";
+import { toast } from "@/components/ui/sonner";
 import { ConfirmDialog } from "@/components/RouteGraph/panels/ConfirmDialog";
 import { cn } from "@/lib/utils";
 
@@ -172,8 +173,9 @@ export function RegexRoutesPage() {
       }
       setForm(null);
       await load();
+      toast.success(t("common.saveSuccess"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.saveFailed"));
+      toast.error(err instanceof Error ? err.message : t("common.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -183,8 +185,9 @@ export function RegexRoutesPage() {
     try {
       await RegexRoutes.delete(row.id!);
       await load();
+      toast.success(t("common.deleteSuccess"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.deleteFailed"));
+      toast.error(err instanceof Error ? err.message : t("common.deleteFailed"));
     }
   }
 

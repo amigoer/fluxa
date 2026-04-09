@@ -303,6 +303,8 @@ export const en = {
     "common.saveFailed": "save failed",
     "common.deleteFailed": "delete failed",
     "common.toggleFailed": "toggle failed",
+    "common.saveSuccess": "Saved",
+    "common.deleteSuccess": "Deleted",
 
     "graph.toolbar.regex": "Regex Route",
     "graph.toolbar.virtual": "Virtual Model",

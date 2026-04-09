@@ -42,6 +42,7 @@ import { useT } from "@/lib/i18n";
 import { ProviderPill } from "@/components/provider-pill";
 import { VirtualTargetsEditor } from "@/components/virtual-targets-editor";
 import { ConfirmDialog } from "@/components/RouteGraph/panels/ConfirmDialog";
+import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
 // VirtualModelsPage is the power-user counterpart to the Routes page.
@@ -123,11 +124,11 @@ export function VirtualModelsPage() {
   async function save() {
     if (!form) return;
     if (!form.name.trim()) {
-      setError(t("vmodels.routesEmpty"));
+      toast.warning(t("vmodels.routesEmpty"));
       return;
     }
     if (form.routes.length === 0) {
-      setError(t("vmodels.routesEmpty"));
+      toast.warning(t("vmodels.routesEmpty"));
       return;
     }
     setSaving(true);
@@ -148,8 +149,9 @@ export function VirtualModelsPage() {
       });
       setForm(null);
       await load();
+      toast.success(t("common.saveSuccess"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.saveFailed"));
+      toast.error(err instanceof Error ? err.message : t("common.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -159,8 +161,9 @@ export function VirtualModelsPage() {
     try {
       await VirtualModels.delete(vm.name);
       await load();
+      toast.success(t("common.deleteSuccess"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.deleteFailed"));
+      toast.error(err instanceof Error ? err.message : t("common.deleteFailed"));
     }
   }
 

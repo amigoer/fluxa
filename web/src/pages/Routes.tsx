@@ -46,6 +46,7 @@ import {
 import { useT } from "@/lib/i18n";
 import { ProviderPicker } from "@/components/provider-picker";
 import { ProviderPill } from "@/components/provider-pill";
+import { toast } from "@/components/ui/sonner";
 import { FallbackChainEditor } from "@/components/fallback-chain-editor";
 import { WeightedTargetsEditor } from "@/components/weighted-targets-editor";
 import { ConfirmDialog } from "@/components/RouteGraph/panels/ConfirmDialog";
@@ -231,8 +232,9 @@ export function RoutesPage() {
       }
       setForm(null);
       await load();
+      toast.success(t("common.saveSuccess"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.saveFailed"));
+      toast.error(err instanceof Error ? err.message : t("common.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -246,8 +248,9 @@ export function RoutesPage() {
         await VirtualModels.delete(row.model);
       }
       await load();
+      toast.success(t("common.deleteSuccess"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.deleteFailed"));
+      toast.error(err instanceof Error ? err.message : t("common.deleteFailed"));
     }
   }
 

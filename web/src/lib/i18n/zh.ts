@@ -305,6 +305,8 @@ export const zh: Record<TranslationKey, string> = {
     "common.saveFailed": "保存失败",
     "common.deleteFailed": "删除失败",
     "common.toggleFailed": "切换失败",
+    "common.saveSuccess": "已保存",
+    "common.deleteSuccess": "已删除",
 
     "graph.toolbar.regex": "正则路由",
     "graph.toolbar.virtual": "虚拟模型",

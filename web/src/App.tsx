@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Auth, getSessionToken, type AdminUser } from "@/lib/api";
 import { I18nProvider, useT, type TranslationKey } from "@/lib/i18n";
+import { Toaster } from "@/components/ui/sonner";
 import { DashboardPage } from "@/pages/Dashboard";
 import { ProvidersPage } from "@/pages/Providers";
 import { RoutesPage } from "@/pages/Routes";
@@ -132,6 +133,7 @@ export default function App() {
   return (
     <I18nProvider>
       <Shell />
+      <Toaster />
     </I18nProvider>
   );
 }
