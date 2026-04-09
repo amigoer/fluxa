@@ -156,6 +156,10 @@ export const zh: Record<TranslationKey, string> = {
     "vmodels.routeVirtual": "虚拟",
     "vmodels.routeRemove": "删除",
     "vmodels.routesEmpty": "至少需要一个目标。",
+    "vmodels.searchPlaceholder": "按名称、描述、供应商或目标搜索…",
+    "vmodels.emptySearch": "没有虚拟模型匹配当前搜索。",
+    "vmodels.deleteTitle": "删除虚拟模型",
+    "vmodels.descriptionPlaceholder": "可选——说明这个别名的用途",
 
     "rx.title": "正则路由",
     "rx.subtitle":

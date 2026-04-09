@@ -44,8 +44,8 @@ import {
   type VirtualModelRoute,
 } from "@/lib/api";
 import { useT } from "@/lib/i18n";
-import { ProviderIcon } from "@/components/provider-icon";
 import { ProviderPicker } from "@/components/provider-picker";
+import { ProviderPill } from "@/components/provider-pill";
 import { FallbackChainEditor } from "@/components/fallback-chain-editor";
 import { WeightedTargetsEditor } from "@/components/weighted-targets-editor";
 import { ConfirmDialog } from "@/components/RouteGraph/panels/ConfirmDialog";
@@ -981,44 +981,3 @@ function SplitFlow({
   );
 }
 
-function ProviderPill({
-  name,
-  kind,
-  disabled,
-  dangling,
-  small,
-}: {
-  name: string;
-  kind?: string;
-  disabled?: boolean;
-  dangling?: boolean;
-  small?: boolean;
-}) {
-  const iconSize = small ? "h-3 w-3" : "h-3.5 w-3.5";
-  const padding = small ? "px-1.5 py-0.5 text-[11px]" : "px-2 py-1 text-xs";
-  if (dangling) {
-    return (
-      <div
-        className={`inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/5 font-medium text-amber-700 dark:text-amber-400 ${padding}`}
-        title="Provider not found"
-      >
-        <AlertTriangle className={iconSize} />
-        <span className="truncate">{name}</span>
-      </div>
-    );
-  }
-  return (
-    <div
-      className={`inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background font-medium ${padding} ${disabled ? "opacity-60" : ""}`}
-      title={kind ? `${name} (${kind})` : name}
-    >
-      {kind && <ProviderIcon kind={kind} className={iconSize} />}
-      <span className="truncate">{name}</span>
-      {disabled && (
-        <span className="rounded bg-muted px-1 text-[9px] text-muted-foreground">
-          off
-        </span>
-      )}
-    </div>
-  );
-}

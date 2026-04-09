@@ -154,6 +154,10 @@ export const en = {
     "vmodels.routeVirtual": "virtual",
     "vmodels.routeRemove": "Remove",
     "vmodels.routesEmpty": "Add at least one target.",
+    "vmodels.searchPlaceholder": "Search by name, description, provider, or target…",
+    "vmodels.emptySearch": "No virtual models match the current search.",
+    "vmodels.deleteTitle": "Delete virtual model",
+    "vmodels.descriptionPlaceholder": "Optional — what this alias is for",
 
     "rx.title": "Regex routes",
     "rx.subtitle":
