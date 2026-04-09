@@ -37,10 +37,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  RegexRoutes,
+  RegexModels,
   Providers,
   VirtualModels,
-  type RegexRoute,
+  type RegexModel,
   type Provider,
   type VirtualModel,
 } from "@/lib/api";
@@ -52,7 +52,7 @@ import { toast } from "@/components/ui/sonner";
 import { ConfirmDialog } from "@/components/RouteGraph/panels/ConfirmDialog";
 import { cn } from "@/lib/utils";
 
-// RegexRoutesPage — priority-ordered intercept table. The gateway
+// RegexModelsPage — priority-ordered intercept table. The gateway
 // runs each enabled pattern in ascending priority order and the
 // first match wins; everything below it on the list is skipped. That
 // first-match-wins semantics is THE thing the UI has to communicate
@@ -91,22 +91,22 @@ const EMPTY_FORM: FormState = {
   enabled: true,
 };
 
-export function RegexRoutesPage() {
+export function RegexModelsPage() {
   const { t } = useT();
-  const [rows, setRows] = useState<RegexRoute[]>([]);
+  const [rows, setRows] = useState<RegexModel[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [vmodels, setVmodels] = useState<VirtualModel[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState<RegexRoute | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<RegexModel | null>(null);
   const [probe, setProbe] = useState("");
 
   async function load() {
     try {
       const [r, p, v] = await Promise.all([
-        RegexRoutes.list(),
+        RegexModels.list(),
         Providers.list(),
         VirtualModels.list(),
       ]);
@@ -155,7 +155,7 @@ export function RegexRoutesPage() {
     if (!form) return;
     setSaving(true);
     setError(null);
-    const payload: RegexRoute = {
+    const payload: RegexModel = {
       pattern: form.pattern.trim(),
       priority: Number(form.priority) || 100,
       target_type: form.target_type,
@@ -167,9 +167,9 @@ export function RegexRoutesPage() {
     };
     try {
       if (form.mode === "edit" && form.id) {
-        await RegexRoutes.update(form.id, payload);
+        await RegexModels.update(form.id, payload);
       } else {
-        await RegexRoutes.create(payload);
+        await RegexModels.create(payload);
       }
       setForm(null);
       await load();
@@ -181,9 +181,9 @@ export function RegexRoutesPage() {
     }
   }
 
-  async function remove(row: RegexRoute) {
+  async function remove(row: RegexModel) {
     try {
-      await RegexRoutes.delete(row.id!);
+      await RegexModels.delete(row.id!);
       await load();
       toast.success(t("common.deleteSuccess"));
     } catch (err) {
@@ -196,7 +196,7 @@ export function RegexRoutesPage() {
     setForm({ ...EMPTY_FORM });
   }
 
-  function openEdit(r: RegexRoute) {
+  function openEdit(r: RegexModel) {
     setProbe("");
     setForm({
       mode: "edit",
@@ -631,7 +631,7 @@ function tryCompile(pattern: string): boolean {
 }
 
 function isDangling(
-  r: RegexRoute,
+  r: RegexModel,
   providerNames: Set<string>,
   vmNames: Set<string>,
 ): boolean {
@@ -646,7 +646,7 @@ function TargetDisplay({
   providers,
   dangling,
 }: {
-  row: RegexRoute;
+  row: RegexModel;
   providers: Provider[];
   dangling: boolean;
 }) {

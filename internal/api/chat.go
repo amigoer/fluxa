@@ -42,7 +42,7 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// v2.4 pre-resolver: virtual_models / regex_routes can rewrite the
+	// Pre-resolver: virtual_models / regex_models can rewrite the
 	// incoming model name (and optionally pin a provider) before the
 	// legacy provider chain lookup runs. A nil target means the resolver
 	// declined to intervene and we should use peek.Model verbatim.

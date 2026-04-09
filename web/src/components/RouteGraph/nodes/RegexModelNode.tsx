@@ -1,4 +1,4 @@
-// RegexRouteNode — amber "regex intercept" card. Shows the pattern,
+// RegexModelNode — amber "regex intercept" card. Shows the pattern,
 // the priority pill, an enable/disable badge, and a one-line subtitle
 // describing where the rule routes to. Click selects the node and
 // pops the side panel; the badge is purely informational.
@@ -15,7 +15,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { RegexNodeData } from "../utils/buildGraph";
 
-export function RegexRouteNode({
+export function RegexModelNode({
   id,
   data,
   selected,
@@ -86,11 +86,11 @@ export function RegexRouteNode({
         )}
       </div>
 
-      {/* Subtitle: "regex route → target". Reads as a complete
+      {/* Subtitle: "regex model → target". Reads as a complete
           sentence so the operator instantly knows where the rule
           sends matched traffic without opening the side panel. */}
       <div className="text-[10px] text-[#854F0B] dark:text-amber-300 mt-1 font-mono truncate">
-        regex route →{" "}
+        regex model →{" "}
         {r.target_model || (
           <span className="italic text-[#854F0B]/50">…</span>
         )}

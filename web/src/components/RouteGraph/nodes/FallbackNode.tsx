@@ -1,6 +1,6 @@
 // FallbackNode — terminal "no rule matched" branch. Always present so
 // the operator can visually confirm there is a default path even when
-// the regex route table is empty. Renders with a dashed border to
+// the regex model table is empty. Renders with a dashed border to
 // signal "passive / catch-all" without competing with the active
 // coloured nodes upstream.
 

@@ -1,5 +1,5 @@
-// regex_routes.go is the persistence layer for the v2.4 "intercept by
-// pattern" feature. A regex route lets an operator say things like
+// regex_models.go is the persistence layer for the "intercept by
+// pattern" feature. A regex model lets an operator say things like
 // "any incoming model name matching ^gpt-4.* should be redirected to
 // my qwen-latest virtual model" without touching the application code
 // that ships those names. Patterns are evaluated in priority order
@@ -18,8 +18,8 @@ import (
 	"time"
 )
 
-// RegexRoute mirrors one regex_routes row.
-type RegexRoute struct {
+// RegexModel mirrors one regex_models row.
+type RegexModel struct {
 	ID          string
 	Pattern     string
 	Priority    int
@@ -32,23 +32,23 @@ type RegexRoute struct {
 	UpdatedAt   time.Time
 }
 
-// ListRegexRoutes returns every row sorted by priority ASC. Disabled
+// ListRegexModels returns every row sorted by priority ASC. Disabled
 // rows are included so the dashboard can render them dimmed; the
 // resolver filters on Enabled before evaluating.
-func (s *Store) ListRegexRoutes(ctx context.Context) ([]RegexRoute, error) {
+func (s *Store) ListRegexModels(ctx context.Context) ([]RegexModel, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, pattern, priority, target_type, target_model, provider,
 		       description, enabled, created_at, updated_at
-		FROM regex_routes ORDER BY priority ASC, created_at ASC`)
+		FROM regex_models ORDER BY priority ASC, created_at ASC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var out []RegexRoute
+	var out []RegexModel
 	for rows.Next() {
 		var (
-			r          RegexRoute
+			r          RegexModel
 			enabledInt int
 		)
 		if err := rows.Scan(
@@ -63,82 +63,82 @@ func (s *Store) ListRegexRoutes(ctx context.Context) ([]RegexRoute, error) {
 	return out, rows.Err()
 }
 
-// GetRegexRoute loads one row by id.
-func (s *Store) GetRegexRoute(ctx context.Context, id string) (RegexRoute, error) {
+// GetRegexModel loads one row by id.
+func (s *Store) GetRegexModel(ctx context.Context, id string) (RegexModel, error) {
 	var (
-		r          RegexRoute
+		r          RegexModel
 		enabledInt int
 	)
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, pattern, priority, target_type, target_model, provider,
 		       description, enabled, created_at, updated_at
-		FROM regex_routes WHERE id = ?`, id)
+		FROM regex_models WHERE id = ?`, id)
 	if err := row.Scan(
 		&r.ID, &r.Pattern, &r.Priority, &r.TargetType, &r.TargetModel,
 		&r.Provider, &r.Description, &enabledInt, &r.CreatedAt, &r.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return RegexRoute{}, ErrNotFound
+			return RegexModel{}, ErrNotFound
 		}
-		return RegexRoute{}, err
+		return RegexModel{}, err
 	}
 	r.Enabled = enabledInt == 1
 	return r, nil
 }
 
-// validateRegexRoute is the shared validation used by both insert and
+// validateRegexModel is the shared validation used by both insert and
 // update. We compile the pattern here even though the router does the
 // same at reload time, because failing fast at the admin write path
 // gives the operator an immediate 400 instead of a silent skip during
 // the next reload (and potential surprise traffic redirection).
-func validateRegexRoute(r *RegexRoute) error {
+func validateRegexModel(r *RegexModel) error {
 	if r.Pattern == "" {
-		return errors.New("store: regex_route.pattern is required")
+		return errors.New("store: regex_model.pattern is required")
 	}
 	if _, err := regexp.Compile(r.Pattern); err != nil {
-		return errors.New("store: regex_route.pattern does not compile: " + err.Error())
+		return errors.New("store: regex_model.pattern does not compile: " + err.Error())
 	}
 	if r.TargetType != "real" && r.TargetType != "virtual" {
-		return errors.New("store: regex_route.target_type must be 'real' or 'virtual'")
+		return errors.New("store: regex_model.target_type must be 'real' or 'virtual'")
 	}
 	if r.TargetModel == "" {
-		return errors.New("store: regex_route.target_model is required")
+		return errors.New("store: regex_model.target_model is required")
 	}
 	if r.TargetType == "real" && r.Provider == "" {
-		return errors.New("store: regex_route.provider is required when target_type='real'")
+		return errors.New("store: regex_model.provider is required when target_type='real'")
 	}
 	return nil
 }
 
-// CreateRegexRoute inserts a new row, returning the persisted form
+// CreateRegexModel inserts a new row, returning the persisted form
 // (with id and timestamps populated by the database).
-func (s *Store) CreateRegexRoute(ctx context.Context, r RegexRoute) (RegexRoute, error) {
-	if err := validateRegexRoute(&r); err != nil {
-		return RegexRoute{}, err
+func (s *Store) CreateRegexModel(ctx context.Context, r RegexModel) (RegexModel, error) {
+	if err := validateRegexModel(&r); err != nil {
+		return RegexModel{}, err
 	}
 	r.ID = newID()
 	if _, err := s.db.ExecContext(ctx, `
-		INSERT INTO regex_routes (
+		INSERT INTO regex_models (
 			id, pattern, priority, target_type, target_model, provider,
 			description, enabled, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
 		r.ID, r.Pattern, r.Priority, r.TargetType, r.TargetModel, r.Provider,
 		r.Description, boolToInt(r.Enabled)); err != nil {
-		return RegexRoute{}, err
+		return RegexModel{}, err
 	}
-	return s.GetRegexRoute(ctx, r.ID)
+	return s.GetRegexModel(ctx, r.ID)
 }
 
-// UpdateRegexRoute replaces every mutable field of an existing row.
-func (s *Store) UpdateRegexRoute(ctx context.Context, r RegexRoute) (RegexRoute, error) {
+// UpdateRegexModel replaces every mutable field of an existing row.
+func (s *Store) UpdateRegexModel(ctx context.Context, r RegexModel) (RegexModel, error) {
 	if r.ID == "" {
-		return RegexRoute{}, errors.New("store: regex_route.id is required for update")
+		return RegexModel{}, errors.New("store: regex_model.id is required for update")
 	}
-	if err := validateRegexRoute(&r); err != nil {
-		return RegexRoute{}, err
+	if err := validateRegexModel(&r); err != nil {
+		return RegexModel{}, err
 	}
 	res, err := s.db.ExecContext(ctx, `
-		UPDATE regex_routes SET
+		UPDATE regex_models SET
 			pattern      = ?,
 			priority     = ?,
 			target_type  = ?,
@@ -151,21 +151,21 @@ func (s *Store) UpdateRegexRoute(ctx context.Context, r RegexRoute) (RegexRoute,
 		r.Pattern, r.Priority, r.TargetType, r.TargetModel, r.Provider,
 		r.Description, boolToInt(r.Enabled), r.ID)
 	if err != nil {
-		return RegexRoute{}, err
+		return RegexModel{}, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return RegexRoute{}, ErrNotFound
+		return RegexModel{}, ErrNotFound
 	}
-	return s.GetRegexRoute(ctx, r.ID)
+	return s.GetRegexModel(ctx, r.ID)
 }
 
-// UpdateRegexRoutePriority is the narrow path used by drag-and-drop
+// UpdateRegexModelPriority is the narrow path used by drag-and-drop
 // reordering in the dashboard. We expose it separately so the UI can
 // reorder a list without having to round-trip every other field of
 // the row (and risk a race with a concurrent edit).
-func (s *Store) UpdateRegexRoutePriority(ctx context.Context, id string, priority int) error {
+func (s *Store) UpdateRegexModelPriority(ctx context.Context, id string, priority int) error {
 	res, err := s.db.ExecContext(ctx, `
-		UPDATE regex_routes SET priority = ?, updated_at = CURRENT_TIMESTAMP
+		UPDATE regex_models SET priority = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`, priority, id)
 	if err != nil {
 		return err
@@ -176,9 +176,9 @@ func (s *Store) UpdateRegexRoutePriority(ctx context.Context, id string, priorit
 	return nil
 }
 
-// DeleteRegexRoute removes one row by id.
-func (s *Store) DeleteRegexRoute(ctx context.Context, id string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM regex_routes WHERE id = ?`, id)
+// DeleteRegexModel removes one row by id.
+func (s *Store) DeleteRegexModel(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM regex_models WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}

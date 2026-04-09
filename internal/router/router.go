@@ -32,7 +32,7 @@ import (
 // swap the provider and route tables while requests are in flight.
 //
 // The store + logger fields are optional. They are only used by the
-// v2.4 ReloadVirtualModels / ReloadRegexRoutes helpers; older callers
+// ReloadVirtualModels / ReloadRegexModels helpers; older callers
 // that just use Reload(providers, routes) work without ever wiring
 // them up.
 type Router struct {
@@ -67,15 +67,15 @@ type state struct {
 	// rejected. Configured via the first route with model "*".
 	catchAll []string
 
-	// virtualModels and regexRoutes are populated from a separate
-	// store reload (see ReloadVirtualModels / ReloadRegexRoutes). The
+	// virtualModels and regexModels are populated from a separate
+	// store reload (see ReloadVirtualModels / ReloadRegexModels). The
 	// model resolver in model_resolver.go consults them before falling
 	// through to the legacy lookup above. Both fields default to nil
-	// on a fresh router so the v2.4 features are strictly opt-in: a
-	// gateway with no virtual models and no regex routes behaves
-	// exactly like v2.3.
+	// on a fresh router so these features are strictly opt-in: a
+	// gateway with no virtual models and no regex models behaves
+	// exactly like the legacy routes-only path.
 	virtualModels map[string]*VirtualModel
-	regexRoutes   []*CompiledRegexRoute
+	regexModels   []*CompiledRegexModel
 }
 
 // VirtualModel is the in-memory shape of a v2.4 virtual model after
@@ -97,11 +97,11 @@ type VirtualModelRoute struct {
 	Provider    string // populated when TargetType == "real"
 }
 
-// CompiledRegexRoute is one regex_routes row with its pattern
+// CompiledRegexModel is one regex_models row with its pattern
 // pre-compiled. The compile happens at reload time, not in the
 // request path, so request-side resolution is a tight loop of
 // MatchString calls and nothing else.
-type CompiledRegexRoute struct {
+type CompiledRegexModel struct {
 	ID          string
 	Pattern     *regexp.Regexp
 	PatternRaw  string
@@ -159,7 +159,7 @@ func (r *Router) Reload(providers []config.ProviderConfig, routes []config.Route
 	r.mu.Lock()
 	if r.state != nil {
 		next.virtualModels = r.state.virtualModels
-		next.regexRoutes = r.state.regexRoutes
+		next.regexModels = r.state.regexModels
 	}
 	r.state = next
 	r.mu.Unlock()
@@ -174,7 +174,7 @@ func (r *Router) Reload(providers []config.ProviderConfig, routes []config.Route
 //
 // The function copies the previous snapshot's other fields verbatim
 // so a virtual-model edit cannot accidentally clear providers,
-// routes, or regex_routes loaded by the other reload paths.
+// routes, or regex_models loaded by the other reload paths.
 func (r *Router) ReloadVirtualModels(ctx context.Context) error {
 	if r.store == nil {
 		return nil
@@ -219,32 +219,32 @@ func (r *Router) ReloadVirtualModels(ctx context.Context) error {
 	return nil
 }
 
-// ReloadRegexRoutes rebuilds the in-memory regex route slice from the
+// ReloadRegexModels rebuilds the in-memory regex model slice from the
 // store, sorted by priority ASC. Patterns that fail to compile are
 // skipped with a warning so a single bad row cannot brick the whole
 // router; the dashboard's create endpoint already validates the
 // pattern at write time, so this is a defence-in-depth path for
 // imported / hand-edited rows.
-func (r *Router) ReloadRegexRoutes(ctx context.Context) error {
+func (r *Router) ReloadRegexModels(ctx context.Context) error {
 	if r.store == nil {
 		return nil
 	}
-	rows, err := r.store.ListRegexRoutes(ctx)
+	rows, err := r.store.ListRegexModels(ctx)
 	if err != nil {
-		return fmt.Errorf("router: load regex routes: %w", err)
+		return fmt.Errorf("router: load regex models: %w", err)
 	}
-	out := make([]*CompiledRegexRoute, 0, len(rows))
+	out := make([]*CompiledRegexModel, 0, len(rows))
 	for _, row := range rows {
 		if !row.Enabled {
 			continue
 		}
 		re, cerr := regexp.Compile(row.Pattern)
 		if cerr != nil {
-			r.warn("regex route compile failed, skipping",
+			r.warn("regex model compile failed, skipping",
 				"id", row.ID, "pattern", row.Pattern, "err", cerr)
 			continue
 		}
-		out = append(out, &CompiledRegexRoute{
+		out = append(out, &CompiledRegexModel{
 			ID:          row.ID,
 			Pattern:     re,
 			PatternRaw:  row.Pattern,
@@ -263,7 +263,7 @@ func (r *Router) ReloadRegexRoutes(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	next := r.copyStateLocked()
-	next.regexRoutes = out
+	next.regexModels = out
 	r.state = next
 	return nil
 }
@@ -284,7 +284,7 @@ func (r *Router) copyStateLocked() *state {
 		routes:        r.state.routes,
 		catchAll:      r.state.catchAll,
 		virtualModels: r.state.virtualModels,
-		regexRoutes:   r.state.regexRoutes,
+		regexModels:   r.state.regexModels,
 	}
 }
 

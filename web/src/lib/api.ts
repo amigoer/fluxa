@@ -216,9 +216,9 @@ export const VirtualModels = {
     request<void>("DELETE", `/admin/virtual-models/${name}`),
 };
 
-// -- regex route types + endpoints -------------------------------------
+// -- regex model types + endpoints -------------------------------------
 
-export interface RegexRoute {
+export interface RegexModel {
   id?: string;
   pattern: string;
   priority: number;
@@ -231,18 +231,18 @@ export interface RegexRoute {
   updated_at?: string;
 }
 
-export const RegexRoutes = {
+export const RegexModels = {
   list: () =>
-    request<{ data: RegexRoute[] }>("GET", "/admin/regex-routes").then(
+    request<{ data: RegexModel[] }>("GET", "/admin/regex-models").then(
       (r) => r.data ?? [],
     ),
-  create: (r: RegexRoute) =>
-    request<RegexRoute>("POST", "/admin/regex-routes", r),
-  update: (id: string, r: RegexRoute) =>
-    request<RegexRoute>("PUT", `/admin/regex-routes/${id}`, r),
+  create: (r: RegexModel) =>
+    request<RegexModel>("POST", "/admin/regex-models", r),
+  update: (id: string, r: RegexModel) =>
+    request<RegexModel>("PUT", `/admin/regex-models/${id}`, r),
   setPriority: (id: string, priority: number) =>
-    request<void>("PATCH", `/admin/regex-routes/${id}/priority`, { priority }),
-  delete: (id: string) => request<void>("DELETE", `/admin/regex-routes/${id}`),
+    request<void>("PATCH", `/admin/regex-models/${id}/priority`, { priority }),
+  delete: (id: string) => request<void>("DELETE", `/admin/regex-models/${id}`),
 };
 
 // -- resolve tester ----------------------------------------------------

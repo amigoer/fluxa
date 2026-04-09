@@ -7,15 +7,15 @@ import (
 	"testing"
 )
 
-// newResolverRouter builds a Router with the v2.4 fields populated
+// newResolverRouter builds a Router with the resolver fields populated
 // directly, bypassing the store. Tests want exact control over the
-// virtual model and regex route tables, so we hand-build the state
+// virtual model and regex model tables, so we hand-build the state
 // rather than threading a real *store.Store through.
-func newResolverRouter(virtual map[string]*VirtualModel, regex []*CompiledRegexRoute) *Router {
+func newResolverRouter(virtual map[string]*VirtualModel, regex []*CompiledRegexModel) *Router {
 	r := New()
 	r.mu.Lock()
 	r.state.virtualModels = virtual
-	r.state.regexRoutes = regex
+	r.state.regexModels = regex
 	r.mu.Unlock()
 	return r
 }
@@ -138,8 +138,8 @@ func TestResolveModel_RegexInterception(t *testing.T) {
 			},
 		},
 	}
-	regex := []*CompiledRegexRoute{
-		mustCompileRoute(t, "^gpt-4", 50, "virtual", "qwen-latest", ""),
+	regex := []*CompiledRegexModel{
+		mustCompileModel(t, "^gpt-4", 50, "virtual", "qwen-latest", ""),
 	}
 	r := newResolverRouter(vm, regex)
 
@@ -158,11 +158,11 @@ func TestResolveModel_RegexInterception(t *testing.T) {
 func TestResolveModel_RegexPriorityOrdering(t *testing.T) {
 	// Two patterns that both match "gpt-4-turbo"; the lower-priority
 	// number must win even though it was inserted second in the slice.
-	regex := []*CompiledRegexRoute{
-		mustCompileRoute(t, "^gpt-4", 50, "real", "fallback", "p"),
-		mustCompileRoute(t, "^gpt-4-turbo", 10, "real", "winner", "p"),
+	regex := []*CompiledRegexModel{
+		mustCompileModel(t, "^gpt-4", 50, "real", "fallback", "p"),
+		mustCompileModel(t, "^gpt-4-turbo", 10, "real", "winner", "p"),
 	}
-	// The router sorts in ReloadRegexRoutes, so simulate that here.
+	// The router sorts in ReloadRegexModels, so simulate that here.
 	regex[0], regex[1] = regex[1], regex[0]
 
 	r := newResolverRouter(nil, regex)
@@ -199,13 +199,13 @@ func TestResolveModel_VirtualWithMissingTarget(t *testing.T) {
 	}
 }
 
-func mustCompileRoute(t *testing.T, pattern string, priority int, ttype, target, provider string) *CompiledRegexRoute {
+func mustCompileModel(t *testing.T, pattern string, priority int, ttype, target, provider string) *CompiledRegexModel {
 	t.Helper()
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		t.Fatalf("compile %q: %v", pattern, err)
 	}
-	return &CompiledRegexRoute{
+	return &CompiledRegexModel{
 		Pattern:     re,
 		PatternRaw:  pattern,
 		Priority:    priority,

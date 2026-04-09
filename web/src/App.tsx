@@ -33,7 +33,7 @@ import { DashboardPage } from "@/pages/Dashboard";
 import { ProvidersPage } from "@/pages/Providers";
 import { RoutesPage } from "@/pages/Routes";
 import { VirtualModelsPage } from "@/pages/VirtualModels";
-import { RegexRoutesPage } from "@/pages/RegexRoutes";
+import { RegexModelsPage } from "@/pages/RegexModels";
 import { ResolveTesterPage } from "@/pages/ResolveTester";
 import { RouteGraphPage } from "@/components/RouteGraph";
 import { KeysPage } from "@/pages/Keys";
@@ -49,7 +49,7 @@ type Tab =
   | "providers"
   | "routes"
   | "virtual-models"
-  | "regex-routes"
+  | "regex-models"
   | "resolve-tester"
   | "route-graph"
   | "keys"
@@ -79,7 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "providers", labelKey: "nav.providers", icon: Server },
       { id: "routes", labelKey: "nav.routes", icon: Waypoints },
       { id: "virtual-models", labelKey: "nav.virtualModels", icon: GitBranch },
-      { id: "regex-routes", labelKey: "nav.regexRoutes", icon: Code2 },
+      { id: "regex-models", labelKey: "nav.regexModels", icon: Code2 },
     ],
   },
   {
@@ -102,7 +102,7 @@ const TAB_IDS = new Set<Tab>([
   "providers",
   "routes",
   "virtual-models",
-  "regex-routes",
+  "regex-models",
   "resolve-tester", // Kept in tabs, but removed from sidebar
   "route-graph",
   "keys",
@@ -438,7 +438,7 @@ function Shell() {
               {tab === "providers" && <ProvidersPage />}
               {tab === "routes" && <RoutesPage />}
               {tab === "virtual-models" && <VirtualModelsPage />}
-              {tab === "regex-routes" && <RegexRoutesPage />}
+              {tab === "regex-models" && <RegexModelsPage />}
               {tab === "resolve-tester" && <ResolveTesterPage />}
               {tab === "keys" && <KeysPage />}
               {tab === "usage" && <UsagePage />}

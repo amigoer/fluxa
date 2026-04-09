@@ -3,19 +3,19 @@
 //
 // The graph is a single connected DAG with this shape:
 //
-//   SourceNode ─┬─► RegexRouteNode ─► VirtualModelNode ─┬─► ProviderNode
+//   SourceNode ─┬─► RegexModelNode ─► VirtualModelNode ─┬─► ProviderNode
 //               │                  └► ProviderNode      ├─► ProviderNode
 //               │                                       └─► ProviderNode
 //               ├─► VirtualModelNode (direct name match)
 //               └─► FallbackNode (always last, dashed)
 //
 // Two important semantic rules embedded here:
-//   1. A VirtualModel that no regex route points to is still a valid
+//   1. A VirtualModel that no regex model points to is still a valid
 //      runtime entry point (a request whose model name matches the
 //      VM's name resolves directly). We draw a source→VM edge for
 //      every such VM so the graph is *always* connected — never a
 //      floating subgraph.
-//   2. Disabled regex routes and disabled VM routes are skipped.
+//   2. Disabled regex models and disabled VM routes are skipped.
 //      Disabled rules do not run at the data plane, so showing them
 //      on the topology view would be misleading.
 //
@@ -27,7 +27,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import type {
   Provider,
-  RegexRoute,
+  RegexModel,
   VirtualModel,
   VirtualModelRoute,
 } from "@/lib/api";
@@ -37,7 +37,7 @@ import type {
 // which node type the offending id belongs to.
 const SOURCE_ID = "source";
 const FALLBACK_ID = "fallback";
-const regexId = (r: RegexRoute) => `regex:${r.id ?? r.pattern}`;
+const regexId = (r: RegexModel) => `regex:${r.id ?? r.pattern}`;
 const vmId = (name: string) => `vm:${name}`;
 const providerId = (provider: string, model: string) =>
   `provider:${provider}:${model}`;
@@ -50,7 +50,7 @@ export interface SourceNodeData {
 }
 
 export interface RegexNodeData {
-  route: RegexRoute;
+  route: RegexModel;
 }
 
 export interface VirtualModelNodeData {
@@ -102,7 +102,7 @@ const SEGMENT_PALETTE = [
 // which makes it trivial to unit test if/when we add coverage.
 export function buildGraph(
   virtualModels: VirtualModel[],
-  regexRoutes: RegexRoute[],
+  regexModels: RegexModel[],
   providers: Provider[],
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
@@ -118,7 +118,7 @@ export function buildGraph(
   });
 
   // 2. VirtualModelNodes — one per configured virtual model. We index
-  //    them by name so the regex-route loop below can wire targets
+  //    them by name so the regex-model loop below can wire targets
   //    without a second pass over the list. Disabled VM routes are
   //    stripped here so the segment colour palette stays in lockstep
   //    with the actually-rendered fanout edges below.
@@ -139,7 +139,7 @@ export function buildGraph(
   }
 
   // 3. ProviderNodes — one per *unique* (provider, model) tuple
-  //    referenced anywhere in the graph (regex routes or virtual model
+  //    referenced anywhere in the graph (regex models or virtual model
   //    routes). We do not draw a provider for every model the provider
   //    advertises in `models[]` because that would explode the canvas
   //    with nodes the user never actually routes to.
@@ -165,7 +165,7 @@ export function buildGraph(
     return id;
   }
 
-  // 4. RegexRouteNodes — emitted in priority order (lowest number =
+  // 4. RegexModelNodes — emitted in priority order (lowest number =
   //    highest priority). Disabled rules are filtered out because the
   //    data plane skips them at runtime; showing them on the topology
   //    view would imply they take traffic. The visual stacking matches
@@ -176,14 +176,14 @@ export function buildGraph(
   //    so the next loop knows whether to draw a "direct name match"
   //    fallback edge into them.
   const regexTargetedVMs = new Set<string>();
-  const sortedRegex = [...regexRoutes]
+  const sortedRegex = [...regexModels]
     .filter((r) => r.enabled !== false)
     .sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100));
   for (const r of sortedRegex) {
     const id = regexId(r);
     nodes.push({
       id,
-      type: "regexRoute",
+      type: "regexModel",
       position: { x: 0, y: 0 },
       data: { route: r } satisfies RegexNodeData,
     });
@@ -223,7 +223,7 @@ export function buildGraph(
   }
 
   // 4b. Direct source→VM edges. Any virtual model that no enabled
-  //     regex route points at is still reachable at runtime by sending
+  //     regex model points at is still reachable at runtime by sending
   //     the request with model=<vm name>. Without these edges, such a
   //     VM would float orphaned on the canvas and the operator could
   //     not see how requests reach it. The edge is the same "route"
@@ -243,7 +243,7 @@ export function buildGraph(
   // 5. FallbackNode — the terminal "no rule matched, pass the model
   //    name through unchanged" branch. Always present so the canvas
   //    visually communicates that there is *always* a default path,
-  //    even if the user has not configured any regex routes yet.
+  //    even if the user has not configured any regex models yet.
   nodes.push({
     id: FALLBACK_ID,
     type: "fallback",

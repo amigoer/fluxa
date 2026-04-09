@@ -1,4 +1,4 @@
-// model_resolver.go is the v2.4 pre-routing pipeline. Every request
+// model_resolver.go is the pre-routing pipeline. Every request
 // runs through ResolveModel before the legacy Resolve lookup; if the
 // pre-stage returns a concrete target, the request handler bypasses
 // the legacy chain entirely. The resolver is intentionally
@@ -9,7 +9,7 @@
 // Resolution order on every call:
 //
 //  1. exact match in virtual_models? → weighted pick → recurse
-//  2. regex match in regex_routes (priority ASC, first wins)? → recurse
+//  2. regex match in regex_models (priority ASC, first wins)? → recurse
 //  3. passthrough — return nil and let the caller fall through to
 //     the legacy Resolve() chain
 //
@@ -31,7 +31,7 @@ import (
 // maxResolveDepth caps the number of virtual → virtual hops the
 // resolver will follow before bailing out. Five is generous: a
 // well-formed alias graph rarely needs more than two levels (a
-// regex_route pointing at a virtual_model that picks among real
+// regex_model pointing at a virtual_model that picks among real
 // models). Anything deeper is almost certainly a misconfigured cycle.
 const maxResolveDepth = 5
 
@@ -127,7 +127,7 @@ func (r *Router) resolveWithCtx(name string, rc *resolveCtx) (*ResolvedTarget, e
 
 	// Step 2: regex match. The slice is pre-sorted by priority so we
 	// can take the first hit and stop scanning.
-	for _, rr := range s.regexRoutes {
+	for _, rr := range s.regexModels {
 		if !rr.Pattern.MatchString(name) {
 			continue
 		}
@@ -155,7 +155,7 @@ func (r *Router) resolveWithCtx(name string, rc *resolveCtx) (*ResolvedTarget, e
 }
 
 // followTarget interprets a (target_type, target_model, provider)
-// triple from a virtual model route or a regex route. Real targets
+// triple from a virtual model route or a regex model. Real targets
 // resolve immediately to a ResolvedTarget; virtual targets recurse
 // after bumping the depth counter.
 func (r *Router) followTarget(targetType, target, provider string, rc *resolveCtx) (*ResolvedTarget, error) {

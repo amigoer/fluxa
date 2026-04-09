@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 // *instance* (e.g. "openai-prod", "azure-eu") from the configured list.
 // Distinct from the `kind` selector in Providers.tsx, which picks a
 // vendor type (openai / azure / …). Routes, fallback chains, virtual
-// models, and regex routes all need to reference a concrete provider by
+// models, and regex models all need to reference a concrete provider by
 // name — this component standardises that picker so icons, disabled
 // states, and dangling-reference warnings look the same everywhere.
 //

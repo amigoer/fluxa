@@ -29,7 +29,7 @@ interface Props {
   // on the canvas; for provider there is no draft node (providers
   // are config blobs, not (provider, model) tuples). The parent
   // owns the node insertion because it has the position context.
-  onStartCreate: (kind: "regexRoute" | "virtualModel" | "provider") => void;
+  onStartCreate: (kind: "regexModel" | "virtualModel" | "provider") => void;
 }
 
 interface ActionBtnProps {
@@ -82,7 +82,7 @@ export function GraphToolbar({ onLayout, onStartCreate }: Props) {
        */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 rounded-xl border border-border/60 bg-background/95 backdrop-blur px-2 py-1.5 shadow-md">
         <ActionBtn
-          onClick={() => onStartCreate("regexRoute")}
+          onClick={() => onStartCreate("regexModel")}
           label={t("graph.toolbar.regex")}
           className={plainPill}
         >

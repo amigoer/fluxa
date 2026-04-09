@@ -1,5 +1,5 @@
 // useSaveShortcut — small hook that wires Cmd/Ctrl+S to a side
-// panel's save callback. Mounted by RegexRoutePanel,
+// panel's save callback. Mounted by RegexModelPanel,
 // VirtualModelPanel and ProviderCreatePanel so the operator can
 // hit the keyboard shortcut from anywhere on the page (the
 // listener lives on `window`, not on the input that is currently

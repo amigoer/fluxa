@@ -197,12 +197,12 @@ func (s *Store) migrate(ctx context.Context) error {
 			FOREIGN KEY (virtual_model_id) REFERENCES virtual_models(id) ON DELETE CASCADE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_vmr_parent ON virtual_model_routes(virtual_model_id)`,
-		// regex_routes is the "intercept by pattern" table also added
-		// in v2.4. priority is ASC = highest first; ties break by
-		// insertion order which is fine because admins can edit it.
-		// We pre-compile patterns at router reload time so the
-		// request path never pays a regexp.MustCompile cost.
-		`CREATE TABLE IF NOT EXISTS regex_routes (
+		// regex_models is the pattern-based model alias table. priority
+		// is ASC = highest first; ties break by insertion order which
+		// is fine because admins can edit it. We pre-compile patterns
+		// at router reload time so the request path never pays a
+		// regexp.MustCompile cost.
+		`CREATE TABLE IF NOT EXISTS regex_models (
 			id           TEXT PRIMARY KEY,
 			pattern      TEXT NOT NULL,
 			priority     INTEGER NOT NULL DEFAULT 100,
@@ -214,14 +214,14 @@ func (s *Store) migrate(ctx context.Context) error {
 			created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
-		`CREATE INDEX IF NOT EXISTS idx_regex_routes_priority ON regex_routes(priority ASC)`,
+		`CREATE INDEX IF NOT EXISTS idx_regex_models_priority ON regex_models(priority ASC)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 	}
-	
+
 	// Safe schema upgrades for v2.5
 	upgrades := []string{
 		`ALTER TABLE admin_users ADD COLUMN nickname TEXT NOT NULL DEFAULT ''`,

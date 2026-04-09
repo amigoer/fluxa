@@ -20,7 +20,7 @@ import type { Node } from "@xyflow/react";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { RegexRoutePanel } from "./RegexRoutePanel";
+import { RegexModelPanel } from "./RegexModelPanel";
 import { VirtualModelPanel } from "./VirtualModelPanel";
 import { ProviderPanel } from "./ProviderPanel";
 import { ProviderCreatePanel } from "./ProviderCreatePanel";
@@ -47,7 +47,7 @@ const CHIP_TONE: Record<
   string,
   { dot: string; bg: string; text: string; border: string }
 > = {
-  regexRoute: {
+  regexModel: {
     dot: "bg-[#EF9F27]",
     bg: "bg-[#FAEEDA]",
     text: "text-[#854F0B]",
@@ -103,7 +103,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
   const [displayed, setDisplayed] = useState<{
     kind: "edit" | "create";
     node?: Node;
-    creatingKind?: "regexRoute" | "virtualModel" | "provider";
+    creatingKind?: "regexModel" | "virtualModel" | "provider";
   } | null>(null);
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
   const { typeLabel, subtitle } = (() => {
     if (!resolvedType) return { typeLabel: "", subtitle: "" };
     switch (resolvedType) {
-      case "regexRoute":
+      case "regexModel":
         return {
           typeLabel: isCreate
             ? t("graph.dialog.newRegex")
@@ -290,8 +290,8 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
             hold onto a previous draft because the same component
             instance is being reused. */}
         <div className="flex-1 overflow-auto px-4 py-4">
-          {isCreate && resolvedType === "regexRoute" && (
-            <RegexRoutePanel
+          {isCreate && resolvedType === "regexModel" && (
+            <RegexModelPanel
               // Key by draftNodeId so a brand-new draft (after a
               // cancel + new click) gets a fresh component mount
               // and the local UI state is reset cleanly.
@@ -339,8 +339,8 @@ export function NodeSidePanel({ onChange, onCancelCreate }: Props) {
               onClose={closeImmediate}
             />
           )}
-          {!isCreate && node?.type === "regexRoute" && (
-            <RegexRoutePanel
+          {!isCreate && node?.type === "regexModel" && (
+            <RegexModelPanel
               key={`edit-${node.id}`}
               route={(node.data as unknown as RegexNodeData).route}
               onChange={onChange}

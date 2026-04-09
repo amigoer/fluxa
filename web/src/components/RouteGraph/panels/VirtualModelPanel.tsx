@@ -87,7 +87,7 @@ export function VirtualModelPanel({
   const isCreate = !!create;
   // rawForm is the real useState; setForm wraps its setter to also
   // ping the parent's onDirty hook so a close-with-unsaved prompt
-  // can fire. See the matching pattern in RegexRoutePanel.
+  // can fire. See the matching pattern in RegexModelPanel.
   const [rawForm, setRawForm] = useState<VirtualModel>(
     model
       ? { ...model, routes: model.routes.map((r) => ({ ...r })) }

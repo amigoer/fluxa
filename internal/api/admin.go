@@ -99,19 +99,21 @@ func (a *AdminServer) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/config/export", a.requireAuth(a.exportConfig))
 	mux.HandleFunc("POST /admin/config/import", a.requireAuth(a.importConfig))
 
-	// v2.4 — virtual models, regex routes, and the resolve tester.
+	// Virtual models, regex models, and the resolve tester. These share
+	// the resolver layer: virtual_models matches exact names, regex_models
+	// matches by pattern, both rewrite to a concrete target.
 	mux.HandleFunc("GET /admin/virtual-models", a.requireAuth(a.listVirtualModels))
 	mux.HandleFunc("POST /admin/virtual-models", a.requireAuth(a.upsertVirtualModel))
 	mux.HandleFunc("GET /admin/virtual-models/{name}", a.requireAuth(a.getVirtualModel))
 	mux.HandleFunc("PUT /admin/virtual-models/{name}", a.requireAuth(a.upsertVirtualModel))
 	mux.HandleFunc("DELETE /admin/virtual-models/{name}", a.requireAuth(a.deleteVirtualModel))
 
-	mux.HandleFunc("GET /admin/regex-routes", a.requireAuth(a.listRegexRoutes))
-	mux.HandleFunc("POST /admin/regex-routes", a.requireAuth(a.createRegexRoute))
-	mux.HandleFunc("GET /admin/regex-routes/{id}", a.requireAuth(a.getRegexRoute))
-	mux.HandleFunc("PUT /admin/regex-routes/{id}", a.requireAuth(a.updateRegexRoute))
-	mux.HandleFunc("PATCH /admin/regex-routes/{id}/priority", a.requireAuth(a.updateRegexRoutePriority))
-	mux.HandleFunc("DELETE /admin/regex-routes/{id}", a.requireAuth(a.deleteRegexRoute))
+	mux.HandleFunc("GET /admin/regex-models", a.requireAuth(a.listRegexModels))
+	mux.HandleFunc("POST /admin/regex-models", a.requireAuth(a.createRegexModel))
+	mux.HandleFunc("GET /admin/regex-models/{id}", a.requireAuth(a.getRegexModel))
+	mux.HandleFunc("PUT /admin/regex-models/{id}", a.requireAuth(a.updateRegexModel))
+	mux.HandleFunc("PATCH /admin/regex-models/{id}/priority", a.requireAuth(a.updateRegexModelPriority))
+	mux.HandleFunc("DELETE /admin/regex-models/{id}", a.requireAuth(a.deleteRegexModel))
 
 	mux.HandleFunc("GET /admin/resolve-model", a.requireAuth(a.resolveModel))
 
@@ -414,8 +416,8 @@ func (a *AdminServer) reloadRouter(ctx context.Context) error {
 	if err := a.router.Reload(provs, routes); err != nil {
 		return err
 	}
-	// Also refresh the v2.4 resolver tables so an /admin/reload picks
-	// up out-of-band edits to virtual_models / regex_routes alongside
+	// Also refresh the resolver tables so an /admin/reload picks
+	// up out-of-band edits to virtual_models / regex_models alongside
 	// the legacy provider/route changes.
 	return a.reloadResolverState(ctx)
 }

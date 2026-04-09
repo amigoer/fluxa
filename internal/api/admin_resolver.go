@@ -1,9 +1,9 @@
-// admin_resolver.go exposes the v2.4 control-plane endpoints that drive
-// the dashboard's Virtual Models, Regex Routes, and Resolve Tester
+// admin_resolver.go exposes the control-plane endpoints that drive
+// the dashboard's Virtual Models, Regex Models, and Resolve Tester
 // pages. The handlers themselves are thin: they decode JSON, call into
 // the store, then trigger the matching router.Reload* helper so the
 // data plane picks up the change with zero downtime. The interesting
-// logic lives in internal/store/{virtual_models,regex_routes}.go and
+// logic lives in internal/store/{virtual_models,regex_models}.go and
 // internal/router/model_resolver.go.
 
 package api
@@ -40,7 +40,7 @@ type virtualModelRouteDTO struct {
 	Position    int    `json:"position,omitempty"`
 }
 
-type regexRouteDTO struct {
+type regexModelDTO struct {
 	ID          string    `json:"id,omitempty"`
 	Pattern     string    `json:"pattern"`
 	Priority    int       `json:"priority"`
@@ -106,9 +106,9 @@ func fromVirtualModelDTO(dto virtualModelDTO) store.VirtualModel {
 	return vm
 }
 
-func toRegexRouteDTO(r store.RegexRoute) regexRouteDTO {
+func toRegexModelDTO(r store.RegexModel) regexModelDTO {
 	enabled := r.Enabled
-	return regexRouteDTO{
+	return regexModelDTO{
 		ID:          r.ID,
 		Pattern:     r.Pattern,
 		Priority:    r.Priority,
@@ -122,12 +122,12 @@ func toRegexRouteDTO(r store.RegexRoute) regexRouteDTO {
 	}
 }
 
-func fromRegexRouteDTO(dto regexRouteDTO) store.RegexRoute {
+func fromRegexModelDTO(dto regexModelDTO) store.RegexModel {
 	enabled := true
 	if dto.Enabled != nil {
 		enabled = *dto.Enabled
 	}
-	return store.RegexRoute{
+	return store.RegexModel{
 		ID:          dto.ID,
 		Pattern:     dto.Pattern,
 		Priority:    dto.Priority,
@@ -208,80 +208,80 @@ func (a *AdminServer) deleteVirtualModel(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// -- regex route handlers ----------------------------------------------
+// -- regex model handlers ----------------------------------------------
 
-func (a *AdminServer) listRegexRoutes(w http.ResponseWriter, r *http.Request) {
-	rows, err := a.store.ListRegexRoutes(r.Context())
+func (a *AdminServer) listRegexModels(w http.ResponseWriter, r *http.Request) {
+	rows, err := a.store.ListRegexModels(r.Context())
 	if err != nil {
 		writeAdminError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	out := make([]regexRouteDTO, 0, len(rows))
+	out := make([]regexModelDTO, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toRegexRouteDTO(row))
+		out = append(out, toRegexModelDTO(row))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": out})
 }
 
-func (a *AdminServer) getRegexRoute(w http.ResponseWriter, r *http.Request) {
-	row, err := a.store.GetRegexRoute(r.Context(), r.PathValue("id"))
+func (a *AdminServer) getRegexModel(w http.ResponseWriter, r *http.Request) {
+	row, err := a.store.GetRegexModel(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
-		writeAdminError(w, http.StatusNotFound, "regex route not found")
+		writeAdminError(w, http.StatusNotFound, "regex model not found")
 		return
 	}
 	if err != nil {
 		writeAdminError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toRegexRouteDTO(row))
+	writeJSON(w, http.StatusOK, toRegexModelDTO(row))
 }
 
-func (a *AdminServer) createRegexRoute(w http.ResponseWriter, r *http.Request) {
-	var dto regexRouteDTO
+func (a *AdminServer) createRegexModel(w http.ResponseWriter, r *http.Request) {
+	var dto regexModelDTO
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
 		writeAdminError(w, http.StatusBadRequest, "invalid json: "+err.Error())
 		return
 	}
-	saved, err := a.store.CreateRegexRoute(r.Context(), fromRegexRouteDTO(dto))
+	saved, err := a.store.CreateRegexModel(r.Context(), fromRegexModelDTO(dto))
 	if err != nil {
 		writeAdminError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := a.router.ReloadRegexRoutes(r.Context()); err != nil {
+	if err := a.router.ReloadRegexModels(r.Context()); err != nil {
 		writeAdminError(w, http.StatusInternalServerError, "reload failed: "+err.Error())
 		return
 	}
-	a.logger.Info("admin regex route created", "id", saved.ID, "pattern", saved.Pattern)
-	writeJSON(w, http.StatusOK, toRegexRouteDTO(saved))
+	a.logger.Info("admin regex model created", "id", saved.ID, "pattern", saved.Pattern)
+	writeJSON(w, http.StatusOK, toRegexModelDTO(saved))
 }
 
-func (a *AdminServer) updateRegexRoute(w http.ResponseWriter, r *http.Request) {
-	var dto regexRouteDTO
+func (a *AdminServer) updateRegexModel(w http.ResponseWriter, r *http.Request) {
+	var dto regexModelDTO
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
 		writeAdminError(w, http.StatusBadRequest, "invalid json: "+err.Error())
 		return
 	}
 	dto.ID = r.PathValue("id")
-	saved, err := a.store.UpdateRegexRoute(r.Context(), fromRegexRouteDTO(dto))
+	saved, err := a.store.UpdateRegexModel(r.Context(), fromRegexModelDTO(dto))
 	if errors.Is(err, store.ErrNotFound) {
-		writeAdminError(w, http.StatusNotFound, "regex route not found")
+		writeAdminError(w, http.StatusNotFound, "regex model not found")
 		return
 	}
 	if err != nil {
 		writeAdminError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := a.router.ReloadRegexRoutes(r.Context()); err != nil {
+	if err := a.router.ReloadRegexModels(r.Context()); err != nil {
 		writeAdminError(w, http.StatusInternalServerError, "reload failed: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toRegexRouteDTO(saved))
+	writeJSON(w, http.StatusOK, toRegexModelDTO(saved))
 }
 
-// updateRegexRoutePriority is the narrow drag-and-drop endpoint. It
+// updateRegexModelPriority is the narrow drag-and-drop endpoint. It
 // accepts only {"priority": int} so the dashboard can reorder rows
 // without round-tripping every other field.
-func (a *AdminServer) updateRegexRoutePriority(w http.ResponseWriter, r *http.Request) {
+func (a *AdminServer) updateRegexModelPriority(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Priority int `json:"priority"`
 	}
@@ -290,31 +290,31 @@ func (a *AdminServer) updateRegexRoutePriority(w http.ResponseWriter, r *http.Re
 		return
 	}
 	id := r.PathValue("id")
-	if err := a.store.UpdateRegexRoutePriority(r.Context(), id, body.Priority); errors.Is(err, store.ErrNotFound) {
-		writeAdminError(w, http.StatusNotFound, "regex route not found")
+	if err := a.store.UpdateRegexModelPriority(r.Context(), id, body.Priority); errors.Is(err, store.ErrNotFound) {
+		writeAdminError(w, http.StatusNotFound, "regex model not found")
 		return
 	} else if err != nil {
 		writeAdminError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := a.router.ReloadRegexRoutes(r.Context()); err != nil {
+	if err := a.router.ReloadRegexModels(r.Context()); err != nil {
 		writeAdminError(w, http.StatusInternalServerError, "reload failed: "+err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (a *AdminServer) deleteRegexRoute(w http.ResponseWriter, r *http.Request) {
+func (a *AdminServer) deleteRegexModel(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if err := a.store.DeleteRegexRoute(r.Context(), id); errors.Is(err, store.ErrNotFound) {
-		writeAdminError(w, http.StatusNotFound, "regex route not found")
+	if err := a.store.DeleteRegexModel(r.Context(), id); errors.Is(err, store.ErrNotFound) {
+		writeAdminError(w, http.StatusNotFound, "regex model not found")
 		return
 	} else if err != nil {
 		writeAdminError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := a.router.ReloadRegexRoutes(r.Context()); err != nil {
-		a.logger.Warn("router reload after regex route delete failed", "id", id, "err", err)
+	if err := a.router.ReloadRegexModels(r.Context()); err != nil {
+		a.logger.Warn("router reload after regex model delete failed", "id", id, "err", err)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -324,7 +324,7 @@ func (a *AdminServer) deleteRegexRoute(w http.ResponseWriter, r *http.Request) {
 // resolveModel is the dashboard's "what would happen if I sent model X
 // right now?" probe. It runs the same pre-resolver as the data plane
 // but returns the full trace so the operator can see exactly which
-// virtual model / regex route fired and what the eventual upstream
+// virtual model / regex model fired and what the eventual upstream
 // target would be. The endpoint never makes a real upstream request,
 // so it is safe to call repeatedly while editing rules.
 func (a *AdminServer) resolveModel(w http.ResponseWriter, r *http.Request) {
@@ -356,11 +356,12 @@ func (a *AdminServer) resolveModel(w http.ResponseWriter, r *http.Request) {
 }
 
 // reloadResolverState is a helper used by /admin/reload to refresh the
-// v2.4 tables alongside the legacy provider/route tables. Pulled out so
-// the existing reload handler can call it without growing too large.
+// resolver tables alongside the legacy provider/route tables. Pulled
+// out so the existing reload handler can call it without growing too
+// large.
 func (a *AdminServer) reloadResolverState(ctx context.Context) error {
 	if err := a.router.ReloadVirtualModels(ctx); err != nil {
 		return err
 	}
-	return a.router.ReloadRegexRoutes(ctx)
+	return a.router.ReloadRegexModels(ctx)
 }

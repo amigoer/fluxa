@@ -1,8 +1,8 @@
 // RouteEdge — non-weighted edges. Four flavours, distinguished by
 // data.labelKind:
 //
-//   - "priority": SourceNode → RegexRouteNode. Solid gray, P{n} label.
-//   - "matched":  RegexRouteNode → target. Solid amber, "matched".
+//   - "priority": SourceNode → RegexModelNode. Solid gray, P{n} label.
+//   - "matched":  RegexModelNode → target. Solid amber, "matched".
 //   - "direct":   SourceNode → VirtualModelNode (no regex pointed at
 //                 it; reachable by direct name match). Solid gray, no
 //                 label — the source→VM line tells the whole story.

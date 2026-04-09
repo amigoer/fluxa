@@ -32,7 +32,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { Providers, RegexRoutes, VirtualModels } from "@/lib/api";
+import { Providers, RegexModels, VirtualModels } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useRouteGraphStore, type EdgeStat } from "@/store/routeGraphStore";
 import { buildGraph } from "./utils/buildGraph";
@@ -49,7 +49,7 @@ import {
 } from "./utils/layout";
 
 import { SourceNode } from "./nodes/SourceNode";
-import { RegexRouteNode } from "./nodes/RegexRouteNode";
+import { RegexModelNode } from "./nodes/RegexModelNode";
 import { VirtualModelNode } from "./nodes/VirtualModelNode";
 import { ProviderNode } from "./nodes/ProviderNode";
 import { FallbackNode } from "./nodes/FallbackNode";
@@ -64,7 +64,7 @@ import { NodeSidePanel } from "./panels/NodeSidePanel";
 // stable for free.
 const nodeTypes: NodeTypes = {
   source: SourceNode,
-  regexRoute: RegexRouteNode,
+  regexModel: RegexModelNode,
   virtualModel: VirtualModelNode,
   provider: ProviderNode,
   fallback: FallbackNode,
@@ -113,7 +113,7 @@ function RouteGraphInner() {
     try {
       const [vms, rxs, ps] = await Promise.all([
         VirtualModels.list(),
-        RegexRoutes.list(),
+        RegexModels.list(),
         Providers.list(),
       ]);
       const built = buildGraph(vms, rxs, ps);
@@ -257,7 +257,7 @@ function RouteGraphInner() {
   // Save the API call + load() replaces the draft with the real
   // server-derived node.
   const onStartCreate = useCallback(
-    (kind: "regexRoute" | "virtualModel" | "provider") => {
+    (kind: "regexModel" | "virtualModel" | "provider") => {
       // Clean up any previous draft so consecutive clicks of the
       // toolbar buttons swap drafts cleanly instead of stacking.
       const prior = useRouteGraphStore.getState().draftNodeId;
@@ -286,15 +286,15 @@ function RouteGraphInner() {
       const offsetY = sourceNode ? sourceNode.position.y - 60 : 0;
 
       const id =
-        kind === "regexRoute"
+        kind === "regexModel"
           ? `draft-regex-${Date.now()}`
           : `draft-virtual-${Date.now()}`;
 
       let draftNode: Node;
-      if (kind === "regexRoute") {
+      if (kind === "regexModel") {
         draftNode = {
           id,
-          type: "regexRoute",
+          type: "regexModel",
           position: { x: offsetX, y: offsetY },
           data: {
             route: {
@@ -373,7 +373,7 @@ function RouteGraphInner() {
   //   VirtualModel handle "route-N" → Provider/VM
   //     -> route N of the VM is reassigned to the new target.
   //
-  //   RegexRoute handle → Provider/VM
+  //   RegexModel handle → Provider/VM
   //     -> the regex's target_model / provider is reassigned.
   //
   // Anything else (drags from source/fallback, drops on source/
@@ -412,7 +412,7 @@ function RouteGraphInner() {
           target: targetNode.id,
           type: "route",
           data: {
-            labelKind: targetNode.type === "regexRoute" ? "priority" : "direct",
+            labelKind: targetNode.type === "regexModel" ? "priority" : "direct",
             priority: 100,
           },
         };
@@ -467,7 +467,7 @@ function RouteGraphInner() {
       if (sourceNode.id.startsWith("draft-")) {
         if (
           sourceNode.type !== "virtualModel" &&
-          sourceNode.type !== "regexRoute"
+          sourceNode.type !== "regexModel"
         ) {
           return;
         }
@@ -582,10 +582,10 @@ function RouteGraphInner() {
             ),
           };
           await VirtualModels.upsert(updated);
-        } else if (sourceNode.type === "regexRoute") {
+        } else if (sourceNode.type === "regexModel") {
           const r = (sourceNode.data as unknown as RegexNodeData).route;
           if (!r.id) return;
-          await RegexRoutes.update(r.id, {
+          await RegexModels.update(r.id, {
             ...r,
             target_type: newTarget.target_type,
             target_model: newTarget.target_model,
@@ -623,12 +623,12 @@ function RouteGraphInner() {
     // self-loops separately (once the operator has typed a name).
     if (s.id.startsWith("draft-")) {
       const validSource =
-        s.type === "virtualModel" || s.type === "regexRoute";
+        s.type === "virtualModel" || s.type === "regexModel";
       const validTarget =
         t.type === "provider" || t.type === "virtualModel";
       return validSource && validTarget;
     }
-    const validSource = s.type === "virtualModel" || s.type === "regexRoute";
+    const validSource = s.type === "virtualModel" || s.type === "regexModel";
     const validTarget = t.type === "provider" || t.type === "virtualModel";
     return validSource && validTarget;
   }, []);

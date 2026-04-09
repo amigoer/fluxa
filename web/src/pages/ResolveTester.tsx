@@ -11,7 +11,7 @@ import { useT } from "@/lib/i18n";
 // model X right now" probe. It calls /admin/resolve-model which runs
 // the same pre-resolver as the data plane and returns the full trace
 // without ever touching an upstream provider — so operators can edit
-// virtual models or regex routes and validate the result immediately.
+// virtual models or regex models and validate the result immediately.
 export function ResolveTesterPage() {
   const { t } = useT();
   const [model, setModel] = useState("");

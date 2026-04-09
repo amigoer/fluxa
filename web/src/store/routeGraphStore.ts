@@ -36,7 +36,7 @@ export interface EdgeStat {
 // only updates on save, via load() picking up the new provider
 // via buildGraph's provider-models loop.
 export type CreatingKind =
-  | "regexRoute"
+  | "regexModel"
   | "virtualModel"
   | "provider"
   | null;

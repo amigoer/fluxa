@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-func TestRegexRouteCRUD(t *testing.T) {
+func TestRegexModelCRUD(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
-	a, err := s.CreateRegexRoute(ctx, RegexRoute{
+	a, err := s.CreateRegexModel(ctx, RegexModel{
 		Pattern:     "^gpt-4",
 		Priority:    50,
 		TargetType:  "virtual",
@@ -19,13 +19,13 @@ func TestRegexRouteCRUD(t *testing.T) {
 		Enabled:     true,
 	})
 	if err != nil {
-		t.Fatalf("CreateRegexRoute: %v", err)
+		t.Fatalf("CreateRegexModel: %v", err)
 	}
 	if a.ID == "" {
 		t.Fatal("expected id to be assigned")
 	}
 
-	b, err := s.CreateRegexRoute(ctx, RegexRoute{
+	b, err := s.CreateRegexModel(ctx, RegexModel{
 		Pattern:     "^claude-",
 		Priority:    10,
 		TargetType:  "real",
@@ -34,12 +34,12 @@ func TestRegexRouteCRUD(t *testing.T) {
 		Enabled:     true,
 	})
 	if err != nil {
-		t.Fatalf("CreateRegexRoute b: %v", err)
+		t.Fatalf("CreateRegexModel b: %v", err)
 	}
 
-	all, err := s.ListRegexRoutes(ctx)
+	all, err := s.ListRegexModels(ctx)
 	if err != nil {
-		t.Fatalf("ListRegexRoutes: %v", err)
+		t.Fatalf("ListRegexModels: %v", err)
 	}
 	if len(all) != 2 {
 		t.Fatalf("expected 2 rows, got %d", len(all))
@@ -50,10 +50,10 @@ func TestRegexRouteCRUD(t *testing.T) {
 	}
 
 	// Update path: change priority via the dedicated endpoint.
-	if err := s.UpdateRegexRoutePriority(ctx, a.ID, 5); err != nil {
-		t.Fatalf("UpdateRegexRoutePriority: %v", err)
+	if err := s.UpdateRegexModelPriority(ctx, a.ID, 5); err != nil {
+		t.Fatalf("UpdateRegexModelPriority: %v", err)
 	}
-	all, _ = s.ListRegexRoutes(ctx)
+	all, _ = s.ListRegexModels(ctx)
 	if all[0].ID != a.ID {
 		t.Errorf("after priority bump, a should be first: %+v", all)
 	}
@@ -61,39 +61,39 @@ func TestRegexRouteCRUD(t *testing.T) {
 	// Full update.
 	a.Description = "edited"
 	a.Pattern = "^gpt-4-turbo"
-	if _, err := s.UpdateRegexRoute(ctx, a); err != nil {
-		t.Fatalf("UpdateRegexRoute: %v", err)
+	if _, err := s.UpdateRegexModel(ctx, a); err != nil {
+		t.Fatalf("UpdateRegexModel: %v", err)
 	}
-	got, _ := s.GetRegexRoute(ctx, a.ID)
+	got, _ := s.GetRegexModel(ctx, a.ID)
 	if got.Description != "edited" || got.Pattern != "^gpt-4-turbo" {
 		t.Errorf("update did not persist: %+v", got)
 	}
 
-	if err := s.DeleteRegexRoute(ctx, a.ID); err != nil {
-		t.Fatalf("DeleteRegexRoute: %v", err)
+	if err := s.DeleteRegexModel(ctx, a.ID); err != nil {
+		t.Fatalf("DeleteRegexModel: %v", err)
 	}
-	if _, err := s.GetRegexRoute(ctx, a.ID); !errors.Is(err, ErrNotFound) {
+	if _, err := s.GetRegexModel(ctx, a.ID); !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }
 
-func TestRegexRouteValidation(t *testing.T) {
+func TestRegexModelValidation(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
 	cases := []struct {
 		name string
-		r    RegexRoute
+		r    RegexModel
 	}{
-		{"empty pattern", RegexRoute{TargetType: "real", TargetModel: "x", Provider: "p"}},
-		{"bad regex", RegexRoute{Pattern: "[unterminated", TargetType: "real", TargetModel: "x", Provider: "p"}},
-		{"bogus target_type", RegexRoute{Pattern: "^.+$", TargetType: "bogus", TargetModel: "x"}},
-		{"real without provider", RegexRoute{Pattern: "^.+$", TargetType: "real", TargetModel: "x"}},
-		{"missing target", RegexRoute{Pattern: "^.+$", TargetType: "virtual"}},
+		{"empty pattern", RegexModel{TargetType: "real", TargetModel: "x", Provider: "p"}},
+		{"bad regex", RegexModel{Pattern: "[unterminated", TargetType: "real", TargetModel: "x", Provider: "p"}},
+		{"bogus target_type", RegexModel{Pattern: "^.+$", TargetType: "bogus", TargetModel: "x"}},
+		{"real without provider", RegexModel{Pattern: "^.+$", TargetType: "real", TargetModel: "x"}},
+		{"missing target", RegexModel{Pattern: "^.+$", TargetType: "virtual"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := s.CreateRegexRoute(ctx, tc.r); err == nil {
+			if _, err := s.CreateRegexModel(ctx, tc.r); err == nil {
 				t.Errorf("expected validation error, got nil")
 			}
 		})

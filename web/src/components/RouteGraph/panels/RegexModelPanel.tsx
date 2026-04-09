@@ -1,5 +1,5 @@
-// RegexRoutePanel — side-panel form for editing one regex intercept
-// rule. Save calls PUT /admin/regex-routes/:id; Delete calls DELETE.
+// RegexModelPanel — side-panel form for editing one regex intercept
+// rule. Save calls PUT /admin/regex-models/:id; Delete calls DELETE.
 // Both trigger an onChange callback so the parent can re-fetch and
 // rebuild the graph after a successful mutation.
 
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { RegexRoutes, type RegexRoute } from "@/lib/api";
+import { RegexModels, type RegexModel } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useRouteGraphStore } from "@/store/routeGraphStore";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -28,14 +28,14 @@ interface Props {
   // onDirty fires the first time the operator touches a form
   // field, so the parent side panel can prompt a confirmation
   // before closing a create flow with unsaved edits.
-  route?: RegexRoute;
+  route?: RegexModel;
   create?: boolean;
   onDirty?: () => void;
   onChange: () => void | Promise<void>;
   onClose: () => void;
 }
 
-const EMPTY_REGEX_ROUTE: RegexRoute = {
+const EMPTY_REGEX_ROUTE: RegexModel = {
   pattern: "",
   priority: 100,
   target_type: "virtual",
@@ -45,7 +45,7 @@ const EMPTY_REGEX_ROUTE: RegexRoute = {
   enabled: true,
 };
 
-export function RegexRoutePanel({
+export function RegexModelPanel({
   route,
   create,
   onDirty,
@@ -61,18 +61,18 @@ export function RegexRoutePanel({
   // dirty for the rest of the panel's lifetime — there is no
   // "un-dirty" on reverting a field, which is fine for a confirm
   // prompt.
-  const [rawForm, setRawForm] = useState<RegexRoute>(
+  const [rawForm, setRawForm] = useState<RegexModel>(
     route ?? EMPTY_REGEX_ROUTE,
   );
   const form = rawForm;
-  const setForm = (next: RegexRoute) => {
+  const setForm = (next: RegexModel) => {
     onDirty?.();
     setRawForm(next);
   };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // deleteOpen drives the shadcn ConfirmDialog we pop before
-  // actually hitting DELETE /admin/regex-routes/:id. We manage it
+  // actually hitting DELETE /admin/regex-models/:id. We manage it
   // as local state because it is purely a panel-level affordance
   // and does not need to survive across sessions.
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -104,7 +104,7 @@ export function RegexRoutePanel({
     setSaving(true);
     setError(null);
     try {
-      const payload: RegexRoute = {
+      const payload: RegexModel = {
         pattern: form.pattern,
         priority: Number(form.priority) || 100,
         target_type: form.target_type,
@@ -114,9 +114,9 @@ export function RegexRoutePanel({
         enabled: form.enabled ?? true,
       };
       if (isCreate) {
-        await RegexRoutes.create(payload);
+        await RegexModels.create(payload);
       } else if (form.id) {
-        await RegexRoutes.update(form.id, payload);
+        await RegexModels.update(form.id, payload);
       } else {
         return;
       }
@@ -137,7 +137,7 @@ export function RegexRoutePanel({
     setSaving(true);
     setError(null);
     try {
-      await RegexRoutes.delete(form.id);
+      await RegexModels.delete(form.id);
       await onChange();
       onClose();
     } catch (err) {
