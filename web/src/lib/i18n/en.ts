@@ -179,6 +179,17 @@ export const en = {
     "rx.fieldProvider": "Provider (required when target type is real)",
     "rx.fieldDescription": "Description",
     "rx.fieldEnabled": "Enabled",
+    "rx.colOrder": "Order",
+    "rx.searchPlaceholder": "Search by pattern, target, or description…",
+    "rx.emptySearch": "No regex routes match the current search.",
+    "rx.deleteTitle": "Delete regex route",
+    "rx.descriptionPlaceholder": "Optional — why this rule exists",
+    "rx.testerLabel": "Pattern tester",
+    "rx.testerPlaceholder": "Type a model name to test…",
+    "rx.testerIdle": "Type a model name above to see whether it matches and what it would rewrite to.",
+    "rx.testerMatch": "matches →",
+    "rx.testerNoMatch": "No match — this rule would not fire.",
+    "rx.testerInvalid": "Fix the pattern above to enable the tester.",
 
     "resolve.title": "Resolve tester",
     "resolve.subtitle":

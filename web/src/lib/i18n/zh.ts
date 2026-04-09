@@ -181,6 +181,17 @@ export const zh: Record<TranslationKey, string> = {
     "rx.fieldProvider": "供应商（target_type=real 时必填）",
     "rx.fieldDescription": "描述",
     "rx.fieldEnabled": "启用",
+    "rx.colOrder": "顺序",
+    "rx.searchPlaceholder": "按正则、目标或描述搜索…",
+    "rx.emptySearch": "没有正则路由匹配当前搜索。",
+    "rx.deleteTitle": "删除正则路由",
+    "rx.descriptionPlaceholder": "可选——说明这条规则的用途",
+    "rx.testerLabel": "正则测试",
+    "rx.testerPlaceholder": "输入模型名进行测试…",
+    "rx.testerIdle": "在上方输入一个模型名，可实时查看是否命中以及会改写成什么。",
+    "rx.testerMatch": "命中 →",
+    "rx.testerNoMatch": "未命中——这条规则不会触发。",
+    "rx.testerInvalid": "请先修正上面的正则表达式。",
 
     "resolve.title": "解析测试",
     "resolve.subtitle":
