@@ -23,3 +23,4 @@ fluxa.yaml
 .gocache/
 .gomodcache/
 .gopath/
+web/dist/.gitkeep

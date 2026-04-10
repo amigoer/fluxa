@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -72,6 +73,23 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// DLP request scan — inspect message content for sensitive data
+	// patterns before it reaches any upstream provider.
+	if s.dlpEngine != nil {
+		result := s.dlpEngine.ScanRequest(r.Context(), body, effectiveModel, keyID)
+		switch result.Action {
+		case "block":
+			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
+			s.writeError(w, &provider.Error{Status: http.StatusForbidden, Message: "request blocked by DLP policy"})
+			return
+		case "mask":
+			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
+			body = result.Masked
+		case "log":
+			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
+		}
+	}
+
 	req := &provider.MessagesRequest{Model: effectiveModel, Raw: body}
 	if peek.Stream {
 		s.streamMessages(w, r, chain, req, keyID)
@@ -114,9 +132,24 @@ func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain
 	for _, p := range attempts {
 		resp, err := p.Messages(r.Context(), req)
 		if err == nil {
+			raw := resp.Raw
+			if s.dlpEngine != nil {
+				result := s.dlpEngine.ScanResponse(r.Context(), raw, req.Model, keyID)
+				switch result.Action {
+				case "block":
+					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
+					s.writeError(w, &provider.Error{Status: http.StatusForbidden, Message: "response blocked by DLP policy"})
+					return
+				case "mask":
+					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
+					raw = result.Masked
+				case "log":
+					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
+				}
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Fluxa-Provider", p.Name())
-			_, _ = w.Write(resp.Raw)
+			_, _ = w.Write(raw)
 			s.recordUsage(r.Context(), keyID, req.Model, p.Name(), resp.Raw, started, http.StatusOK, usageFromAnthropic)
 			return
 		}

@@ -245,6 +245,62 @@ export const RegexModels = {
   delete: (id: string) => request<void>("DELETE", `/admin/regex-models/${id}`),
 };
 
+// -- dlp types + endpoints ----------------------------------------------
+
+export interface DLPRule {
+  id?: string;
+  name: string;
+  pattern: string;
+  pattern_type: "keyword" | "regex";
+  scope: "request" | "response" | "both";
+  action: "block" | "mask" | "log";
+  priority: number;
+  model_pattern?: string;
+  description?: string;
+  enabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DLPViolation {
+  id: number;
+  rule_id: string;
+  rule_name: string;
+  key_id: string;
+  model: string;
+  direction: "request" | "response";
+  matched_text: string;
+  action_taken: string;
+  created_at: string;
+}
+
+export const DLPRules = {
+  list: () =>
+    request<{ data: DLPRule[] }>("GET", "/admin/dlp-rules").then(
+      (r) => r.data ?? [],
+    ),
+  create: (r: DLPRule) =>
+    request<DLPRule>("POST", "/admin/dlp-rules", r),
+  update: (id: string, r: Partial<DLPRule>) =>
+    request<DLPRule>("PUT", `/admin/dlp-rules/${id}`, r),
+  setPriority: (id: string, priority: number) =>
+    request<void>("PATCH", `/admin/dlp-rules/${id}/priority`, { priority }),
+  delete: (id: string) => request<void>("DELETE", `/admin/dlp-rules/${id}`),
+};
+
+export const DLPViolations = {
+  list: (params?: { limit?: number; offset?: number; rule_id?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.offset) qs.set("offset", String(params.offset));
+    if (params?.rule_id) qs.set("rule_id", params.rule_id);
+    return request<{ data: DLPViolation[]; total: number }>(
+      "GET",
+      `/admin/dlp-violations?${qs.toString()}`,
+    );
+  },
+};
+
 // -- resolve tester ----------------------------------------------------
 
 export interface ResolveTraceStep {

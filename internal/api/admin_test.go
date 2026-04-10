@@ -50,7 +50,7 @@ func newAdminFixture(t *testing.T) (*http.ServeMux, *store.Store, string) {
 	}
 
 	mux := http.NewServeMux()
-	NewAdmin(r, st, nil, nil).Routes(mux)
+	NewAdmin(r, st, nil, nil, nil).Routes(mux)
 	return mux, st, sess.Token
 }
 
@@ -173,7 +173,7 @@ func TestAdmin_LoginFlow(t *testing.T) {
 		t.Fatalf("create user: %v", err)
 	}
 	mux := http.NewServeMux()
-	NewAdmin(router.New(), st, nil, nil).Routes(mux)
+	NewAdmin(router.New(), st, nil, nil, nil).Routes(mux)
 
 	// Wrong password → 401.
 	rec := doAdmin(t, mux, "POST", "/admin/auth/login", "", map[string]string{

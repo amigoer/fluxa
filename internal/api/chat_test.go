@@ -23,7 +23,7 @@ func newTestServer(t *testing.T, upstream *httptest.Server) *Server {
 	if err := r.Reload(providers, routes); err != nil {
 		t.Fatalf("router.Reload: %v", err)
 	}
-	return New(r, nil, nil, nil)
+	return New(r, nil, nil, nil, nil)
 }
 
 func TestHandleChatCompletions_NonStream(t *testing.T) {

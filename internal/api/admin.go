@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/amigoer/fluxa/internal/dlp"
 	"github.com/amigoer/fluxa/internal/keys"
 	"github.com/amigoer/fluxa/internal/router"
 	"github.com/amigoer/fluxa/internal/store"
@@ -44,10 +45,11 @@ func userFromContext(r *http.Request) (store.AdminUser, bool) {
 // AdminServer owns the admin REST endpoints. It is constructed once at
 // startup and installed alongside the data-plane routes on the same mux.
 type AdminServer struct {
-	router  *router.Router
-	store   *store.Store
-	keyring *keys.Keyring // optional: nil disables virtual-key admin reloads
-	logger  *slog.Logger
+	router    *router.Router
+	store     *store.Store
+	keyring   *keys.Keyring   // optional: nil disables virtual-key admin reloads
+	dlpEngine *dlp.Engine     // optional: nil disables DLP admin reloads
+	logger    *slog.Logger
 }
 
 // NewAdmin returns a ready-to-wire AdminServer. Authentication is now
@@ -56,11 +58,11 @@ type AdminServer struct {
 // optional — when nil the virtual-key endpoints still work, but no
 // in-memory cache is invalidated so the data plane will lag the store
 // by at most one process lifetime.
-func NewAdmin(r *router.Router, s *store.Store, kr *keys.Keyring, logger *slog.Logger) *AdminServer {
+func NewAdmin(r *router.Router, s *store.Store, kr *keys.Keyring, de *dlp.Engine, logger *slog.Logger) *AdminServer {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &AdminServer{router: r, store: s, keyring: kr, logger: logger}
+	return &AdminServer{router: r, store: s, keyring: kr, dlpEngine: de, logger: logger}
 }
 
 // Routes installs the admin handlers onto mux. They share the mux with the
@@ -116,6 +118,15 @@ func (a *AdminServer) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /admin/regex-models/{id}", a.requireAuth(a.deleteRegexModel))
 
 	mux.HandleFunc("GET /admin/resolve-model", a.requireAuth(a.resolveModel))
+
+	// DLP — data loss prevention rules and violation audit log.
+	mux.HandleFunc("GET /admin/dlp-rules", a.requireAuth(a.listDLPRules))
+	mux.HandleFunc("POST /admin/dlp-rules", a.requireAuth(a.createDLPRule))
+	mux.HandleFunc("GET /admin/dlp-rules/{id}", a.requireAuth(a.getDLPRule))
+	mux.HandleFunc("PUT /admin/dlp-rules/{id}", a.requireAuth(a.updateDLPRule))
+	mux.HandleFunc("PATCH /admin/dlp-rules/{id}/priority", a.requireAuth(a.updateDLPRulePriority))
+	mux.HandleFunc("DELETE /admin/dlp-rules/{id}", a.requireAuth(a.deleteDLPRule))
+	mux.HandleFunc("GET /admin/dlp-violations", a.requireAuth(a.listDLPViolations))
 
 	// Live edge stats for the visual route graph editor. The handler
 	// is currently a stub that returns an empty map; the dashboard

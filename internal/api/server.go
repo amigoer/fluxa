@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/amigoer/fluxa/internal/dlp"
 	"github.com/amigoer/fluxa/internal/keys"
 	"github.com/amigoer/fluxa/internal/provider"
 	"github.com/amigoer/fluxa/internal/router"
@@ -19,21 +20,22 @@ import (
 // Server bundles the dependencies needed by every HTTP handler. It is
 // constructed once at startup and installed onto an http.ServeMux.
 type Server struct {
-	router  *router.Router
-	logger  *slog.Logger
-	keyring *keys.Keyring // optional: nil disables virtual key auth
-	store   *store.Store  // optional: nil disables usage recording
+	router    *router.Router
+	logger    *slog.Logger
+	keyring   *keys.Keyring   // optional: nil disables virtual key auth
+	store     *store.Store    // optional: nil disables usage recording
+	dlpEngine *dlp.Engine     // optional: nil disables DLP scanning
 }
 
 // New returns a Server wired to the supplied router. A zero-value logger is
 // replaced with the default slog logger so callers can pass nil in tests.
 // Passing nil for keyring / store keeps the legacy "no virtual keys"
 // behaviour, which is useful for the existing API tests.
-func New(r *router.Router, logger *slog.Logger, kr *keys.Keyring, st *store.Store) *Server {
+func New(r *router.Router, logger *slog.Logger, kr *keys.Keyring, st *store.Store, de *dlp.Engine) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Server{router: r, logger: logger, keyring: kr, store: st}
+	return &Server{router: r, logger: logger, keyring: kr, store: st, dlpEngine: de}
 }
 
 // Routes installs the HTTP handlers onto mux. Keeping the mux mutation in

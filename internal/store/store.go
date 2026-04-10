@@ -215,6 +215,44 @@ func (s *Store) migrate(ctx context.Context) error {
 			updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_regex_models_priority ON regex_models(priority ASC)`,
+
+		// dlp_rules stores admin-defined content inspection rules.
+		// Each rule carries a keyword or regex pattern that is matched
+		// against request/response message content. The action column
+		// determines what happens on a match: block (403), mask
+		// (replace with ***), or log (allow but record).
+		`CREATE TABLE IF NOT EXISTS dlp_rules (
+			id            TEXT PRIMARY KEY,
+			name          TEXT NOT NULL,
+			pattern       TEXT NOT NULL,
+			pattern_type  TEXT NOT NULL CHECK(pattern_type IN ('keyword','regex')),
+			scope         TEXT NOT NULL CHECK(scope IN ('request','response','both')),
+			action        TEXT NOT NULL CHECK(action IN ('block','mask','log')),
+			priority      INTEGER NOT NULL DEFAULT 100,
+			model_pattern TEXT NOT NULL DEFAULT '',
+			description   TEXT NOT NULL DEFAULT '',
+			enabled       INTEGER NOT NULL DEFAULT 1,
+			created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_dlp_rules_priority ON dlp_rules(priority ASC)`,
+
+		// dlp_violations is an append-only audit log of every DLP
+		// match. rule_name is denormalised so entries remain readable
+		// after the originating rule is deleted.
+		`CREATE TABLE IF NOT EXISTS dlp_violations (
+			id            INTEGER PRIMARY KEY AUTOINCREMENT,
+			rule_id       TEXT NOT NULL,
+			rule_name     TEXT NOT NULL,
+			key_id        TEXT NOT NULL DEFAULT '',
+			model         TEXT NOT NULL DEFAULT '',
+			direction     TEXT NOT NULL CHECK(direction IN ('request','response')),
+			matched_text  TEXT NOT NULL DEFAULT '',
+			action_taken  TEXT NOT NULL,
+			created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_dlp_violations_ts ON dlp_violations(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_dlp_violations_rule ON dlp_violations(rule_id)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {

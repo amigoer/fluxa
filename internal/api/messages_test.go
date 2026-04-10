@@ -22,7 +22,7 @@ func newAnthropicTestServer(t *testing.T, upstream *httptest.Server) *Server {
 	if err := r.Reload(providers, routes); err != nil {
 		t.Fatalf("router.Reload: %v", err)
 	}
-	return New(r, nil, nil, nil)
+	return New(r, nil, nil, nil, nil)
 }
 
 func TestHandleMessages_NonStream(t *testing.T) {
@@ -70,7 +70,7 @@ func TestHandleMessages_RejectsNonAnthropicProvider(t *testing.T) {
 	if err := r.Reload(providers, routes); err != nil {
 		t.Fatalf("router.Reload: %v", err)
 	}
-	s := New(r, nil, nil, nil)
+	s := New(r, nil, nil, nil, nil)
 	mux := http.NewServeMux()
 	s.Routes(mux)
 

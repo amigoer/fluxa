@@ -30,6 +30,7 @@ import (
 
 	"github.com/amigoer/fluxa/internal/api"
 	"github.com/amigoer/fluxa/internal/config"
+	"github.com/amigoer/fluxa/internal/dlp"
 	"github.com/amigoer/fluxa/internal/keys"
 	"github.com/amigoer/fluxa/internal/router"
 	"github.com/amigoer/fluxa/internal/store"
@@ -132,9 +133,15 @@ func main() {
 	// was offline so the table does not grow forever.
 	_ = st.PurgeExpiredSessions(context.Background())
 
+	// DLP engine — load rules into memory for request/response scanning.
+	dlpEngine := dlp.NewEngine(st, logger)
+	if err := dlpEngine.Reload(context.Background()); err != nil {
+		logger.Warn("load dlp rules", "err", err)
+	}
+
 	mux := http.NewServeMux()
-	api.New(r, logger, kr, st).Routes(mux)
-	api.NewAdmin(r, st, kr, logger).Routes(mux)
+	api.New(r, logger, kr, st, dlpEngine).Routes(mux)
+	api.NewAdmin(r, st, kr, dlpEngine, logger).Routes(mux)
 
 	// Mount the embedded admin dashboard at the root. The handler is a
 	// catch-all for GET requests, so anything that does not match a more

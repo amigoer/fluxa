@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,6 +77,23 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// DLP request scan — inspect message content for sensitive data
+	// patterns before it reaches any upstream provider.
+	if s.dlpEngine != nil {
+		result := s.dlpEngine.ScanRequest(r.Context(), body, effectiveModel, keyID)
+		switch result.Action {
+		case "block":
+			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
+			s.writeError(w, &provider.Error{Status: http.StatusForbidden, Message: "request blocked by DLP policy"})
+			return
+		case "mask":
+			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
+			body = result.Masked
+		case "log":
+			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
+		}
+	}
+
 	req := &provider.ChatRequest{
 		Model:  effectiveModel,
 		Stream: peek.Stream,
@@ -96,9 +114,26 @@ func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []p
 	for _, p := range chain {
 		resp, err := p.Chat(r.Context(), req)
 		if err == nil {
+			// DLP response scan — inspect provider output before it
+			// reaches the client.
+			raw := resp.Raw
+			if s.dlpEngine != nil {
+				result := s.dlpEngine.ScanResponse(r.Context(), raw, req.Model, keyID)
+				switch result.Action {
+				case "block":
+					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
+					s.writeError(w, &provider.Error{Status: http.StatusForbidden, Message: "response blocked by DLP policy"})
+					return
+				case "mask":
+					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
+					raw = result.Masked
+				case "log":
+					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
+				}
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Fluxa-Provider", p.Name())
-			_, _ = w.Write(resp.Raw)
+			_, _ = w.Write(raw)
 			s.recordUsage(r.Context(), keyID, req.Model, p.Name(), resp.Raw, started, http.StatusOK, usageFromOpenAI)
 			return
 		}

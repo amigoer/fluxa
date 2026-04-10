@@ -4,6 +4,7 @@ import {
   Server,
   Waypoints,
   KeyRound,
+  Shield,
   BarChart3,
   Settings as SettingsIcon,
   LogOut,
@@ -34,6 +35,7 @@ import { ProvidersPage } from "@/pages/Providers";
 import { RoutesPage } from "@/pages/Routes";
 import { VirtualModelsPage } from "@/pages/VirtualModels";
 import { RegexModelsPage } from "@/pages/RegexModels";
+import { DLPPage } from "@/pages/DLP";
 import { ResolveTesterPage } from "@/pages/ResolveTester";
 import { RouteGraphPage } from "@/components/RouteGraph";
 import { KeysPage } from "@/pages/Keys";
@@ -53,6 +55,7 @@ type Tab =
   | "resolve-tester"
   | "route-graph"
   | "keys"
+  | "dlp"
   | "usage"
   | "settings"
   | "profile";
@@ -83,16 +86,13 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    titleKey: "nav.group.access",
-    items: [{ id: "keys", labelKey: "nav.keys", icon: KeyRound }],
-  },
-  {
-    titleKey: "nav.group.monitoring",
-    items: [{ id: "usage", labelKey: "nav.usage", icon: BarChart3 }],
-  },
-  {
-    titleKey: "nav.group.system",
-    items: [{ id: "settings", labelKey: "nav.settings", icon: SettingsIcon }],
+    titleKey: "nav.group.manage",
+    items: [
+      { id: "keys", labelKey: "nav.keys", icon: KeyRound },
+      { id: "dlp", labelKey: "nav.dlp", icon: Shield },
+      { id: "usage", labelKey: "nav.usage", icon: BarChart3 },
+      { id: "settings", labelKey: "nav.settings", icon: SettingsIcon },
+    ],
   },
 ];
 
@@ -106,6 +106,7 @@ const TAB_IDS = new Set<Tab>([
   "resolve-tester", // Kept in tabs, but removed from sidebar
   "route-graph",
   "keys",
+  "dlp",
   "usage",
   "settings",
   "profile",
@@ -308,10 +309,10 @@ function Shell() {
         <Separator />
         <nav
           className={cn(
-            "flex-1 overflow-y-auto py-2",
+            "flex-1 py-2",
             effectiveCollapsed
-              ? "flex flex-col items-center gap-1.5 px-0"
-              : "px-2 space-y-4",
+              ? "flex flex-col items-center gap-1.5 px-0 overflow-visible"
+              : "overflow-y-auto px-2 space-y-4",
           )}
         >
           {NAV_GROUPS.map((group, gIdx) => (
@@ -441,6 +442,7 @@ function Shell() {
               {tab === "regex-models" && <RegexModelsPage />}
               {tab === "resolve-tester" && <ResolveTesterPage />}
               {tab === "keys" && <KeysPage />}
+              {tab === "dlp" && <DLPPage />}
               {tab === "usage" && <UsagePage />}
               {tab === "settings" && <SettingsPage />}
               {tab === "profile" && <ProfilePage user={user} onUserUpdate={setUser} onSignOut={signOut} />}
@@ -506,7 +508,7 @@ function SidebarIconAction({
 // ~1s delay — important when scanning a column of unfamiliar icons.
 function SidebarTooltip({ label }: { label: string }) {
   return (
-    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border/60 bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+    <span className="pointer-events-none absolute left-full top-1/2 z-[200] ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border/60 bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity group-hover:opacity-100">
       {label}
     </span>
   );
