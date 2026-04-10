@@ -8,7 +8,6 @@ import {
   Check,
   X,
   FlaskConical,
-  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,20 +78,20 @@ const EMPTY_FORM: FormState = {
 const PAGE_SIZE = 20;
 
 const scopeColor: Record<string, string> = {
-  request: "bg-sky-100 text-sky-700",
-  response: "bg-amber-100 text-amber-700",
-  both: "bg-violet-100 text-violet-700",
+  request: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+  response: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  both: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
 };
 
 const actionColor: Record<string, string> = {
-  block: "bg-rose-100 text-rose-700",
-  mask: "bg-amber-100 text-amber-700",
-  log: "bg-sky-100 text-sky-700",
+  block: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+  mask: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  log: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
 };
 
 const directionColor: Record<string, string> = {
-  request: "bg-sky-100 text-sky-700",
-  response: "bg-amber-100 text-amber-700",
+  request: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+  response: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
 };
 
 export function DLPPage() {
@@ -168,10 +167,10 @@ export function DLPPage() {
 
   const compiled = useMemo(() => {
     if (!form?.pattern) return { ok: false, error: undefined as string | undefined };
-    if (form.pattern_type === "keyword") return { ok: true };
+    if (form.pattern_type === "keyword") return { ok: true, error: undefined };
     try {
       new RegExp(form.pattern);
-      return { ok: true };
+      return { ok: true, error: undefined };
     } catch (err) {
       return {
         ok: false,
@@ -253,13 +252,38 @@ export function DLPPage() {
     });
   }
 
+  // i18n label helpers for scope / action / direction
+  const scopeLabel = (s: string) => {
+    const map: Record<string, string> = {
+      request: t("dlp.scopeRequest"),
+      response: t("dlp.scopeResponse"),
+      both: t("dlp.scopeBoth"),
+    };
+    return map[s] ?? s;
+  };
+  const actionLabel = (a: string) => {
+    const map: Record<string, string> = {
+      block: t("dlp.actionBlock"),
+      mask: t("dlp.actionMask"),
+      log: t("dlp.actionLog"),
+    };
+    return map[a] ?? a;
+  };
+  const dirLabel = (d: string) => {
+    const map: Record<string, string> = {
+      request: t("dlp.dirRequest"),
+      response: t("dlp.dirResponse"),
+    };
+    return map[d] ?? d;
+  };
+
   // Pattern tester result for the dialog
   function testerResult() {
     if (!form?.pattern) return null;
     if (!probe) {
       return (
         <p className="text-[11px] text-muted-foreground">
-          Type test text above to check for matches.
+          {t("dlp.testerIdle")}
         </p>
       );
     }
@@ -268,12 +292,12 @@ export function DLPPage() {
       return match ? (
         <div className="flex items-center gap-1.5 text-[11px]">
           <Check className="h-3 w-3 text-emerald-500" />
-          <span className="text-emerald-700">Match found</span>
+          <span className="text-emerald-700 dark:text-emerald-300">{t("dlp.testerMatch")}</span>
         </div>
       ) : (
         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <X className="h-3 w-3 text-destructive" />
-          <span>No match</span>
+          <span>{t("dlp.testerNoMatch")}</span>
         </div>
       );
     }
@@ -281,7 +305,7 @@ export function DLPPage() {
     if (!compiled.ok) {
       return (
         <p className="flex items-center gap-1 text-[11px] text-destructive">
-          <X className="h-3 w-3" /> Invalid pattern
+          <X className="h-3 w-3" /> {t("dlp.testerInvalid")}
         </p>
       );
     }
@@ -291,18 +315,18 @@ export function DLPPage() {
       return match ? (
         <div className="flex items-center gap-1.5 text-[11px]">
           <Check className="h-3 w-3 text-emerald-500" />
-          <span className="text-emerald-700">Match found</span>
+          <span className="text-emerald-700 dark:text-emerald-300">{t("dlp.testerMatch")}</span>
         </div>
       ) : (
         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <X className="h-3 w-3 text-destructive" />
-          <span>No match</span>
+          <span>{t("dlp.testerNoMatch")}</span>
         </div>
       );
     } catch {
       return (
         <p className="flex items-center gap-1 text-[11px] text-destructive">
-          <X className="h-3 w-3" /> Invalid pattern
+          <X className="h-3 w-3" /> {t("dlp.testerInvalid")}
         </p>
       );
     }
@@ -312,20 +336,20 @@ export function DLPPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">
-            <Shield className="mr-2 inline-block h-6 w-6 align-text-bottom" />
-            DLP
+            {t("dlp.title")}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Data loss prevention rules and violation log
+            {t("dlp.subtitle")}
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
           {activeTab === "rules" && (
             <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> New Rule
+              <Plus className="h-4 w-4" /> {t("dlp.new")}
             </Button>
           )}
         </div>
@@ -343,7 +367,7 @@ export function DLPPage() {
               : "text-muted-foreground hover:bg-accent",
           )}
         >
-          Rules
+          {t("dlp.tabRules")}
         </button>
         <button
           type="button"
@@ -355,7 +379,7 @@ export function DLPPage() {
               : "text-muted-foreground hover:bg-accent",
           )}
         >
-          Violations
+          {t("dlp.tabViolations")}
         </button>
       </div>
 
@@ -374,7 +398,7 @@ export function DLPPage() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search rules..."
+                placeholder={t("dlp.searchPlaceholder")}
                 className="pl-9"
               />
             </div>
@@ -385,12 +409,12 @@ export function DLPPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Pattern</TableHead>
-                    <TableHead className="w-24">Scope</TableHead>
-                    <TableHead className="w-24">Action</TableHead>
-                    <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="w-16">{t("dlp.colOrder")}</TableHead>
+                    <TableHead>{t("dlp.colName")}</TableHead>
+                    <TableHead>{t("dlp.colPattern")}</TableHead>
+                    <TableHead className="w-24">{t("dlp.colScope")}</TableHead>
+                    <TableHead className="w-24">{t("dlp.colAction")}</TableHead>
+                    <TableHead className="w-28">{t("dlp.colStatus")}</TableHead>
                     <TableHead className="w-24"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -398,15 +422,20 @@ export function DLPPage() {
                   {filteredRows.map((r, idx) => (
                     <TableRow key={r.id ?? r.name}>
                       <TableCell className="align-middle">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary tabular-nums">
-                          {idx + 1}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary tabular-nums">
+                            {idx + 1}
+                          </span>
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            p{r.priority}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="align-middle">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-medium text-sm">{r.name}</span>
+                          <span className="text-sm font-medium">{r.name}</span>
                           {r.description && (
-                            <p className="truncate text-[11px] text-muted-foreground">
+                            <p className="truncate text-[11px] text-muted-foreground max-w-[200px]">
                               {r.description}
                             </p>
                           )}
@@ -416,27 +445,24 @@ export function DLPPage() {
                         <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs">
                           {r.pattern}
                         </code>
+                        <span className="ml-1.5 text-[10px] text-muted-foreground">
+                          {r.pattern_type === "keyword" ? t("dlp.patternKeyword") : t("dlp.patternRegex")}
+                        </span>
                       </TableCell>
                       <TableCell className="align-middle">
                         <Badge
                           variant="secondary"
-                          className={cn(
-                            "border-transparent",
-                            scopeColor[r.scope],
-                          )}
+                          className={cn("border-transparent", scopeColor[r.scope])}
                         >
-                          {r.scope}
+                          {scopeLabel(r.scope)}
                         </Badge>
                       </TableCell>
                       <TableCell className="align-middle">
                         <Badge
                           variant="secondary"
-                          className={cn(
-                            "border-transparent",
-                            actionColor[r.action],
-                          )}
+                          className={cn("border-transparent", actionColor[r.action])}
                         >
-                          {r.action}
+                          {actionLabel(r.action)}
                         </Badge>
                       </TableCell>
                       <TableCell className="align-middle">
@@ -474,7 +500,7 @@ export function DLPPage() {
                         colSpan={7}
                         className="py-12 text-center text-muted-foreground"
                       >
-                        {query ? "No rules match your search." : "No DLP rules yet."}
+                        {query ? t("dlp.emptySearch") : t("dlp.empty")}
                       </TableCell>
                     </TableRow>
                   )}
@@ -497,7 +523,9 @@ export function DLPPage() {
               }}
               className="h-9 rounded-md border border-border bg-background px-3 text-sm"
             >
-              <option value="">All rules</option>
+              <option value="">
+                {t("dlp.colRule")} — {t("dlp.scopeBoth").toLowerCase()}
+              </option>
               {rows.map((r) => (
                 <option key={r.id ?? r.name} value={r.id ?? ""}>
                   {r.name}
@@ -511,12 +539,12 @@ export function DLPPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Rule Name</TableHead>
-                    <TableHead>Model</TableHead>
-                    <TableHead className="w-24">Direction</TableHead>
-                    <TableHead className="w-24">Action</TableHead>
-                    <TableHead>Matched Text</TableHead>
+                    <TableHead>{t("dlp.colTime")}</TableHead>
+                    <TableHead>{t("dlp.colRule")}</TableHead>
+                    <TableHead>{t("dlp.colModel")}</TableHead>
+                    <TableHead className="w-24">{t("dlp.colDirection")}</TableHead>
+                    <TableHead className="w-24">{t("dlp.colActionTaken")}</TableHead>
+                    <TableHead>{t("dlp.colMatched")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -530,29 +558,23 @@ export function DLPPage() {
                       </TableCell>
                       <TableCell className="align-middle">
                         <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs">
-                          {v.model}
+                          {v.model || "—"}
                         </code>
                       </TableCell>
                       <TableCell className="align-middle">
                         <Badge
                           variant="secondary"
-                          className={cn(
-                            "border-transparent",
-                            directionColor[v.direction] ?? "",
-                          )}
+                          className={cn("border-transparent", directionColor[v.direction] ?? "")}
                         >
-                          {v.direction}
+                          {dirLabel(v.direction)}
                         </Badge>
                       </TableCell>
                       <TableCell className="align-middle">
                         <Badge
                           variant="secondary"
-                          className={cn(
-                            "border-transparent",
-                            actionColor[v.action_taken] ?? "",
-                          )}
+                          className={cn("border-transparent", actionColor[v.action_taken] ?? "")}
                         >
-                          {v.action_taken}
+                          {actionLabel(v.action_taken)}
                         </Badge>
                       </TableCell>
                       <TableCell className="align-middle max-w-[300px]">
@@ -573,7 +595,7 @@ export function DLPPage() {
                         colSpan={6}
                         className="py-12 text-center text-muted-foreground"
                       >
-                        No violations recorded.
+                        {t("dlp.violationsEmpty")}
                       </TableCell>
                     </TableRow>
                   )}
@@ -586,7 +608,7 @@ export function DLPPage() {
           {violationsTotal > PAGE_SIZE && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {violationsTotal} violation{violationsTotal !== 1 ? "s" : ""} total
+                {violationsTotal} {t("dlp.tabViolations").toLowerCase()}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -595,9 +617,9 @@ export function DLPPage() {
                   disabled={violationsPage === 0}
                   onClick={() => setViolationsPage((p) => Math.max(0, p - 1))}
                 >
-                  Previous
+                  {t("dlp.prevPage")}
                 </Button>
-                <span className="flex items-center text-sm text-muted-foreground">
+                <span className="flex items-center text-sm text-muted-foreground tabular-nums">
                   {violationsPage + 1} / {totalViolationPages}
                 </span>
                 <Button
@@ -606,7 +628,7 @@ export function DLPPage() {
                   disabled={violationsPage >= totalViolationPages - 1}
                   onClick={() => setViolationsPage((p) => p + 1)}
                 >
-                  Next
+                  {t("dlp.nextPage")}
                 </Button>
               </div>
             </div>
@@ -624,10 +646,10 @@ export function DLPPage() {
         <DialogContent className="!flex max-h-[90vh] max-w-xl !flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
-              {form?.mode === "edit" ? "Edit Rule" : "New Rule"}
+              {form?.mode === "edit" ? t("dlp.edit") : t("dlp.new")}
             </DialogTitle>
             <DialogDescription>
-              Configure a data loss prevention rule.
+              {t("dlp.subtitle")}
             </DialogDescription>
           </DialogHeader>
           {form && (
@@ -642,7 +664,7 @@ export function DLPPage() {
               <div className="-mx-1 flex-1 space-y-5 overflow-y-auto px-1 pb-2">
                 {/* 1. Name */}
                 <div className="space-y-2">
-                  <Label>Name</Label>
+                  <Label>{t("dlp.fieldName")}</Label>
                   <Input
                     value={form.name}
                     onChange={(e) =>
@@ -657,7 +679,7 @@ export function DLPPage() {
 
                 {/* 2. Pattern */}
                 <div className="space-y-2">
-                  <Label>Pattern</Label>
+                  <Label>{t("dlp.fieldPattern")}</Label>
                   <Input
                     value={form.pattern}
                     onChange={(e) =>
@@ -671,9 +693,7 @@ export function DLPPage() {
                     required
                     className={cn(
                       "font-mono",
-                      form.pattern &&
-                        !compiled.ok &&
-                        "border-destructive",
+                      form.pattern && !compiled.ok && "border-destructive",
                     )}
                   />
                   {form.pattern && !compiled.ok ? (
@@ -681,22 +701,16 @@ export function DLPPage() {
                       <X className="h-3 w-3" />
                       {compiled.error}
                     </p>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground">
-                      {form.pattern_type === "regex"
-                        ? "JavaScript regular expression syntax"
-                        : "Case-insensitive keyword match"}
-                    </p>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* 3. Pattern type */}
                 <div className="space-y-2">
-                  <Label>Pattern type</Label>
+                  <Label>{t("dlp.fieldPatternType")}</Label>
                   <div className="flex overflow-hidden rounded-lg border border-border">
                     {([
-                      { value: "keyword" as const, label: "Keyword" },
-                      { value: "regex" as const, label: "Regex" },
+                      { value: "keyword" as const, label: t("dlp.patternKeyword") },
+                      { value: "regex" as const, label: t("dlp.patternRegex") },
                     ]).map((opt) => (
                       <button
                         key={opt.value}
@@ -719,12 +733,12 @@ export function DLPPage() {
 
                 {/* 4. Scope */}
                 <div className="space-y-2">
-                  <Label>Scope</Label>
+                  <Label>{t("dlp.fieldScope")}</Label>
                   <div className="flex overflow-hidden rounded-lg border border-border">
                     {([
-                      { value: "request" as const, label: "Request" },
-                      { value: "response" as const, label: "Response" },
-                      { value: "both" as const, label: "Both" },
+                      { value: "request" as const, label: t("dlp.scopeRequest") },
+                      { value: "response" as const, label: t("dlp.scopeResponse") },
+                      { value: "both" as const, label: t("dlp.scopeBoth") },
                     ]).map((opt) => (
                       <button
                         key={opt.value}
@@ -747,12 +761,12 @@ export function DLPPage() {
 
                 {/* 5. Action */}
                 <div className="space-y-2">
-                  <Label>Action</Label>
+                  <Label>{t("dlp.fieldAction")}</Label>
                   <div className="flex overflow-hidden rounded-lg border border-border">
                     {([
-                      { value: "block" as const, label: "Block" },
-                      { value: "mask" as const, label: "Mask" },
-                      { value: "log" as const, label: "Log only" },
+                      { value: "block" as const, label: t("dlp.actionBlock") },
+                      { value: "mask" as const, label: t("dlp.actionMask") },
+                      { value: "log" as const, label: t("dlp.actionLog") },
                     ]).map((opt) => (
                       <button
                         key={opt.value}
@@ -775,7 +789,7 @@ export function DLPPage() {
 
                 {/* 6. Priority */}
                 <div className="space-y-2">
-                  <Label>Priority</Label>
+                  <Label>{t("dlp.fieldPriority")}</Label>
                   <Input
                     type="number"
                     value={form.priority}
@@ -787,11 +801,14 @@ export function DLPPage() {
                     }
                     required
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("dlp.priorityHint")}
+                  </p>
                 </div>
 
                 {/* 7. Model pattern */}
                 <div className="space-y-2">
-                  <Label>Model pattern</Label>
+                  <Label>{t("dlp.fieldModelPattern")}</Label>
                   <Input
                     value={form.model_pattern}
                     onChange={(e) =>
@@ -801,27 +818,26 @@ export function DLPPage() {
                     className="font-mono"
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Optional regex to restrict this rule to specific models. Leave
-                    blank to apply to all models.
+                    {t("dlp.modelPatternHint")}
                   </p>
                 </div>
 
                 {/* 8. Description */}
                 <div className="space-y-2">
-                  <Label>Description</Label>
+                  <Label>{t("dlp.fieldDescription")}</Label>
                   <Textarea
                     value={form.description}
                     onChange={(e) =>
                       setForm({ ...form, description: e.target.value })
                     }
                     rows={2}
-                    placeholder="What does this rule protect against?"
+                    placeholder={t("dlp.descriptionPlaceholder")}
                   />
                 </div>
 
                 {/* 9. Enabled */}
                 <div className="space-y-2">
-                  <Label>Enabled</Label>
+                  <Label>{t("dlp.colStatus")}</Label>
                   <button
                     type="button"
                     onClick={() =>
@@ -846,12 +862,12 @@ export function DLPPage() {
                   <div className="space-y-2 rounded-md border border-dashed border-border/60 bg-muted/20 p-3">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                       <FlaskConical className="h-3.5 w-3.5" />
-                      Pattern Tester
+                      {t("dlp.testerLabel")}
                     </div>
                     <Input
                       value={probe}
                       onChange={(e) => setProbe(e.target.value)}
-                      placeholder="Paste text to test against the pattern..."
+                      placeholder={t("dlp.testerPlaceholder")}
                       className="h-8 font-mono text-xs"
                     />
                     {testerResult()}
@@ -879,12 +895,8 @@ export function DLPPage() {
         onOpenChange={(open) => {
           if (!open) setConfirmDelete(null);
         }}
-        title="Delete Rule"
-        description={
-          confirmDelete
-            ? `Are you sure you want to delete the rule "${confirmDelete.name}"? This action cannot be undone.`
-            : ""
-        }
+        title={t("dlp.deleteTitle")}
+        description={confirmDelete ? t("dlp.deleteConfirm") : ""}
         destructive
         confirmLabel={t("common.delete")}
         cancelLabel={t("common.cancel")}

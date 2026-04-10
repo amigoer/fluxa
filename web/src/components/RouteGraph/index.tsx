@@ -53,6 +53,7 @@ import { RegexModelNode } from "./nodes/RegexModelNode";
 import { VirtualModelNode } from "./nodes/VirtualModelNode";
 import { ProviderNode } from "./nodes/ProviderNode";
 import { FallbackNode } from "./nodes/FallbackNode";
+import { OutboundNode } from "./nodes/OutboundNode";
 import { WeightedEdge, type EditWeightDetail } from "./edges/WeightedEdge";
 import { RouteEdge } from "./edges/RouteEdge";
 import { GraphToolbar } from "./toolbar/GraphToolbar";
@@ -68,6 +69,7 @@ const nodeTypes: NodeTypes = {
   virtualModel: VirtualModelNode,
   provider: ProviderNode,
   fallback: FallbackNode,
+  outbound: OutboundNode,
 };
 
 const edgeTypes: EdgeTypes = {

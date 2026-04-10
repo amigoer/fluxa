@@ -107,6 +107,11 @@ export function ProviderNode({
         position={Position.Left}
         className="!h-3 !w-3 !bg-white !border-2 !border-[#5DCAA5]"
       />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!h-3 !w-3 !bg-white !border-2 !border-[#5DCAA5]"
+      />
     </div>
   );
 }

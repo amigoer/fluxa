@@ -369,6 +369,8 @@ export const en = {
     "graph.toolbar.live": "Live",
     "graph.toolbar.fitView": "Fit View",
     "graph.source.label": "Incoming Request",
+    "graph.outbound.label": "Client",
+    "graph.outbound.subtitle": "Outbound",
     "graph.fallback.label": "Passthrough",
     "graph.fallback.hint": "original model name forwarded",
     "graph.virtual.badge": "virtual",

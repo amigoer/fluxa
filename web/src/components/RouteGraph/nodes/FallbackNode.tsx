@@ -23,6 +23,11 @@ export function FallbackNode(_props: NodeProps & { data: FallbackNodeData }) {
         position={Position.Left}
         className="!h-3 !w-3 !bg-white !border-2 !border-[#B4B2A9]"
       />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!h-3 !w-3 !bg-white !border-2 !border-[#B4B2A9]"
+      />
     </div>
   );
 }

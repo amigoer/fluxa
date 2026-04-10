@@ -3,11 +3,11 @@
 //
 // The graph is a single connected DAG with this shape:
 //
-//   SourceNode ─┬─► RegexModelNode ─► VirtualModelNode ─┬─► ProviderNode
-//               │                  └► ProviderNode      ├─► ProviderNode
-//               │                                       └─► ProviderNode
-//               ├─► VirtualModelNode (direct name match)
-//               └─► FallbackNode (always last, dashed)
+//   SourceNode ─┬─► RegexModelNode ─► VirtualModelNode ─┬─► ProviderNode ──┐
+//               │                  └► ProviderNode ─────────────────────────┤
+//               │                                       └─► ProviderNode ──┤
+//               ├─► VirtualModelNode (direct name match) ─► ProviderNode ──┼─► OutboundNode
+//               └─► FallbackNode (always last, dashed) ────────────────────┘
 //
 // Two important semantic rules embedded here:
 //   1. A VirtualModel that no regex model points to is still a valid
@@ -37,6 +37,7 @@ import type {
 // which node type the offending id belongs to.
 const SOURCE_ID = "source";
 const FALLBACK_ID = "fallback";
+const OUTBOUND_ID = "outbound";
 const regexId = (r: RegexModel) => `regex:${r.id ?? r.pattern}`;
 const vmId = (name: string) => `vm:${name}`;
 const providerId = (provider: string, model: string) =>
@@ -67,6 +68,10 @@ export interface ProviderNodeData {
 }
 
 export interface FallbackNodeData {
+  label: string;
+}
+
+export interface OutboundNodeData {
   label: string;
 }
 
@@ -322,6 +327,34 @@ export function buildGraph(
       ensureProviderNode(p.name, model);
     }
   }
+
+  // 8. OutboundNode — the "response returns to client" anchor on the
+  //    right edge. Edges flow from every terminal node (providers +
+  //    fallback) into this single endpoint to close the visual loop.
+  nodes.push({
+    id: OUTBOUND_ID,
+    type: "outbound",
+    position: { x: 0, y: 0 },
+    data: { label: "Client" } satisfies OutboundNodeData,
+  });
+  // Connect every provider node to outbound.
+  for (const pid of providerNodeIds) {
+    edges.push({
+      id: `e:${pid}->${OUTBOUND_ID}`,
+      source: pid,
+      target: OUTBOUND_ID,
+      type: "route",
+      data: {} satisfies RouteEdgeData,
+    });
+  }
+  // Connect fallback to outbound.
+  edges.push({
+    id: `e:${FALLBACK_ID}->${OUTBOUND_ID}`,
+    source: FALLBACK_ID,
+    target: OUTBOUND_ID,
+    type: "route",
+    data: {} satisfies RouteEdgeData,
+  });
 
   return { nodes, edges };
 }
