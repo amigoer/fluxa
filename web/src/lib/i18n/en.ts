@@ -22,6 +22,7 @@ export const en = {
     "nav.group.manage": "Management",
 
     "lang.toggle": "中文",
+    "theme.toggle": "Toggle theme",
 
     "login.title": "Fluxa admin",
     "login.username": "Username",
@@ -34,6 +35,21 @@ export const en = {
     "login.failed": "Login failed",
     "login.firstRunHint":
       "First run? Default credentials are admin / admin — change them in Settings after sign-in.",
+    "login.welcome": "Welcome back",
+    "login.subtitle":
+      "Enter your credentials to access the admin console.",
+    "login.headline": "The unified gateway for every AI provider.",
+    "login.tagline":
+      "Route, regulate, and observe traffic across OpenAI, Anthropic, Bedrock and more — from one control plane.",
+    "login.feature1Title": "Multi-provider routing",
+    "login.feature1Body":
+      "Compose providers, routes, and virtual models with visual fallback chains.",
+    "login.feature2Title": "Built-in DLP",
+    "login.feature2Body":
+      "Block prompts that leak secrets or PII before they hit upstream.",
+    "login.feature3Title": "Usage and cost insights",
+    "login.feature3Body":
+      "Per-key, per-model, per-day breakdowns of tokens and spend.",
 
     "dashboard.title": "Dashboard",
     "dashboard.subtitle": "Fleet-wide snapshot of routing state and key usage.",

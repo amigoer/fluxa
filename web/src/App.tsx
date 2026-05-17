@@ -17,18 +17,20 @@ import {
   ChevronRight,
   Menu,
   Github,
+  Loader2,
+  LogIn,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Auth, getSessionToken, type AdminUser } from "@/lib/api";
 import { I18nProvider, useT, type TranslationKey } from "@/lib/i18n";
+import { useAppearance, type Theme } from "@/components/appearance-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { DashboardPage } from "@/pages/Dashboard";
 import { ProvidersPage } from "@/pages/Providers";
@@ -145,6 +147,7 @@ const SIDEBAR_STORAGE = "fluxa-sidebar-collapsed";
 
 function Shell() {
   const { t } = useT();
+  const { Icon: ThemeIcon, cycle: cycleTheme } = useThemeCycle();
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loadingMe, setLoadingMe] = useState<boolean>(!!getSessionToken());
   // The active tab is derived from the URL pathname so a hard refresh
@@ -386,6 +389,11 @@ function Shell() {
                 )}
               </div>
               <SidebarIconAction
+                icon={ThemeIcon}
+                label={t("theme.toggle")}
+                onClick={cycleTheme}
+              />
+              <SidebarIconAction
                 icon={LogOut}
                 label={t("nav.signOut")}
                 onClick={signOut}
@@ -415,6 +423,11 @@ function Shell() {
                 </div>
               </div>
               <div className="flex items-center gap-0.5 shrink-0">
+                <SidebarIconAction
+                  icon={ThemeIcon}
+                  label={t("theme.toggle")}
+                  onClick={cycleTheme}
+                />
                 <SidebarIconAction
                   icon={LogOut}
                   label={t("nav.signOut")}
@@ -471,6 +484,17 @@ function Shell() {
   );
 }
 
+// useThemeCycle wraps useAppearance() so callers can render a single
+// icon that advances through light → dark → system on click. Returning
+// the resolved icon lets the call sites stay short — no per-site
+// switch on the current theme.
+function useThemeCycle() {
+  const { theme, setTheme } = useAppearance();
+  const next: Theme = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
+  const Icon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+  return { Icon, cycle: () => setTheme(next) };
+}
+
 // SidebarIconAction is the compact icon-only button used in the
 // sidebar footer. It always renders as a 8x8 square; because it has no
 // visible label in either collapsed or expanded mode, it always shows
@@ -518,8 +542,14 @@ function SidebarTooltip({ label }: { label: string }) {
 // password to /admin/auth/login and stashes the resulting token via
 // the Auth client; on success it hands the resolved user back to the
 // shell via onAuth so we never have to read /me on the same boot.
+//
+// Layout mirrors the shadcn-admin "sign-in-2" pattern: a dark brand
+// showcase on the left (lg+ only) and the credential form on the right.
+// Below the lg breakpoint the showcase collapses and the form takes
+// the full viewport with a compact brand header.
 function LoginScreen({ onAuth }: { onAuth: (u: AdminUser) => void }) {
   const { t, locale, setLocale } = useT();
+  const { Icon: ThemeIcon, cycle: cycleTheme } = useThemeCycle();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -540,88 +570,219 @@ function LoginScreen({ onAuth }: { onAuth: (u: AdminUser) => void }) {
     }
   }
 
+  const features: Array<{
+    icon: typeof Network;
+    titleKey: TranslationKey;
+    bodyKey: TranslationKey;
+  }> = [
+    { icon: Network, titleKey: "login.feature1Title", bodyKey: "login.feature1Body" },
+    { icon: Shield, titleKey: "login.feature2Title", bodyKey: "login.feature2Body" },
+    { icon: BarChart3, titleKey: "login.feature3Title", bodyKey: "login.feature3Body" },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background relative px-4 overflow-hidden">
-      {/* Decorative subtle background pattern / elements */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-muted/50 via-background to-background pointer-events-none" />
+    <div className="relative min-h-svh w-full lg:grid lg:grid-cols-2 font-[Inter,sans-serif] overflow-hidden">
+      {/* Page-wide decorative grid. Lives on the root so it spans both
+          halves of the split-screen — the form area sits on the same
+          texture as the brand showcase. Mask fades to transparent at
+          the corners so the lines don't crowd the page edges. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 z-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.04)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_80%)] pointer-events-none"
+      />
 
-      <button
-        onClick={() => setLocale(locale === "en" ? "zh" : "en")}
-        className="absolute top-6 right-6 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-sm border border-border text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center gap-1.5 shadow-sm transition-all z-20"
-      >
-        <Languages className="h-3.5 w-3.5" />
-        {t("lang.toggle")}
-      </button>
+      {/* Left: brand showcase. Transparent so the page-wide grid shows
+          through. The radial purple glow stays scoped to this side so
+          it visually anchors the brand content without bleeding into
+          the form area. */}
+      <aside className="relative hidden lg:flex flex-col justify-between p-10 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(120,119,198,0.10),transparent_50%),radial-gradient(circle_at_80%_100%,rgba(120,119,198,0.04),transparent_45%)] pointer-events-none"
+        />
 
-      {/* Main Login Card */}
-      <div className="w-full max-w-[380px] z-10 space-y-8 mt-[-5%]">
-        <div className="flex flex-col items-center space-y-5 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm ring-1 ring-border/10">
-            <Zap className="h-8 w-8" strokeWidth={2} />
+        {/* Top: brand mark + wordmark. The mark uses primary so it
+            always inverts against the muted panel — dark square in
+            light mode, light square in dark mode. */}
+        <div className="relative z-10 flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <Zap className="h-4 w-4" strokeWidth={2.5} />
           </div>
-          <div className="space-y-1.5">
-            <h1 className="text-[26px] font-semibold tracking-tight">{t("login.title")}</h1>
-            <p className="text-[14px] text-muted-foreground font-medium">{t("app.subtitle")}</p>
-          </div>
+          <span className="text-base font-semibold tracking-tight">
+            {t("app.title")}
+          </span>
         </div>
 
-        <Card className="border-border/60 shadow-xl shadow-black/[0.03] bg-card/80 backdrop-blur-xl">
-          <CardContent className="p-7 md:p-8">
-            <form onSubmit={submit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">{t("login.username")}</Label>
-                <Input
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t("login.placeholderUser")}
-                  autoFocus
-                  autoComplete="username"
-                  className="h-11 bg-background/50 focus-visible:bg-background"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">{t("login.password")}</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t("login.placeholderPass")}
-                  autoComplete="current-password"
-                  className="h-11 bg-background/50 focus-visible:bg-background"
-                />
-                {error && <p className="text-[13px] text-destructive pt-1.5 font-medium">{error}</p>}
-              </div>
-              <div className="pt-3">
-                <Button type="submit" className="w-full h-11 text-[15px] font-medium transition-all active:scale-[0.98]" disabled={loading}>
-                  {loading ? t("login.checking") : t("login.submit")}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        {/* Center: marketing headline + feature highlights. */}
+        <div className="relative z-10 max-w-md space-y-10 py-12">
+          <div>
+            <h2 className="text-[28px] font-semibold leading-[1.2] tracking-tight">
+              {t("login.headline")}
+            </h2>
+            <p className="mt-4 text-[15px] text-muted-foreground leading-relaxed">
+              {t("login.tagline")}
+            </p>
+          </div>
 
-        <p className="text-center text-[13px] text-muted-foreground/80 px-4 leading-relaxed">
-          {t("login.firstRunHint")}
-        </p>
-      </div>
+          <ul className="space-y-5">
+            {features.map((f) => {
+              const Icon = f.icon;
+              return (
+                <li key={f.titleKey} className="flex items-start gap-3.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted border border-border">
+                    <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-medium leading-tight">
+                      {t(f.titleKey)}
+                    </div>
+                    <div className="mt-1 text-[13px] text-muted-foreground leading-relaxed">
+                      {t(f.bodyKey)}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
 
-      <footer className="absolute bottom-6 w-full text-center text-[13px] text-muted-foreground/60 z-10 px-4">
-        <div className="flex flex-wrap justify-center items-center gap-2">
-          <span>&copy; {new Date().getFullYear()} Fluxa. All rights reserved.</span>
-          <span className="hidden sm:inline opacity-50">|</span>
-          <a
-            href="https://github.com/amigoer/fluxa"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+        {/* Bottom: repo link. */}
+        <a
+          href="https://github.com/amigoer/fluxa"
+          target="_blank"
+          rel="noreferrer"
+          className="relative z-10 inline-flex w-fit items-center gap-2 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Github className="h-4 w-4" />
+          github.com/amigoer/fluxa
+        </a>
+      </aside>
+
+      {/* Right: credential form panel. Background stays transparent so
+          the page-wide grid stays continuous across the split. */}
+      <main className="relative flex min-h-svh flex-col items-center justify-center px-4 py-12 sm:px-8">
+        {/* Mobile brand header (mirrors the dashboard's top bar). */}
+        <div className="lg:hidden absolute top-6 left-6 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <Zap className="h-4 w-4" strokeWidth={2.5} />
+          </div>
+          <span className="text-sm font-semibold tracking-tight">
+            {t("app.title")}
+          </span>
+        </div>
+
+        {/* Theme + language togglers, top-right of the form panel. Two
+            sibling pill buttons so the form area never looks bare and
+            the operator can flip both axes without digging into
+            Settings. */}
+        <div className="absolute top-6 right-6 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={cycleTheme}
+            title={t("theme.toggle")}
+            aria-label={t("theme.toggle")}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
           >
-            <Github className="h-3.5 w-3.5" />
-            GitHub Repository
-          </a>
+            <ThemeIcon className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setLocale(locale === "en" ? "zh" : "en")}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Languages className="h-3.5 w-3.5" />
+            {t("lang.toggle")}
+          </button>
         </div>
-      </footer>
+
+        <div className="w-full max-w-sm space-y-6">
+          <div className="space-y-2 text-start">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {t("login.welcome")}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {t("login.subtitle")}
+            </p>
+          </div>
+
+          <form onSubmit={submit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-sm font-medium">
+                {t("login.username")}
+              </Label>
+              <Input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={t("login.placeholderUser")}
+                autoFocus
+                autoComplete="username"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">
+                {t("login.password")}
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t("login.placeholderPass")}
+                autoComplete="current-password"
+                className="h-10"
+              />
+              {error && (
+                <p className="pt-1 text-[13px] font-medium text-destructive">
+                  {error}
+                </p>
+              )}
+            </div>
+            <Button
+              type="submit"
+              className="mt-2 w-full h-10 text-sm font-medium"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t("login.checking")}
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4" />
+                  {t("login.submit")}
+                </>
+              )}
+            </Button>
+          </form>
+
+          <Separator />
+
+          <p className="px-2 text-center text-xs text-muted-foreground/80 leading-relaxed">
+            {t("login.firstRunHint")}
+          </p>
+        </div>
+
+        <footer className="absolute bottom-6 inset-x-0 px-4 text-center text-xs text-muted-foreground/60">
+          <div className="flex flex-wrap justify-center items-center gap-2">
+            <span>
+              &copy; {new Date().getFullYear()} Fluxa. All rights reserved.
+            </span>
+            <span className="hidden sm:inline opacity-50">|</span>
+            <a
+              href="https://github.com/amigoer/fluxa"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors lg:hidden"
+            >
+              <Github className="h-3.5 w-3.5" />
+              GitHub
+            </a>
+          </div>
+        </footer>
+      </main>
     </div>
   );
 }

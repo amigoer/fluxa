@@ -24,6 +24,7 @@ export const zh: Record<TranslationKey, string> = {
     "nav.group.manage": "管理",
 
     "lang.toggle": "English",
+    "theme.toggle": "切换主题",
 
     "login.title": "Fluxa 管理后台",
     "login.username": "账号",
@@ -36,6 +37,20 @@ export const zh: Record<TranslationKey, string> = {
     "login.failed": "登录失败",
     "login.firstRunHint":
       "首次启动？默认账号 admin / admin，登录后请立即在「设置」中修改密码。",
+    "login.welcome": "欢迎回来",
+    "login.subtitle": "请输入账号密码进入管理后台。",
+    "login.headline": "面向所有 AI 服务商的统一网关",
+    "login.tagline":
+      "在一个控制面板中调度、审查并观测来自 OpenAI、Anthropic、Bedrock 等渠道的流量。",
+    "login.feature1Title": "多供应商路由",
+    "login.feature1Body":
+      "可视化编排服务商、路由与虚拟模型，灵活配置故障回退链。",
+    "login.feature2Title": "内置数据防泄漏",
+    "login.feature2Body":
+      "在请求到达上游之前，拦截泄露密钥或个人信息的 Prompt。",
+    "login.feature3Title": "用量与成本洞察",
+    "login.feature3Body":
+      "按密钥、模型、日期细分 Token 用量与开销。",
 
     "dashboard.title": "概览",
     "dashboard.subtitle": "整个网关的路由状态与密钥用量快照。",
