@@ -253,6 +253,45 @@ func (s *Store) migrate(ctx context.Context) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_dlp_violations_ts ON dlp_violations(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_dlp_violations_rule ON dlp_violations(rule_id)`,
+
+		// request_logs is the per-call raw log: one row per incoming
+		// /v1/chat/completions or /v1/messages request, whether it
+		// succeeded, failed, or was blocked by DLP. request_body and
+		// response_body hold the full payloads so operators can
+		// reproduce calls and audit what data left the network.
+		// usage_records remains the aggregation table (budgets,
+		// dashboards); request_logs is the raw stream and is expected
+		// to be pruned by a retention job in a later iteration.
+		`CREATE TABLE IF NOT EXISTS request_logs (
+			id                TEXT PRIMARY KEY,
+			virtual_key_id    TEXT NOT NULL DEFAULT '',
+			started_at        DATETIME NOT NULL,
+			first_byte_at     DATETIME,
+			completed_at      DATETIME NOT NULL,
+			endpoint          TEXT NOT NULL DEFAULT '',
+			method            TEXT NOT NULL DEFAULT 'POST',
+			model_requested   TEXT NOT NULL DEFAULT '',
+			model_resolved    TEXT NOT NULL DEFAULT '',
+			provider          TEXT NOT NULL DEFAULT '',
+			is_stream         INTEGER NOT NULL DEFAULT 0,
+			cache_hit         INTEGER NOT NULL DEFAULT 0,
+			status_code       INTEGER NOT NULL DEFAULT 0,
+			error             TEXT NOT NULL DEFAULT '',
+			prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+			completion_tokens INTEGER NOT NULL DEFAULT 0,
+			total_tokens      INTEGER NOT NULL DEFAULT 0,
+			cost_usd          REAL NOT NULL DEFAULT 0,
+			latency_ms        INTEGER NOT NULL DEFAULT 0,
+			ttft_ms           INTEGER NOT NULL DEFAULT 0,
+			request_body      TEXT NOT NULL DEFAULT '',
+			response_body     TEXT NOT NULL DEFAULT '',
+			client_ip         TEXT NOT NULL DEFAULT '',
+			user_agent        TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_request_logs_started ON request_logs(started_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_request_logs_key ON request_logs(virtual_key_id, started_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_request_logs_status ON request_logs(status_code)`,
+		`CREATE INDEX IF NOT EXISTS idx_request_logs_model ON request_logs(model_resolved)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
