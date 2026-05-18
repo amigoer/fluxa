@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Download, Upload, Monitor, Sun, Moon, Type, Languages, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Config } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useAppearance, Theme, FontSize } from "@/components/appearance-provider";
@@ -16,39 +17,6 @@ export function SettingsPage() {
       </div>
       <AppearanceCard />
       <BackupCard />
-    </div>
-  );
-}
-
-function SegmentedControl<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { label: string; value: T; icon?: React.ReactNode }[];
-  value: T;
-  onChange: (val: T) => void;
-}) {
-  return (
-    <div className="flex w-full sm:w-auto items-center p-1 rounded-xl bg-accent/50 text-muted-foreground border border-border/40">
-      {options.map((opt) => {
-        const isActive = value === opt.value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            className={`flex flex-1 sm:flex-initial items-center justify-center whitespace-nowrap rounded-lg px-4 py-1.5 text-[13px] font-medium transition-all duration-300 ${
-              isActive
-                ? "bg-background text-foreground shadow-sm ring-1 ring-border/20 scale-[0.98] sm:scale-100"
-                : "hover:text-foreground opacity-80 hover:opacity-100 hover:bg-background/40"
-            }`}
-          >
-            {opt.icon && <span className="mr-1.5 shrink-0">{opt.icon}</span>}
-            {opt.label}
-          </button>
-        );
-      })}
     </div>
   );
 }

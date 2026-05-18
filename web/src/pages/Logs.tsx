@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Dialog,
   DialogContent,
@@ -186,19 +187,20 @@ export function LogsPage() {
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t("logs.filterStatus")}
               </Label>
-              <select
+              <SegmentedControl<StatusBucket>
                 value={status}
-                onChange={(e) => {
+                onChange={(v) => {
                   setOffset(0);
-                  setStatus(e.target.value as StatusBucket);
+                  setStatus(v);
                 }}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="all">{t("logs.filterStatusAll")}</option>
-                <option value="2xx">{t("logs.filterStatus2xx")}</option>
-                <option value="4xx">{t("logs.filterStatus4xx")}</option>
-                <option value="5xx">{t("logs.filterStatus5xx")}</option>
-              </select>
+                size="sm"
+                options={[
+                  { label: t("logs.filterStatusAll"), value: "all" },
+                  { label: t("logs.filterStatus2xx"), value: "2xx" },
+                  { label: t("logs.filterStatus4xx"), value: "4xx" },
+                  { label: t("logs.filterStatus5xx"), value: "5xx" },
+                ]}
+              />
             </div>
           </div>
           <div className="flex flex-wrap items-end gap-3">
@@ -206,18 +208,19 @@ export function LogsPage() {
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t("logs.filterStream")}
               </Label>
-              <select
+              <SegmentedControl<StreamBucket>
                 value={stream}
-                onChange={(e) => {
+                onChange={(v) => {
                   setOffset(0);
-                  setStream(e.target.value as StreamBucket);
+                  setStream(v);
                 }}
-                className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="all">{t("logs.filterStreamAll")}</option>
-                <option value="stream">{t("logs.filterStreamOn")}</option>
-                <option value="nostream">{t("logs.filterStreamOff")}</option>
-              </select>
+                size="sm"
+                options={[
+                  { label: t("logs.filterStreamAll"), value: "all" },
+                  { label: t("logs.filterStreamOn"), value: "stream" },
+                  { label: t("logs.filterStreamOff"), value: "nostream" },
+                ]}
+              />
             </div>
             <div className="flex items-end gap-2 ml-auto">
               {filtersDirty && (
