@@ -442,3 +442,80 @@ export const Usage = {
     return request<UsageSummary>("GET", path);
   },
 };
+
+// -- request logs ------------------------------------------------------
+//
+// Per-call raw logs from the request_logs table. The list endpoint
+// returns slim summary rows (no bodies); the detail endpoint inlines
+// the full request and response bodies for the dashboard's drawer.
+
+export interface RequestLogSummary {
+  id: string;
+  virtual_key_id: string;
+  started_at: string;
+  first_byte_at?: string | null;
+  completed_at: string;
+  endpoint: string;
+  method: string;
+  model_requested: string;
+  model_resolved: string;
+  provider: string;
+  is_stream: boolean;
+  cache_hit: boolean;
+  status_code: number;
+  error: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  latency_ms: number;
+  ttft_ms: number;
+  client_ip: string;
+  user_agent: string;
+}
+
+export interface RequestLogDetail extends RequestLogSummary {
+  request_body: string;
+  response_body: string;
+}
+
+export interface RequestLogFilter {
+  key_id?: string;
+  model?: string;
+  provider?: string;
+  status_min?: number;
+  status_max?: number;
+  stream?: boolean;
+  since?: string;
+  until?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface RequestLogListResponse {
+  data: RequestLogSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const Logs = {
+  list: (filter: RequestLogFilter = {}) => {
+    const q = new URLSearchParams();
+    if (filter.key_id) q.set("key_id", filter.key_id);
+    if (filter.model) q.set("model", filter.model);
+    if (filter.provider) q.set("provider", filter.provider);
+    if (filter.status_min !== undefined) q.set("status_min", String(filter.status_min));
+    if (filter.status_max !== undefined) q.set("status_max", String(filter.status_max));
+    if (filter.stream !== undefined) q.set("stream", filter.stream ? "true" : "false");
+    if (filter.since) q.set("since", filter.since);
+    if (filter.until) q.set("until", filter.until);
+    if (filter.search) q.set("search", filter.search);
+    if (filter.limit !== undefined) q.set("limit", String(filter.limit));
+    if (filter.offset !== undefined) q.set("offset", String(filter.offset));
+    const qs = q.toString();
+    return request<RequestLogListResponse>("GET", `/admin/logs${qs ? `?${qs}` : ""}`);
+  },
+  get: (id: string) => request<RequestLogDetail>("GET", `/admin/logs/${id}`),
+};

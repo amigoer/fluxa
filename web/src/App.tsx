@@ -22,6 +22,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ import { ResolveTesterPage } from "@/pages/ResolveTester";
 import { RouteGraphPage } from "@/components/RouteGraph";
 import { KeysPage } from "@/pages/Keys";
 import { UsagePage } from "@/pages/Usage";
+import { LogsPage } from "@/pages/Logs";
 import { SettingsPage } from "@/pages/Settings";
 import { ProfilePage } from "@/pages/Profile";
 
@@ -59,6 +61,7 @@ type Tab =
   | "keys"
   | "dlp"
   | "usage"
+  | "logs"
   | "settings"
   | "profile";
 
@@ -92,6 +95,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: "keys", labelKey: "nav.keys", icon: KeyRound },
       { id: "dlp", labelKey: "nav.dlp", icon: Shield },
+      { id: "logs", labelKey: "nav.logs", icon: ScrollText },
       { id: "usage", labelKey: "nav.usage", icon: BarChart3 },
       { id: "settings", labelKey: "nav.settings", icon: SettingsIcon },
     ],
@@ -108,6 +112,7 @@ const TAB_IDS = new Set<Tab>([
   "resolve-tester", // Kept in tabs, but removed from sidebar
   "route-graph",
   "keys",
+  "logs",
   "dlp",
   "usage",
   "settings",
@@ -457,6 +462,7 @@ function Shell() {
               {tab === "keys" && <KeysPage />}
               {tab === "dlp" && <DLPPage />}
               {tab === "usage" && <UsagePage />}
+              {tab === "logs" && <LogsPage />}
               {tab === "settings" && <SettingsPage />}
               {tab === "profile" && <ProfilePage user={user} onUserUpdate={setUser} onSignOut={signOut} />}
             </div>
