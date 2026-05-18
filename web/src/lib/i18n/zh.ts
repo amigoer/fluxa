@@ -527,4 +527,11 @@ export const zh: Record<TranslationKey, string> = {
     "logs.detailNoBody": "（空）",
     "logs.detailCopy": "复制",
     "logs.detailCopied": "已复制",
+    "logs.detailBytes": "{size}",
+    "logs.timeJustNow": "刚刚",
+    "logs.timeMinutesAgo": "{n} 分钟前",
+    "logs.timeHoursAgo": "{n} 小时前",
+    "logs.timeDaysAgo": "{n} 天前",
+    "logs.emptyHint": "向网关发起一次 chat 或 messages 调用，即可看到流量实时出现在这里。",
+    "logs.searchHint": "回车搜索",
   };

@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Inbox,
   RefreshCw,
   Search,
   X,
@@ -12,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Dialog,
@@ -29,7 +31,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Logs, type RequestLogDetail, type RequestLogSummary } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useT, type TranslationKey } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 // PAGE_SIZE keeps requests cheap and the table readable. The server
@@ -49,9 +52,10 @@ export function LogsPage() {
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
 
   // Filter inputs are kept in local state and only applied on submit
-  // (Enter / button click) so typing in the search box does not
+  // (Enter / segmented onChange) so typing in the search box does not
   // hammer the server. The committed values live alongside them.
   const [searchInput, setSearchInput] = useState("");
   const [keyInput, setKeyInput] = useState("");
@@ -84,6 +88,7 @@ export function LogsPage() {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
+      setInitialLoaded(true);
     }
   };
 
@@ -91,7 +96,7 @@ export function LogsPage() {
     loadRef.current();
   }, [committed, status, stream, offset]);
 
-  function applyFilters() {
+  function commitText() {
     setOffset(0);
     setCommitted({ search: searchInput, key: keyInput, model: modelInput });
   }
@@ -118,14 +123,8 @@ export function LogsPage() {
     }
   }
 
-  const pageInfo = useMemo(() => {
-    if (total === 0) return { from: 0, to: 0 };
-    return {
-      from: offset + 1,
-      to: Math.min(offset + PAGE_SIZE, total),
-    };
-  }, [offset, total]);
-
+  const pageFrom = total === 0 ? 0 : offset + 1;
+  const pageTo = Math.min(offset + PAGE_SIZE, total);
   const hasNext = offset + PAGE_SIZE < total;
   const hasPrev = offset > 0;
   const filtersDirty =
@@ -142,51 +141,62 @@ export function LogsPage() {
         <p className="text-sm text-muted-foreground">{t("logs.subtitle")}</p>
       </div>
 
-      {/* Filter bar */}
+      {/* Filter bar — two rows. The top row is the always-visible search
+          + global actions. The bottom row is the detail filters which
+          auto-apply (segmented controls) or apply on Enter (text). */}
       <Card>
-        <CardContent className="p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1.5 md:col-span-3">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t("logs.searchPlaceholder")}
-              </Label>
-              <div className="relative">
-                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && applyFilters()}
-                  placeholder={t("logs.searchPlaceholder")}
-                  className="pl-9"
-                />
-              </div>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && commitText()}
+                placeholder={t("logs.searchPlaceholder")}
+                className="h-10 pl-9 pr-24"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground/70">
+                {t("logs.searchHint")}
+              </span>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t("logs.filterKey")}
-              </Label>
+            {filtersDirty && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-3.5 w-3.5" />
+                {t("logs.clear")}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadRef.current()}
+              disabled={loading}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+              {t("logs.refresh")}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-x-4 gap-y-3 pt-1">
+            <FilterField label={t("logs.filterKey")} className="min-w-[180px] flex-1">
               <Input
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+                onKeyDown={(e) => e.key === "Enter" && commitText()}
                 placeholder="vk-…"
+                className="h-9"
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t("logs.filterModel")}
-              </Label>
+            </FilterField>
+            <FilterField label={t("logs.filterModel")} className="min-w-[180px] flex-1">
               <Input
                 value={modelInput}
                 onChange={(e) => setModelInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+                onKeyDown={(e) => e.key === "Enter" && commitText()}
                 placeholder="gpt-4o"
+                className="h-9"
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t("logs.filterStatus")}
-              </Label>
+            </FilterField>
+            <FilterField label={t("logs.filterStatus")}>
               <SegmentedControl<StatusBucket>
                 value={status}
                 onChange={(v) => {
@@ -201,13 +211,8 @@ export function LogsPage() {
                   { label: t("logs.filterStatus5xx"), value: "5xx" },
                 ]}
               />
-            </div>
-          </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t("logs.filterStream")}
-              </Label>
+            </FilterField>
+            <FilterField label={t("logs.filterStream")}>
               <SegmentedControl<StreamBucket>
                 value={stream}
                 onChange={(v) => {
@@ -221,26 +226,7 @@ export function LogsPage() {
                   { label: t("logs.filterStreamOff"), value: "nostream" },
                 ]}
               />
-            </div>
-            <div className="flex items-end gap-2 ml-auto">
-              {filtersDirty && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  <X className="h-3.5 w-3.5" /> {t("logs.clear")}
-                </Button>
-              )}
-              <Button onClick={applyFilters} size="sm">
-                <Search className="h-3.5 w-3.5" /> {t("logs.searchPlaceholder").split("…")[0]}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadRef.current()}
-                disabled={loading}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-                {t("logs.refresh")}
-              </Button>
-            </div>
+            </FilterField>
           </div>
         </CardContent>
       </Card>
@@ -250,7 +236,7 @@ export function LogsPage() {
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 <TableHead className="w-[160px]">{t("logs.colTime")}</TableHead>
                 <TableHead>{t("logs.colKey")}</TableHead>
                 <TableHead>{t("logs.colModel")}</TableHead>
@@ -263,58 +249,76 @@ export function LogsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="cursor-pointer"
-                  onClick={() => openRow(row.id)}
-                >
-                  <TableCell className="text-xs text-muted-foreground">
-                    {formatTime(row.started_at)}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {row.virtual_key_id ? row.virtual_key_id.slice(0, 14) + "…" : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <span>{row.model_requested || row.model_resolved}</span>
-                      {row.is_stream && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
-                          <Activity className="h-2.5 w-2.5" />
-                          {t("logs.streamBadge")}
+              {!initialLoaded && loading && (
+                <SkeletonRows count={8} />
+              )}
+              {initialLoaded &&
+                rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className="cursor-pointer transition-colors"
+                    onClick={() => openRow(row.id)}
+                  >
+                    <TableCell
+                      className="text-xs text-muted-foreground"
+                      title={formatTime(row.started_at)}
+                    >
+                      {formatRelativeTime(t, row.started_at)}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {row.virtual_key_id ? (
+                        <span title={row.virtual_key_id}>
+                          {row.virtual_key_id.slice(0, 14)}…
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
-                    </div>
-                    {row.model_resolved &&
-                      row.model_resolved !== row.model_requested && (
-                        <div className="text-[11px] text-muted-foreground font-mono">
-                          → {row.model_resolved}
-                        </div>
-                      )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{row.provider || "—"}</TableCell>
-                  <TableCell>
-                    <StatusPill status={row.status_code} />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {row.prompt_tokens} / {row.completion_tokens} /{" "}
-                    <span className="font-medium">{row.total_tokens}</span>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {row.latency_ms}ms
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                    {row.ttft_ms > 0 ? `${row.ttft_ms}ms` : "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {row.cost_usd > 0 ? `$${row.cost_usd.toFixed(5)}` : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {rows.length === 0 && !loading && (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-12">
-                    {filtersDirty ? t("logs.emptySearch") : t("logs.empty")}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <span>{row.model_requested || row.model_resolved}</span>
+                        {row.is_stream && <StreamBadge />}
+                      </div>
+                      {row.model_resolved &&
+                        row.model_resolved !== row.model_requested && (
+                          <div className="text-[11px] text-muted-foreground font-mono">
+                            → {row.model_resolved}
+                          </div>
+                        )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {row.provider || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <StatusPill status={row.status_code} />
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      <span className="text-muted-foreground">
+                        {formatTokens(row.prompt_tokens)} /{" "}
+                        {formatTokens(row.completion_tokens)} /{" "}
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {formatTokens(row.total_tokens)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatLatency(row.latency_ms)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      {row.ttft_ms > 0 ? formatLatency(row.ttft_ms) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatCost(row.cost_usd)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              {initialLoaded && rows.length === 0 && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={9} className="py-16">
+                    <EmptyState
+                      filtered={filtersDirty}
+                      onClear={clearFilters}
+                    />
                   </TableCell>
                 </TableRow>
               )}
@@ -327,11 +331,7 @@ export function LogsPage() {
       {total > 0 && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            {t("logs.pageOf", {
-              from: pageInfo.from,
-              to: pageInfo.to,
-              total,
-            })}
+            {t("logs.pageOf", { from: pageFrom, to: pageTo, total })}
           </span>
           <div className="flex gap-2">
             <Button
@@ -356,13 +356,87 @@ export function LogsPage() {
         </div>
       )}
 
-      <Dialog open={activeLog !== null} onOpenChange={(open) => !open && setActiveLog(null)}>
+      <Dialog
+        open={activeLog !== null}
+        onOpenChange={(open) => !open && setActiveLog(null)}
+      >
         <DialogContent className="!flex max-h-[90vh] !max-w-3xl !flex-col overflow-hidden">
-          {activeLog && (
-            <LogDetailPanel detail={activeLog} loading={activeLoading} />
-          )}
+          {activeLog && <LogDetailPanel detail={activeLog} loading={activeLoading} />}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// FilterField wraps a label and its control with consistent spacing so
+// rows of mixed inputs (text + segmented) line up at the baseline.
+function FilterField({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+        {label}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+// SkeletonRows paints loading placeholders that mirror the live row
+// shape, so the table does not collapse to a single empty cell while
+// the first request is in flight.
+function SkeletonRows({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <TableRow key={`skeleton-${i}`} className="hover:bg-transparent">
+          {Array.from({ length: 9 }).map((__, j) => (
+            <TableCell key={j}>
+              <Skeleton className="h-4 w-full" />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
+function EmptyState({
+  filtered,
+  onClear,
+}: {
+  filtered: boolean;
+  onClear: () => void;
+}) {
+  const { t } = useT();
+  return (
+    <div className="flex flex-col items-center gap-3 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Inbox className="h-5 w-5" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-foreground">
+          {filtered ? t("logs.emptySearch") : t("logs.empty")}
+        </p>
+        {!filtered && (
+          <p className="max-w-sm text-xs text-muted-foreground">
+            {t("logs.emptyHint")}
+          </p>
+        )}
+      </div>
+      {filtered && (
+        <Button variant="outline" size="sm" onClick={onClear}>
+          <X className="h-3.5 w-3.5" />
+          {t("logs.clear")}
+        </Button>
+      )}
     </div>
   );
 }
@@ -408,26 +482,107 @@ function buildFilter({
   return filter;
 }
 
-// StatusPill colours the status_code by class to keep the eye on the
-// rare 4xx/5xx without making the common 200 row visually noisy.
+// StreamBadge marks a row as a streaming response. Kept tiny so the
+// model column stays scannable; the colour is the same blue we use
+// in the route graph for stream edges so the visual vocabulary is
+// consistent.
+function StreamBadge() {
+  const { t } = useT();
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
+      <Activity className="h-2.5 w-2.5" />
+      {t("logs.streamBadge")}
+    </span>
+  );
+}
+
+// StatusPill colours the status_code by class so the rare 4xx/5xx
+// pops without making the common 200 row visually noisy.
 function StatusPill({ status }: { status: number }) {
   let tone = "bg-muted text-muted-foreground";
-  if (status >= 200 && status < 300) tone = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
-  else if (status >= 400 && status < 500) tone = "bg-amber-500/10 text-amber-600 dark:text-amber-400";
-  else if (status >= 500) tone = "bg-rose-500/10 text-rose-600 dark:text-rose-400";
+  if (status >= 200 && status < 300)
+    tone = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+  else if (status >= 400 && status < 500)
+    tone = "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+  else if (status >= 500)
+    tone = "bg-rose-500/10 text-rose-600 dark:text-rose-400";
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone}`}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
+        tone,
+      )}
+    >
       {status || "—"}
     </span>
   );
 }
 
+// formatTime returns a locale-aware absolute timestamp. Used as the
+// tooltip on relative-time cells so hovering still gives the exact
+// value when "5m ago" is not precise enough.
 function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleString();
   } catch {
     return iso;
   }
+}
+
+// formatRelativeTime returns "just now / Xm ago / Xh ago / Xd ago"
+// for recent timestamps and falls back to an absolute date when the
+// value is older than a week. i18n is threaded through `t` so the
+// Chinese locale renders the same buckets natively.
+function formatRelativeTime(
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  iso: string,
+): string {
+  try {
+    const ms = Date.now() - new Date(iso).getTime();
+    if (ms < 60_000) return t("logs.timeJustNow");
+    if (ms < 3_600_000) return t("logs.timeMinutesAgo", { n: Math.floor(ms / 60_000) });
+    if (ms < 86_400_000) return t("logs.timeHoursAgo", { n: Math.floor(ms / 3_600_000) });
+    if (ms < 7 * 86_400_000) return t("logs.timeDaysAgo", { n: Math.floor(ms / 86_400_000) });
+    return new Date(iso).toLocaleDateString();
+  } catch {
+    return iso;
+  }
+}
+
+// formatLatency picks ms or s based on magnitude. Anything ≥ 1s
+// reads better as seconds with two decimals than as a four-digit
+// millisecond count.
+function formatLatency(ms: number): string {
+  if (!ms) return "—";
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+// formatCost picks precision based on magnitude. Tiny costs (sub-
+// cent) get more decimals so a 0.0001 / 0.000001 difference does
+// not collapse to "$0.00"; dollar-level costs get the usual two.
+function formatCost(usd: number): string {
+  if (!usd) return "—";
+  if (usd >= 1) return `$${usd.toFixed(2)}`;
+  if (usd >= 0.01) return `$${usd.toFixed(4)}`;
+  if (usd >= 0.000001) return `$${usd.toFixed(6)}`;
+  return `<$${(0.000001).toFixed(6)}`;
+}
+
+// formatTokens adds thousands separators so 12 345 reads as easily
+// as 12 — admins comparing per-request token counts across rows
+// benefit from the visual delimiter.
+function formatTokens(n: number): string {
+  return n.toLocaleString();
+}
+
+// formatBytes converts a byte count to a human label. Used to show
+// payload size next to body section titles in the detail dialog so
+// the operator knows up front whether the body is small or capped.
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 // LogDetailPanel renders the full request_log row inside the dialog,
@@ -445,7 +600,10 @@ function LogDetailPanel({
   const { t } = useT();
 
   const meta: Array<{ label: string; value: React.ReactNode }> = [
-    { label: t("logs.detailEndpoint"), value: <code className="font-mono">{detail.endpoint}</code> },
+    {
+      label: t("logs.detailEndpoint"),
+      value: <code className="font-mono">{detail.endpoint}</code>,
+    },
     { label: t("logs.detailMethod"), value: detail.method },
     {
       label: t("logs.detailModelRequested"),
@@ -458,55 +616,74 @@ function LogDetailPanel({
     { label: t("logs.detailProvider"), value: detail.provider || "—" },
     {
       label: t("logs.detailIsStream"),
-      value: detail.is_stream ? t("logs.filterStreamOn") : t("logs.filterStreamOff"),
+      value: detail.is_stream
+        ? t("logs.filterStreamOn")
+        : t("logs.filterStreamOff"),
     },
-    { label: t("logs.colStatus"), value: <StatusPill status={detail.status_code} /> },
+    {
+      label: t("logs.colStatus"),
+      value: <StatusPill status={detail.status_code} />,
+    },
     {
       label: t("logs.detailTokens"),
       value: (
         <span className="font-mono">
-          {detail.prompt_tokens} / {detail.completion_tokens} / {detail.total_tokens}
+          {formatTokens(detail.prompt_tokens)} /{" "}
+          {formatTokens(detail.completion_tokens)} /{" "}
+          {formatTokens(detail.total_tokens)}
         </span>
       ),
     },
     {
       label: t("logs.detailLatencyMs"),
-      value: <span className="font-mono">{detail.latency_ms}ms</span>,
+      value: <span className="font-mono">{formatLatency(detail.latency_ms)}</span>,
     },
     {
       label: t("logs.detailTTFTMs"),
       value: (
         <span className="font-mono">
-          {detail.ttft_ms > 0 ? `${detail.ttft_ms}ms` : "—"}
+          {detail.ttft_ms > 0 ? formatLatency(detail.ttft_ms) : "—"}
         </span>
       ),
     },
     {
       label: t("logs.detailCost"),
-      value: (
-        <span className="font-mono">
-          {detail.cost_usd > 0 ? `$${detail.cost_usd.toFixed(6)}` : "—"}
-        </span>
-      ),
+      value: <span className="font-mono">{formatCost(detail.cost_usd)}</span>,
     },
     { label: t("logs.detailStartedAt"), value: formatTime(detail.started_at) },
     {
       label: t("logs.detailFirstByteAt"),
       value: detail.first_byte_at ? formatTime(detail.first_byte_at) : "—",
     },
-    { label: t("logs.detailCompletedAt"), value: formatTime(detail.completed_at) },
+    {
+      label: t("logs.detailCompletedAt"),
+      value: formatTime(detail.completed_at),
+    },
     { label: t("logs.detailClientIP"), value: detail.client_ip || "—" },
-    { label: t("logs.detailUserAgent"), value: detail.user_agent || "—" },
+    {
+      label: t("logs.detailUserAgent"),
+      value: (
+        <span className="truncate" title={detail.user_agent}>
+          {detail.user_agent || "—"}
+        </span>
+      ),
+    },
   ];
 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{t("logs.detailTitle")}</DialogTitle>
-        <DialogDescription className="font-mono text-xs">{detail.id}</DialogDescription>
+        <DialogTitle className="flex items-center gap-2">
+          {t("logs.detailTitle")}
+          <StatusPill status={detail.status_code} />
+          {detail.is_stream && <StreamBadge />}
+        </DialogTitle>
+        <DialogDescription className="font-mono text-xs">
+          {detail.id}
+        </DialogDescription>
       </DialogHeader>
 
-      <div className="flex-1 overflow-y-auto -mx-6 px-6 space-y-5">
+      <div className="-mx-6 flex-1 space-y-5 overflow-y-auto px-6">
         {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
 
         {detail.error && (
@@ -524,10 +701,15 @@ function LogDetailPanel({
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t("logs.detailMetadata")}
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm md:grid-cols-2">
             {meta.map((m) => (
-              <div key={m.label} className="flex items-baseline justify-between gap-3 border-b border-border/40 py-1">
-                <span className="text-muted-foreground text-xs uppercase tracking-wider">{m.label}</span>
+              <div
+                key={m.label}
+                className="flex items-baseline justify-between gap-3 border-b border-border/40 py-1"
+              >
+                <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {m.label}
+                </span>
                 <span className="text-right">{m.value}</span>
               </div>
             ))}
@@ -545,6 +727,10 @@ function BodySection({ title, body }: { title: string; body: string }) {
   const { t } = useT();
   const [copied, setCopied] = useState(false);
   const pretty = useMemo(() => prettyJSON(body), [body]);
+  const byteLength = useMemo(
+    () => new TextEncoder().encode(body).length,
+    [body],
+  );
 
   async function copy() {
     try {
@@ -559,8 +745,13 @@ function BodySection({ title, body }: { title: string; body: string }) {
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {title}
+          {body && (
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono normal-case tracking-normal text-muted-foreground">
+              {formatBytes(byteLength)}
+            </span>
+          )}
         </h3>
         {body && (
           <Button variant="ghost" size="sm" onClick={copy}>
@@ -570,11 +761,13 @@ function BodySection({ title, body }: { title: string; body: string }) {
         )}
       </div>
       {body ? (
-        <pre className="rounded-md border border-border bg-muted/40 p-3 text-[12px] leading-relaxed font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-96">
+        <pre className="max-h-96 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 p-3 font-mono text-[12px] leading-relaxed">
           {pretty}
         </pre>
       ) : (
-        <div className="text-xs text-muted-foreground italic">{t("logs.detailNoBody")}</div>
+        <div className="text-xs italic text-muted-foreground">
+          {t("logs.detailNoBody")}
+        </div>
       )}
     </section>
   );

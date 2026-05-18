@@ -529,6 +529,13 @@ export const en = {
     "logs.detailNoBody": "(empty)",
     "logs.detailCopy": "Copy",
     "logs.detailCopied": "Copied",
+    "logs.detailBytes": "{size}",
+    "logs.timeJustNow": "just now",
+    "logs.timeMinutesAgo": "{n}m ago",
+    "logs.timeHoursAgo": "{n}h ago",
+    "logs.timeDaysAgo": "{n}d ago",
+    "logs.emptyHint": "Make a chat or messages call to see traffic show up here in real time.",
+    "logs.searchHint": "Press Enter to search",
   } as const;
 
 export type TranslationKey = keyof typeof en;
