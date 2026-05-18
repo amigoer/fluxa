@@ -37,11 +37,17 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rec := s.newRequestRecorder(r, "/v1/messages", body, peek.Model, peek.Stream, usageFromAnthropic)
+	defer rec.flush()
+	w = wrapRecording(w, rec)
+
 	keyID, err := s.authorize(r, peek.Model)
 	if err != nil {
+		rec.markError(err)
 		s.writeError(w, err)
 		return
 	}
+	rec.setKey(keyID)
 
 	// v2.4 pre-resolver: same pipeline as /v1/chat/completions. See
 	// chat.go for the full reasoning; in short the resolver may rewrite
@@ -49,6 +55,7 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 	// chain lookup runs.
 	target, _, err := s.router.ResolveModel(peek.Model)
 	if err != nil {
+		rec.markError(err)
 		s.writeError(w, err)
 		return
 	}
@@ -61,14 +68,18 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		chain, err = s.router.Resolve(peek.Model)
 	}
 	if err != nil {
+		rec.markError(err)
 		s.writeError(w, err)
 		return
 	}
+	rec.setResolvedModel(effectiveModel)
 
 	if effectiveModel != peek.Model {
 		body, err = rewriteModelField(body, effectiveModel)
 		if err != nil {
-			s.writeError(w, &provider.Error{Status: http.StatusInternalServerError, Message: "rewrite model: " + err.Error()})
+			pErr := &provider.Error{Status: http.StatusInternalServerError, Message: "rewrite model: " + err.Error()}
+			rec.markError(pErr)
+			s.writeError(w, pErr)
 			return
 		}
 	}
@@ -80,7 +91,9 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		switch result.Action {
 		case "block":
 			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
-			s.writeError(w, &provider.Error{Status: http.StatusForbidden, Message: "request blocked by DLP policy"})
+			pErr := &provider.Error{Status: http.StatusForbidden, Message: "request blocked by DLP policy"}
+			rec.markError(pErr)
+			s.writeError(w, pErr)
 			return
 		case "mask":
 			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
@@ -92,10 +105,10 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 
 	req := &provider.MessagesRequest{Model: effectiveModel, Raw: body}
 	if peek.Stream {
-		s.streamMessages(w, r, chain, req, keyID)
+		s.streamMessages(w, r, chain, req, keyID, rec)
 		return
 	}
-	s.nonStreamMessages(w, r, chain, req, keyID)
+	s.nonStreamMessages(w, r, chain, req, keyID, rec)
 }
 
 // firstMessagesProvider walks the resolved chain and returns the first
@@ -119,10 +132,12 @@ func firstMessagesProvider(chain []provider.Provider) (provider.MessagesProvider
 	return primary, fallbacks
 }
 
-func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.MessagesRequest, keyID string) {
+func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.MessagesRequest, keyID string, rec *requestRecorder) {
 	primary, fallbacks := firstMessagesProvider(chain)
 	if primary == nil {
-		s.writeError(w, &provider.Error{Status: http.StatusNotImplemented, Message: "no Anthropic-compatible provider configured for this model"})
+		pErr := &provider.Error{Status: http.StatusNotImplemented, Message: "no Anthropic-compatible provider configured for this model"}
+		rec.markError(pErr)
+		s.writeError(w, pErr)
 		return
 	}
 
@@ -138,7 +153,10 @@ func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain
 				switch result.Action {
 				case "block":
 					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
-					s.writeError(w, &provider.Error{Status: http.StatusForbidden, Message: "response blocked by DLP policy"})
+					pErr := &provider.Error{Status: http.StatusForbidden, Message: "response blocked by DLP policy"}
+					rec.setProvider(p.Name())
+					rec.markError(pErr)
+					s.writeError(w, pErr)
 					return
 				case "mask":
 					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
@@ -147,6 +165,7 @@ func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain
 					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
 				}
 			}
+			rec.setProvider(p.Name())
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Fluxa-Provider", p.Name())
 			_, _ = w.Write(raw)
@@ -155,6 +174,8 @@ func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain
 		}
 		lastErr = err
 		if !isRetryable(err) {
+			rec.setProvider(p.Name())
+			rec.markError(err)
 			s.writeError(w, err)
 			return
 		}
@@ -163,19 +184,24 @@ func (s *Server) nonStreamMessages(w http.ResponseWriter, r *http.Request, chain
 	if lastErr == nil {
 		lastErr = fmt.Errorf("no providers available")
 	}
+	rec.markError(lastErr)
 	s.writeError(w, lastErr)
 }
 
-func (s *Server) streamMessages(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.MessagesRequest, keyID string) {
-	_ = keyID // streaming usage accounting is deferred; rate limits still apply.
+func (s *Server) streamMessages(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.MessagesRequest, keyID string, rec *requestRecorder) {
+	_ = keyID // streaming usage accounting is still TODO; request_log row is recorded regardless.
 	primary, fallbacks := firstMessagesProvider(chain)
 	if primary == nil {
-		s.writeError(w, &provider.Error{Status: http.StatusNotImplemented, Message: "no Anthropic-compatible provider configured for this model"})
+		pErr := &provider.Error{Status: http.StatusNotImplemented, Message: "no Anthropic-compatible provider configured for this model"}
+		rec.markError(pErr)
+		s.writeError(w, pErr)
 		return
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		s.writeError(w, &provider.Error{Status: http.StatusInternalServerError, Message: "streaming unsupported by server"})
+		pErr := &provider.Error{Status: http.StatusInternalServerError, Message: "streaming unsupported by server"}
+		rec.markError(pErr)
+		s.writeError(w, pErr)
 		return
 	}
 
@@ -194,6 +220,8 @@ func (s *Server) streamMessages(w http.ResponseWriter, r *http.Request, chain []
 		}
 		lastErr = err
 		if !isRetryable(err) {
+			rec.setProvider(p.Name())
+			rec.markError(err)
 			s.writeError(w, err)
 			return
 		}
@@ -203,10 +231,12 @@ func (s *Server) streamMessages(w http.ResponseWriter, r *http.Request, chain []
 		if lastErr == nil {
 			lastErr = fmt.Errorf("no providers available")
 		}
+		rec.markError(lastErr)
 		s.writeError(w, lastErr)
 		return
 	}
 
+	rec.setProvider(active.Name())
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -218,6 +248,7 @@ func (s *Server) streamMessages(w http.ResponseWriter, r *http.Request, chain []
 	for event := range stream {
 		if event.Err != nil {
 			s.logger.Warn("messages stream aborted", "provider", active.Name(), "err", event.Err)
+			rec.markError(event.Err)
 			fmt.Fprintf(w, "event: error\ndata: {\"error\":{\"message\":%q}}\n\n", event.Err.Error())
 			flusher.Flush()
 			return

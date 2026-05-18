@@ -37,11 +37,20 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// From this point on the request is well-formed enough to be worth
+	// logging. The recorder is wired up before authorize/resolver/DLP
+	// so every early-exit code path still produces a request_logs row.
+	rec := s.newRequestRecorder(r, "/v1/chat/completions", body, peek.Model, peek.Stream, usageFromOpenAI)
+	defer rec.flush()
+	w = wrapRecording(w, rec)
+
 	keyID, err := s.authorize(r, peek.Model)
 	if err != nil {
+		rec.markError(err)
 		s.writeError(w, err)
 		return
 	}
+	rec.setKey(keyID)
 
 	// Pre-resolver: virtual_models / regex_models can rewrite the
 	// incoming model name (and optionally pin a provider) before the
@@ -49,6 +58,7 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	// declined to intervene and we should use peek.Model verbatim.
 	target, _, err := s.router.ResolveModel(peek.Model)
 	if err != nil {
+		rec.markError(err)
 		s.writeError(w, err)
 		return
 	}
@@ -61,9 +71,11 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		chain, err = s.router.Resolve(peek.Model)
 	}
 	if err != nil {
+		rec.markError(err)
 		s.writeError(w, err)
 		return
 	}
+	rec.setResolvedModel(effectiveModel)
 
 	// Rewrite the request body so the upstream sees the resolved model
 	// name. We only touch the "model" field — every other field stays
@@ -72,7 +84,9 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if effectiveModel != peek.Model {
 		body, err = rewriteModelField(body, effectiveModel)
 		if err != nil {
-			s.writeError(w, &provider.Error{Status: http.StatusInternalServerError, Message: "rewrite model: " + err.Error()})
+			pErr := &provider.Error{Status: http.StatusInternalServerError, Message: "rewrite model: " + err.Error()}
+			rec.markError(pErr)
+			s.writeError(w, pErr)
 			return
 		}
 	}
@@ -84,7 +98,9 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		switch result.Action {
 		case "block":
 			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
-			s.writeError(w, &provider.Error{Status: http.StatusForbidden, Message: "request blocked by DLP policy"})
+			pErr := &provider.Error{Status: http.StatusForbidden, Message: "request blocked by DLP policy"}
+			rec.markError(pErr)
+			s.writeError(w, pErr)
 			return
 		case "mask":
 			go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, effectiveModel, "request")
@@ -101,14 +117,14 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if peek.Stream {
-		s.streamChat(w, r, chain, req, keyID)
+		s.streamChat(w, r, chain, req, keyID, rec)
 		return
 	}
-	s.nonStreamChat(w, r, chain, req, keyID)
+	s.nonStreamChat(w, r, chain, req, keyID, rec)
 }
 
 // nonStreamChat walks the fallback chain for a buffered chat completion.
-func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.ChatRequest, keyID string) {
+func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.ChatRequest, keyID string, rec *requestRecorder) {
 	started := time.Now()
 	var lastErr error
 	for _, p := range chain {
@@ -122,7 +138,10 @@ func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []p
 				switch result.Action {
 				case "block":
 					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
-					s.writeError(w, &provider.Error{Status: http.StatusForbidden, Message: "response blocked by DLP policy"})
+					pErr := &provider.Error{Status: http.StatusForbidden, Message: "response blocked by DLP policy"}
+					rec.setProvider(p.Name())
+					rec.markError(pErr)
+					s.writeError(w, pErr)
 					return
 				case "mask":
 					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
@@ -131,6 +150,7 @@ func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []p
 					go s.dlpEngine.RecordViolations(context.Background(), result.Violations, keyID, req.Model, "response")
 				}
 			}
+			rec.setProvider(p.Name())
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Fluxa-Provider", p.Name())
 			_, _ = w.Write(raw)
@@ -140,6 +160,8 @@ func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []p
 		lastErr = err
 		if !isRetryable(err) {
 			s.logger.Warn("chat completion failed, no fallback", "provider", p.Name(), "err", err)
+			rec.setProvider(p.Name())
+			rec.markError(err)
 			s.writeError(w, err)
 			return
 		}
@@ -148,17 +170,20 @@ func (s *Server) nonStreamChat(w http.ResponseWriter, r *http.Request, chain []p
 	if lastErr == nil {
 		lastErr = fmt.Errorf("no providers available")
 	}
+	rec.markError(lastErr)
 	s.writeError(w, lastErr)
 }
 
 // streamChat walks the fallback chain for a streaming chat completion. Once
 // the first byte is flushed to the client we can no longer fall back, so
 // retries only happen before ChatStream returns successfully.
-func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.ChatRequest, keyID string) {
-	_ = keyID // streaming usage accounting is handled at the final chunk via TODO; see nonStreamChat for the buffered path.
+func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, chain []provider.Provider, req *provider.ChatRequest, keyID string, rec *requestRecorder) {
+	_ = keyID // streaming usage accounting is still TODO; see nonStreamChat for the buffered path. The request_log row captures the call regardless.
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		s.writeError(w, &provider.Error{Status: http.StatusInternalServerError, Message: "streaming unsupported by server"})
+		pErr := &provider.Error{Status: http.StatusInternalServerError, Message: "streaming unsupported by server"}
+		rec.markError(pErr)
+		s.writeError(w, pErr)
 		return
 	}
 
@@ -176,6 +201,8 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, chain []prov
 		}
 		lastErr = err
 		if !isRetryable(err) {
+			rec.setProvider(p.Name())
+			rec.markError(err)
 			s.writeError(w, err)
 			return
 		}
@@ -185,10 +212,12 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, chain []prov
 		if lastErr == nil {
 			lastErr = fmt.Errorf("no providers available")
 		}
+		rec.markError(lastErr)
 		s.writeError(w, lastErr)
 		return
 	}
 
+	rec.setProvider(active.Name())
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -200,6 +229,7 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, chain []prov
 	for event := range stream {
 		if event.Err != nil {
 			s.logger.Warn("stream aborted by upstream", "provider", active.Name(), "err", event.Err)
+			rec.markError(event.Err)
 			// Emit an SSE error frame the client can parse; we cannot
 			// change the HTTP status at this point.
 			fmt.Fprintf(w, "data: {\"error\":{\"message\":%q}}\n\n", event.Err.Error())
