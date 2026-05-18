@@ -98,6 +98,9 @@ func (a *AdminServer) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/usage", a.requireAuth(a.listUsage))
 	mux.HandleFunc("GET /admin/usage/summary", a.requireAuth(a.usageSummary))
 
+	mux.HandleFunc("GET /admin/logs", a.requireAuth(a.listRequestLogs))
+	mux.HandleFunc("GET /admin/logs/{id}", a.requireAuth(a.getRequestLog))
+
 	mux.HandleFunc("GET /admin/config/export", a.requireAuth(a.exportConfig))
 	mux.HandleFunc("POST /admin/config/import", a.requireAuth(a.importConfig))
 
