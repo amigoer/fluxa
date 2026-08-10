@@ -2,9 +2,14 @@
 #
 # Targets are intentionally thin wrappers around the Go toolchain so the
 # same commands work locally, in CI, and inside Docker builds. The build
-# and run targets also compile the React admin dashboard first so the
-# resulting binary serves a ready-to-use admin UI at the root URL — one
-# command, no separate npm step.
+# and run targets also compile the admin dashboard first so the resulting
+# binary serves a ready-to-use admin UI at the root URL — one command, no
+# separate npm step.
+#
+# The dashboard front-end has been removed pending a rewrite. Until a new
+# web/package.json exists the dashboard steps are skipped and the binary
+# serves the placeholder page baked into web/embed.go; once the new
+# front-end lands the npm build wires itself back up automatically.
 
 BINARY  ?= fluxa
 PKG     ?= ./cmd/fluxa
@@ -16,7 +21,11 @@ LDFLAGS := -s -w -X main.Version=$(VERSION)
 # every file manually.
 WEB_SRC := $(shell find web/src web/index.html web/package.json web/vite.config.ts web/tailwind.config.js web/postcss.config.js web/tsconfig.json 2>/dev/null)
 
-.PHONY: build run web web-clean test vet fmt tidy clean clean-all docker help
+# Empty while no front-end exists, which turns `make web` into a no-op
+# instead of a hard failure on the missing web/package.json prerequisite.
+WEB_TARGET := $(if $(wildcard web/package.json),web/dist/.built,)
+
+.PHONY: build run web web-clean test test-db vet fmt tidy clean clean-all docker help
 
 help: ## show this help
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -30,7 +39,9 @@ run: web ## build dashboard then run fluxa from env vars
 
 # web is a phony alias for the real dist artefact so callers can type
 # `make web` without caring about the file path.
-web: web/dist/.built ## build the embedded React admin dashboard
+web: $(WEB_TARGET) ## build the embedded admin dashboard (skipped when absent)
+	@test -n "$(WEB_TARGET)" || \
+	  echo ">> no web/package.json — skipping dashboard build"
 
 # The real build target: a sentinel file inside web/dist. Make rebuilds
 # it whenever any of the front-end sources are newer, and skips the
@@ -61,9 +72,22 @@ web/node_modules/.install-stamp: web/package.json
 
 web-clean: ## remove the dashboard build output and node_modules
 	rm -rf web/dist web/node_modules
+	@# dist/ must stay non-empty for the go:embed directive in embed.go.
+	@mkdir -p web/dist && touch web/dist/.gitkeep
 
-test: ## run unit tests
+# Database-backed tests need a Postgres server; they skip when
+# FLUXA_TEST_DATABASE_URL is unset, so `make test` is still meaningful
+# without one. See internal/testdb.
+test: ## run unit tests (set FLUXA_TEST_DATABASE_URL to include db tests)
 	go test ./...
+
+test-db: ## run the full suite against a throwaway Postgres in docker
+	docker run -d --rm --name fluxa-pg-test \
+	  -e POSTGRES_USER=fluxa -e POSTGRES_PASSWORD=fluxa -e POSTGRES_DB=fluxa_test \
+	  -p 5433:5432 postgres:16-alpine >/dev/null
+	@until docker exec fluxa-pg-test pg_isready -U fluxa -d fluxa_test >/dev/null 2>&1; do sleep 1; done
+	-FLUXA_TEST_DATABASE_URL="postgres://fluxa:fluxa@localhost:5433/fluxa_test?sslmode=disable" go test ./...
+	docker stop fluxa-pg-test >/dev/null
 
 vet: ## run go vet
 	go vet ./...

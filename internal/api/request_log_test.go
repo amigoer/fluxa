@@ -3,20 +3,20 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/amigoer/fluxa/internal/config"
 	"github.com/amigoer/fluxa/internal/router"
 	"github.com/amigoer/fluxa/internal/store"
+	"github.com/amigoer/fluxa/internal/testdb"
 )
 
 // newTestServerWithStore boots a Server with a real on-disk store so
 // request_log inserts can be inspected after the handler runs.
 func newTestServerWithStore(t *testing.T, upstream *httptest.Server) (*Server, *store.Store) {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "fluxa.db"))
+	st, err := store.Open(t.Context(), testdb.New(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

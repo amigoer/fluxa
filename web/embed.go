@@ -1,17 +1,16 @@
 // Package web serves the embedded admin dashboard.
 //
-// The React bundle under web/src is built with Vite into web/dist and
-// embedded directly into the Go binary so Fluxa keeps its single-file
-// deployment story — operators download one executable and get both
-// the gateway and the admin UI. `make build` and `make run` compile
-// the dashboard automatically, so normal workflows produce a binary
-// that already serves the real SPA at the root URL.
+// The dashboard front-end is built into web/dist and embedded directly
+// into the Go binary so Fluxa keeps its single-file deployment story —
+// operators download one executable and get both the gateway and the
+// admin UI. `make build` and `make run` compile the dashboard
+// automatically when a front-end is present under web/.
 //
-// The repository keeps an empty web/dist/.gitkeep so the embed
-// directive matches at least one file even on a brand-new clone that
-// has not built the dashboard yet. In that case the handler falls
-// back to an inline HTML stub that tells the operator how to build
-// the real bundle — the gateway itself still starts normally.
+// The previous React dashboard was removed pending a rewrite, so right
+// now web/dist holds only the tracked .gitkeep placeholder that keeps
+// the embed directive matching at least one file. With no index.html to
+// serve, the handler falls back to an inline HTML stub — the gateway
+// and the /admin REST API run normally regardless.
 //
 // Routing: the handler falls back to index.html on any path that does
 // not map to a file in dist/, which is the standard single-page-app
@@ -66,15 +65,16 @@ func serveIndex(w http.ResponseWriter, index []byte) {
 	_, _ = w.Write(index)
 }
 
-// fallbackIndex is served when web/dist contains no index.html — which
-// only happens on a fresh clone that has not run `make build` yet.
-// The page is intentionally self-contained (no external assets) so it
-// renders correctly even when embedded into a stripped binary.
+// fallbackIndex is served when web/dist contains no index.html — the
+// case while the dashboard front-end is being rewritten, and on a fresh
+// clone that has not run `make build` yet. The page is intentionally
+// self-contained (no external assets) so it renders correctly even when
+// embedded into a stripped binary.
 const fallbackIndex = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Fluxa admin — dashboard not built</title>
+    <title>Fluxa admin — dashboard unavailable</title>
     <style>
       body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
              max-width: 40rem; margin: 4rem auto; padding: 0 1rem;
@@ -88,15 +88,16 @@ const fallbackIndex = `<!doctype html>
   <body>
     <h1>Fluxa admin dashboard</h1>
     <p class="hint">No compiled bundle found in the embedded filesystem.</p>
-    <p>Rebuild the binary with the dashboard included:</p>
-    <pre><code>make build</code></pre>
     <p>
-      This will run <code>npm install &amp;&amp; npm run build</code> inside
-      <code>web/</code> and then recompile the Go binary so the React SPA
-      ends up embedded at the root URL. The admin REST API under
-      <code>/admin/*</code> is already live on this port — the React UI
-      is just a client on top of it.
+      The dashboard front-end has been removed and is being rewritten, so
+      no UI is embedded in this binary. The admin REST API under
+      <code>/admin/*</code> is live on this port and fully usable in the
+      meantime — the dashboard is only a client on top of it.
     </p>
+    <p>
+      Once a front-end exists under <code>web/</code>, rebuild with
+      <code>make build</code> to embed it at the root URL:
+    </p>
+    <pre><code>make build</code></pre>
   </body>
 </html>`
-

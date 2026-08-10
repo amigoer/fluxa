@@ -3,14 +3,17 @@ package store
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
+
+	"github.com/amigoer/fluxa/internal/testdb"
 )
 
+// newTestStore opens a Store against a private schema on the Postgres
+// instance named by FLUXA_TEST_DATABASE_URL, skipping when none is
+// configured. See internal/testdb.
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	dbPath := filepath.Join(t.TempDir(), "fluxa.db")
-	s, err := Open(dbPath)
+	s, err := Open(t.Context(), testdb.New(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -131,19 +134,23 @@ func TestRouteCRUD(t *testing.T) {
 	}
 }
 
+// Reopening the same database must re-run the migrations without
+// error and without touching existing rows — every process restart
+// takes that path.
 func TestMigrateIsIdempotent(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "fluxa.db")
-	s1, err := Open(dbPath)
+	cfg := testdb.New(t)
+	ctx := t.Context()
+
+	s1, err := Open(ctx, cfg)
 	if err != nil {
 		t.Fatalf("open 1: %v", err)
 	}
-	ctx := context.Background()
 	if err := s1.UpsertProvider(ctx, Provider{Name: "openai", Kind: "openai", APIKey: "k", Enabled: true}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	_ = s1.Close()
 
-	s2, err := Open(dbPath)
+	s2, err := Open(ctx, cfg)
 	if err != nil {
 		t.Fatalf("open 2: %v", err)
 	}

@@ -36,8 +36,8 @@ type loginRequest struct {
 // loginResponse returns the freshly minted token + user info so the
 // dashboard can stash both in one round trip.
 type loginResponse struct {
-	Token     string `json:"token"`
-	ExpiresAt string `json:"expires_at"`
+	Token     string  `json:"token"`
+	ExpiresAt string  `json:"expires_at"`
 	User      userDTO `json:"user"`
 }
 
@@ -198,7 +198,7 @@ func (a *AdminServer) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 		writeAdminError(w, http.StatusBadRequest, "failed to parse upload: "+err.Error())
 		return
 	}
-	
+
 	file, header, err := r.FormFile("avatar")
 	if err != nil {
 		writeAdminError(w, http.StatusBadRequest, "missing 'avatar' field in form")

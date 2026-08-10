@@ -53,11 +53,11 @@ type UsageRecord struct {
 
 // UsageTotals aggregates usage over a time window for a single virtual key.
 type UsageTotals struct {
-	Tokens   int64
-	PromptTokens int64
+	Tokens           int64
+	PromptTokens     int64
 	CompletionTokens int64
-	CostUSD  float64
-	Requests int64
+	CostUSD          float64
+	Requests         int64
 }
 
 // -- virtual key CRUD --------------------------------------------------
@@ -92,7 +92,7 @@ func (s *Store) GetVirtualKey(ctx context.Context, id string) (VirtualKey, error
 		       budget_tokens_daily, budget_tokens_monthly,
 		       budget_usd_daily, budget_usd_monthly, rpm_limit,
 		       enabled, expires_at, created_at, updated_at
-		FROM virtual_keys WHERE id = ?`, id)
+		FROM virtual_keys WHERE id = $1`, id)
 	vk, err := scanVirtualKey(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return VirtualKey{}, ErrNotFound
@@ -107,9 +107,9 @@ func (s *Store) UpsertVirtualKey(ctx context.Context, vk VirtualKey) error {
 	}
 	models, _ := json.Marshal(nilSlice(vk.Models))
 	ips, _ := json.Marshal(nilSlice(vk.IPAllowlist))
-	var expires any
+	var expires sql.NullTime
 	if vk.ExpiresAt != nil {
-		expires = vk.ExpiresAt.UTC()
+		expires = sql.NullTime{Time: vk.ExpiresAt.UTC(), Valid: true}
 	}
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO virtual_keys (
@@ -117,8 +117,8 @@ func (s *Store) UpsertVirtualKey(ctx context.Context, vk VirtualKey) error {
 			budget_tokens_daily, budget_tokens_monthly,
 			budget_usd_daily, budget_usd_monthly, rpm_limit,
 			enabled, expires_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(id) DO UPDATE SET
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
+		ON CONFLICT (id) DO UPDATE SET
 			name                  = excluded.name,
 			description           = excluded.description,
 			models                = excluded.models,
@@ -134,13 +134,13 @@ func (s *Store) UpsertVirtualKey(ctx context.Context, vk VirtualKey) error {
 		vk.ID, vk.Name, vk.Description, string(models), string(ips),
 		vk.BudgetTokensDaily, vk.BudgetTokensMonthly,
 		vk.BudgetUSDDaily, vk.BudgetUSDMonthly, vk.RPMLimit,
-		boolToInt(vk.Enabled), expires)
+		vk.Enabled, expires)
 	return err
 }
 
 // DeleteVirtualKey cascades to any linked usage_records rows via the FK.
 func (s *Store) DeleteVirtualKey(ctx context.Context, id string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM virtual_keys WHERE id = ?`, id)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM virtual_keys WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (s *Store) InsertUsage(ctx context.Context, u UsageRecord) error {
 			virtual_key_id, ts, model, provider,
 			prompt_tokens, completion_tokens, total_tokens,
 			cost_usd, latency_ms, status
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		u.VirtualKeyID, u.Ts.UTC(), u.Model, u.Provider,
 		u.PromptTokens, u.CompletionTokens, u.TotalTokens,
 		u.CostUSD, u.LatencyMs, u.Status)
@@ -179,7 +179,7 @@ func (s *Store) SumUsage(ctx context.Context, keyID string, from, to time.Time) 
 			COALESCE(SUM(cost_usd), 0),
 			COUNT(*)
 		FROM usage_records
-		WHERE virtual_key_id = ? AND ts >= ? AND ts <= ?`,
+		WHERE virtual_key_id = $1 AND ts >= $2 AND ts <= $3`,
 		keyID, from.UTC(), to.UTC())
 	var t UsageTotals
 	if err := row.Scan(&t.Tokens, &t.PromptTokens, &t.CompletionTokens, &t.CostUSD, &t.Requests); err != nil {
@@ -203,14 +203,14 @@ func (s *Store) RecentUsage(ctx context.Context, keyID string, limit int) ([]Usa
 			SELECT id, virtual_key_id, ts, model, provider,
 			       prompt_tokens, completion_tokens, total_tokens,
 			       cost_usd, latency_ms, status
-			FROM usage_records ORDER BY ts DESC LIMIT ?`, limit)
+			FROM usage_records ORDER BY ts DESC LIMIT $1`, limit)
 	} else {
 		rows, err = s.db.QueryContext(ctx, `
 			SELECT id, virtual_key_id, ts, model, provider,
 			       prompt_tokens, completion_tokens, total_tokens,
 			       cost_usd, latency_ms, status
-			FROM usage_records WHERE virtual_key_id = ?
-			ORDER BY ts DESC LIMIT ?`, keyID, limit)
+			FROM usage_records WHERE virtual_key_id = $1
+			ORDER BY ts DESC LIMIT $2`, keyID, limit)
 	}
 	if err != nil {
 		return nil, err
@@ -233,27 +233,25 @@ func (s *Store) RecentUsage(ctx context.Context, keyID string, limit int) ([]Usa
 
 func scanVirtualKey(sc scanner) (VirtualKey, error) {
 	var (
-		vk                    VirtualKey
-		models, ips           string
-		enabledInt            int
-		expiresAt             sql.NullTime
-		createdAt, updatedAt  time.Time
+		vk                   VirtualKey
+		models, ips          []byte
+		expiresAt            sql.NullTime
+		createdAt, updatedAt time.Time
 	)
 	if err := sc.Scan(
 		&vk.ID, &vk.Name, &vk.Description, &models, &ips,
 		&vk.BudgetTokensDaily, &vk.BudgetTokensMonthly,
 		&vk.BudgetUSDDaily, &vk.BudgetUSDMonthly, &vk.RPMLimit,
-		&enabledInt, &expiresAt, &createdAt, &updatedAt,
+		&vk.Enabled, &expiresAt, &createdAt, &updatedAt,
 	); err != nil {
 		return VirtualKey{}, fmt.Errorf("store: scan virtual_key: %w", err)
 	}
-	if models != "" {
-		_ = json.Unmarshal([]byte(models), &vk.Models)
+	if len(models) > 0 {
+		_ = json.Unmarshal(models, &vk.Models)
 	}
-	if ips != "" {
-		_ = json.Unmarshal([]byte(ips), &vk.IPAllowlist)
+	if len(ips) > 0 {
+		_ = json.Unmarshal(ips, &vk.IPAllowlist)
 	}
-	vk.Enabled = enabledInt != 0
 	if expiresAt.Valid {
 		t := expiresAt.Time
 		vk.ExpiresAt = &t

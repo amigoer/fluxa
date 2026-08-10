@@ -1,7 +1,6 @@
 // bootstrap.go bridges the persistent store rows and the in-memory
-// config.ProviderConfig / config.RouteConfig types consumed by the router.
-// It also exposes the Import entry point used by the admin YAML import
-// endpoint to replay a Bundle into the database.
+// config.ProviderConfig / config.RouteConfig types consumed by the
+// router.
 
 package store
 
@@ -57,9 +56,8 @@ func ToConfigRoutes(rows []Route) []config.RouteConfig {
 	return out
 }
 
-// FromConfigProvider is the inverse of ToConfigProviders for a single row.
-// It is used by the admin API ingest path and by Import when replaying a
-// YAML bundle.
+// FromConfigProvider is the inverse of ToConfigProviders for a single
+// row. It is used by the admin API ingest path.
 func FromConfigProvider(pc config.ProviderConfig) Provider {
 	return Provider{
 		Name:         pc.Name,
@@ -86,25 +84,6 @@ func FromConfigRoute(rc config.RouteConfig) Route {
 		Provider: rc.Provider,
 		Fallback: rc.Fallback,
 	}
-}
-
-// Import upserts every provider and route from a YAML bundle into the
-// store unconditionally. Unlike the old SeedIfEmpty flow it never inspects
-// the current row count: operators who hit /admin/config/import explicitly
-// asked for the incoming document to win. Existing rows not mentioned in
-// the bundle are left alone so imports can be additive.
-func (s *Store) Import(ctx context.Context, providers []config.ProviderConfig, routes []config.RouteConfig) error {
-	for _, pc := range providers {
-		if err := s.UpsertProvider(ctx, FromConfigProvider(pc)); err != nil {
-			return err
-		}
-	}
-	for _, rc := range routes {
-		if err := s.UpsertRoute(ctx, FromConfigRoute(rc)); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // LoadRouterInputs fetches the enabled providers and all routes from the

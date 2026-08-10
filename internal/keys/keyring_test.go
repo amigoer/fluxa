@@ -2,17 +2,16 @@ package keys
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/amigoer/fluxa/internal/store"
+	"github.com/amigoer/fluxa/internal/testdb"
 )
 
 func newRing(t *testing.T) (*Keyring, *store.Store) {
 	t.Helper()
-	dbPath := filepath.Join(t.TempDir(), "fluxa.db")
-	s, err := store.Open(dbPath)
+	s, err := store.Open(t.Context(), testdb.New(t))
 	if err != nil {
 		t.Fatalf("store open: %v", err)
 	}

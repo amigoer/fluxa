@@ -5,17 +5,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	"github.com/amigoer/fluxa/internal/router"
 	"github.com/amigoer/fluxa/internal/store"
+	"github.com/amigoer/fluxa/internal/testdb"
 )
 
 func newAdminFixture(t *testing.T) (*http.ServeMux, *store.Store, string) {
 	t.Helper()
-	dbPath := filepath.Join(t.TempDir(), "fluxa.db")
-	st, err := store.Open(dbPath)
+	st, err := store.Open(t.Context(), testdb.New(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -163,8 +162,7 @@ func TestAdmin_RouteCreateReloadsRouter(t *testing.T) {
 }
 
 func TestAdmin_LoginFlow(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "fluxa.db")
-	st, err := store.Open(dbPath)
+	st, err := store.Open(t.Context(), testdb.New(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

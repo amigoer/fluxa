@@ -56,18 +56,14 @@ func (s *Store) ListDLPRules(ctx context.Context) ([]DLPRule, error) {
 
 	var out []DLPRule
 	for rows.Next() {
-		var (
-			r          DLPRule
-			enabledInt int
-		)
+		var r DLPRule
 		if err := rows.Scan(
 			&r.ID, &r.Name, &r.Pattern, &r.PatternType, &r.Scope, &r.Action,
-			&r.Priority, &r.ModelPattern, &r.Description, &enabledInt,
+			&r.Priority, &r.ModelPattern, &r.Description, &r.Enabled,
 			&r.CreatedAt, &r.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
-		r.Enabled = enabledInt == 1
 		out = append(out, r)
 	}
 	return out, rows.Err()
@@ -75,17 +71,14 @@ func (s *Store) ListDLPRules(ctx context.Context) ([]DLPRule, error) {
 
 // GetDLPRule loads one row by id.
 func (s *Store) GetDLPRule(ctx context.Context, id string) (DLPRule, error) {
-	var (
-		r          DLPRule
-		enabledInt int
-	)
+	var r DLPRule
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, pattern, pattern_type, scope, action, priority,
 		       model_pattern, description, enabled, created_at, updated_at
-		FROM dlp_rules WHERE id = ?`, id)
+		FROM dlp_rules WHERE id = $1`, id)
 	if err := row.Scan(
 		&r.ID, &r.Name, &r.Pattern, &r.PatternType, &r.Scope, &r.Action,
-		&r.Priority, &r.ModelPattern, &r.Description, &enabledInt,
+		&r.Priority, &r.ModelPattern, &r.Description, &r.Enabled,
 		&r.CreatedAt, &r.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -93,7 +86,6 @@ func (s *Store) GetDLPRule(ctx context.Context, id string) (DLPRule, error) {
 		}
 		return DLPRule{}, err
 	}
-	r.Enabled = enabledInt == 1
 	return r, nil
 }
 
@@ -139,9 +131,9 @@ func (s *Store) CreateDLPRule(ctx context.Context, r DLPRule) (DLPRule, error) {
 		INSERT INTO dlp_rules (
 			id, name, pattern, pattern_type, scope, action, priority,
 			model_pattern, description, enabled, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
 		r.ID, r.Name, r.Pattern, r.PatternType, r.Scope, r.Action,
-		r.Priority, r.ModelPattern, r.Description, boolToInt(r.Enabled)); err != nil {
+		r.Priority, r.ModelPattern, r.Description, r.Enabled); err != nil {
 		return DLPRule{}, err
 	}
 	return s.GetDLPRule(ctx, r.ID)
@@ -157,19 +149,19 @@ func (s *Store) UpdateDLPRule(ctx context.Context, r DLPRule) (DLPRule, error) {
 	}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE dlp_rules SET
-			name          = ?,
-			pattern       = ?,
-			pattern_type  = ?,
-			scope         = ?,
-			action        = ?,
-			priority      = ?,
-			model_pattern = ?,
-			description   = ?,
-			enabled       = ?,
+			name          = $1,
+			pattern       = $2,
+			pattern_type  = $3,
+			scope         = $4,
+			action        = $5,
+			priority      = $6,
+			model_pattern = $7,
+			description   = $8,
+			enabled       = $9,
 			updated_at    = CURRENT_TIMESTAMP
-		WHERE id = ?`,
+		WHERE id = $10`,
 		r.Name, r.Pattern, r.PatternType, r.Scope, r.Action,
-		r.Priority, r.ModelPattern, r.Description, boolToInt(r.Enabled), r.ID)
+		r.Priority, r.ModelPattern, r.Description, r.Enabled, r.ID)
 	if err != nil {
 		return DLPRule{}, err
 	}
@@ -182,8 +174,8 @@ func (s *Store) UpdateDLPRule(ctx context.Context, r DLPRule) (DLPRule, error) {
 // UpdateDLPRulePriority is the narrow path for drag-and-drop reordering.
 func (s *Store) UpdateDLPRulePriority(ctx context.Context, id string, priority int) error {
 	res, err := s.db.ExecContext(ctx, `
-		UPDATE dlp_rules SET priority = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`, priority, id)
+		UPDATE dlp_rules SET priority = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2`, priority, id)
 	if err != nil {
 		return err
 	}
@@ -195,7 +187,7 @@ func (s *Store) UpdateDLPRulePriority(ctx context.Context, id string, priority i
 
 // DeleteDLPRule removes one row by id.
 func (s *Store) DeleteDLPRule(ctx context.Context, id string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM dlp_rules WHERE id = ?`, id)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM dlp_rules WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}
@@ -218,7 +210,7 @@ func (s *Store) InsertDLPViolation(ctx context.Context, v DLPViolation) error {
 		INSERT INTO dlp_violations (
 			rule_id, rule_name, key_id, model, direction,
 			matched_text, action_taken, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
 		v.RuleID, v.RuleName, v.KeyID, v.Model, v.Direction,
 		text, v.ActionTaken)
 	return err
@@ -235,7 +227,7 @@ func (s *Store) ListDLPViolations(ctx context.Context, limit, offset int, ruleID
 	var total int
 	if ruleID != "" {
 		err := s.db.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM dlp_violations WHERE rule_id = ?`, ruleID).Scan(&total)
+			`SELECT COUNT(*) FROM dlp_violations WHERE rule_id = $1`, ruleID).Scan(&total)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -256,14 +248,14 @@ func (s *Store) ListDLPViolations(ctx context.Context, limit, offset int, ruleID
 		rows, err = s.db.QueryContext(ctx, `
 			SELECT id, rule_id, rule_name, key_id, model, direction,
 			       matched_text, action_taken, created_at
-			FROM dlp_violations WHERE rule_id = ?
-			ORDER BY created_at DESC LIMIT ? OFFSET ?`, ruleID, limit, offset)
+			FROM dlp_violations WHERE rule_id = $1
+			ORDER BY created_at DESC LIMIT $2 OFFSET $3`, ruleID, limit, offset)
 	} else {
 		rows, err = s.db.QueryContext(ctx, `
 			SELECT id, rule_id, rule_name, key_id, model, direction,
 			       matched_text, action_taken, created_at
 			FROM dlp_violations
-			ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
+			ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
 	}
 	if err != nil {
 		return nil, 0, err

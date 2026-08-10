@@ -1,17 +1,15 @@
 // Package main is the entrypoint for the Fluxa AI gateway binary.
 //
 // The binary is intentionally tiny: it reads its runtime configuration
-// from environment variables, opens the SQLite store that holds
-// providers, routes, and virtual keys, wires up the router plus admin
-// REST surface, and starts the HTTP server. Every piece of real logic
-// lives under internal/ so other entrypoints (CLI, tests, embedded
-// library use) can compose the same building blocks.
+// from environment variables, connects to the Postgres database that
+// holds providers, routes, and virtual keys, wires up the router plus
+// admin REST surface, and starts the HTTP server. Every piece of real
+// logic lives under internal/ so other entrypoints (CLI, tests,
+// embedded library use) can compose the same building blocks.
 //
-// Starting with v2.1 there is no YAML file on the startup path. The
-// `fluxa` binary boots on a fresh box with zero files — operators
-// configure providers through the dashboard at / or the /admin REST
-// API, and can still round-trip the full state as YAML through the
-// /admin/config/export and /admin/config/import endpoints.
+// There is no configuration file. The only thing an operator must
+// supply is a Postgres connection; every provider, route and key is
+// created at runtime through the /admin REST API.
 package main
 
 import (
@@ -61,15 +59,22 @@ func main() {
 	logger := newLogger(cfg.Logging.Level)
 	slog.SetDefault(logger)
 
-	// Open the SQLite-backed config store. Providers, routes, virtual
-	// keys and usage rows all live here so operators can mutate them
-	// through the admin API without restarting the process.
-	st, err := store.Open(cfg.Database.Path)
+	// Connect to Postgres and apply migrations. Providers, routes,
+	// virtual keys and usage rows all live here so operators can mutate
+	// them through the admin API without restarting the process.
+	//
+	// The connect gets its own timeout: a database that is still booting
+	// (the common case under docker-compose) should fail with a clear
+	// error rather than hang the process forever.
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	st, err := store.Open(dbCtx, cfg.Database)
+	dbCancel()
 	if err != nil {
-		logger.Error("open store", "path", cfg.Database.Path, "err", err)
+		logger.Error("open store", "dsn", cfg.Database.Redacted(), "err", err)
 		os.Exit(1)
 	}
 	defer st.Close()
+	logger.Info("database ready", "dsn", cfg.Database.Redacted())
 
 	provs, routes, err := st.LoadRouterInputs(context.Background())
 	if err != nil {

@@ -47,8 +47,8 @@ func userFromContext(r *http.Request) (store.AdminUser, bool) {
 type AdminServer struct {
 	router    *router.Router
 	store     *store.Store
-	keyring   *keys.Keyring   // optional: nil disables virtual-key admin reloads
-	dlpEngine *dlp.Engine     // optional: nil disables DLP admin reloads
+	keyring   *keys.Keyring // optional: nil disables virtual-key admin reloads
+	dlpEngine *dlp.Engine   // optional: nil disables DLP admin reloads
 	logger    *slog.Logger
 }
 
@@ -100,9 +100,6 @@ func (a *AdminServer) Routes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /admin/logs", a.requireAuth(a.listRequestLogs))
 	mux.HandleFunc("GET /admin/logs/{id}", a.requireAuth(a.getRequestLog))
-
-	mux.HandleFunc("GET /admin/config/export", a.requireAuth(a.exportConfig))
-	mux.HandleFunc("POST /admin/config/import", a.requireAuth(a.importConfig))
 
 	// Virtual models, regex models, and the resolve tester. These share
 	// the resolver layer: virtual_models matches exact names, regex_models

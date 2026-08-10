@@ -22,9 +22,9 @@ import (
 type Server struct {
 	router    *router.Router
 	logger    *slog.Logger
-	keyring   *keys.Keyring   // optional: nil disables virtual key auth
-	store     *store.Store    // optional: nil disables usage recording
-	dlpEngine *dlp.Engine     // optional: nil disables DLP scanning
+	keyring   *keys.Keyring // optional: nil disables virtual key auth
+	store     *store.Store  // optional: nil disables usage recording
+	dlpEngine *dlp.Engine   // optional: nil disables DLP scanning
 }
 
 // New returns a Server wired to the supplied router. A zero-value logger is

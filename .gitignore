@@ -5,13 +5,12 @@ plan/
 /bin/
 /dist/
 
-# Runtime data — the SQLite store and its WAL/SHM sidecars are produced
-# every time the gateway boots, so they must never end up in commits.
+# Runtime data. State lives in Postgres now; the *.db patterns only keep
+# leftover SQLite files from older checkouts out of commits.
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
-fluxa.yaml
 /data/
 
 # Editor

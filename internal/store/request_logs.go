@@ -17,6 +17,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -92,15 +94,15 @@ func (s *Store) InsertRequestLog(ctx context.Context, l RequestLog) (string, err
 			prompt_tokens, completion_tokens, total_tokens, cost_usd,
 			latency_ms, ttft_ms, request_body, response_body,
 			client_ip, user_agent
-		) VALUES (?, ?, ?, ?, ?,
-		          ?, ?, ?, ?, ?,
-		          ?, ?, ?, ?,
-		          ?, ?, ?, ?,
-		          ?, ?, ?, ?,
-		          ?, ?)`,
+		) VALUES ($1, $2, $3, $4, $5,
+		          $6, $7, $8, $9, $10,
+		          $11, $12, $13, $14,
+		          $15, $16, $17, $18,
+		          $19, $20, $21, $22,
+		          $23, $24)`,
 		l.ID, l.VirtualKeyID, l.StartedAt, firstByteAt, l.CompletedAt,
 		l.Endpoint, l.Method, l.ModelRequested, l.ModelResolved, l.Provider,
-		boolToInt(l.IsStream), boolToInt(l.CacheHit), l.StatusCode, l.Error,
+		l.IsStream, l.CacheHit, l.StatusCode, l.Error,
 		l.PromptTokens, l.CompletionTokens, l.TotalTokens, l.CostUSD,
 		l.LatencyMs, l.TTFTMs, l.RequestBody, l.ResponseBody,
 		l.ClientIP, l.UserAgent,
@@ -113,7 +115,7 @@ func (s *Store) InsertRequestLog(ctx context.Context, l RequestLog) (string, err
 
 // GetRequestLog loads one row by id. Returns ErrNotFound when missing.
 func (s *Store) GetRequestLog(ctx context.Context, id string) (RequestLog, error) {
-	row := s.db.QueryRowContext(ctx, requestLogSelectCols+` WHERE id = ?`, id)
+	row := s.db.QueryRowContext(ctx, requestLogSelectCols+` WHERE id = $1`, id)
 	l, err := scanRequestLog(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RequestLog{}, ErrNotFound
@@ -142,7 +144,8 @@ func (s *Store) ListRequestLogs(ctx context.Context, f RequestLogFilter) ([]Requ
 
 	pageArgs := append(append([]any{}, args...), f.Limit, f.Offset)
 	rows, err := s.db.QueryContext(ctx,
-		requestLogSelectCols+` `+where+` ORDER BY started_at DESC, id DESC LIMIT ? OFFSET ?`,
+		fmt.Sprintf(`%s %s ORDER BY started_at DESC, id DESC LIMIT $%d OFFSET $%d`,
+			requestLogSelectCols, where, len(args)+1, len(args)+2),
 		pageArgs...)
 	if err != nil {
 		return nil, 0, err
@@ -174,48 +177,52 @@ const requestLogSelectCols = `
 
 // buildRequestLogWhere assembles the WHERE clause from a filter.
 // Returns "" + nil when the filter is empty so the query degrades to
-// a full scan against the started_at index.
+// a full scan against the started_at index. Placeholders are numbered
+// as they are appended; callers that add LIMIT/OFFSET continue from
+// len(args)+1.
 func buildRequestLogWhere(f RequestLogFilter) (string, []any) {
 	var (
 		clauses []string
 		args    []any
 	)
+	// next records an argument and returns its $n placeholder.
+	next := func(v any) string {
+		args = append(args, v)
+		return "$" + strconv.Itoa(len(args))
+	}
 	if f.VirtualKeyID != "" {
-		clauses = append(clauses, "virtual_key_id = ?")
-		args = append(args, f.VirtualKeyID)
+		clauses = append(clauses, "virtual_key_id = "+next(f.VirtualKeyID))
 	}
 	if f.Model != "" {
-		clauses = append(clauses, "(model_requested = ? OR model_resolved = ?)")
-		args = append(args, f.Model, f.Model)
+		// One placeholder reused for both columns keeps the arg list
+		// aligned with what the caller passes in.
+		p := next(f.Model)
+		clauses = append(clauses, "(model_requested = "+p+" OR model_resolved = "+p+")")
 	}
 	if f.Provider != "" {
-		clauses = append(clauses, "provider = ?")
-		args = append(args, f.Provider)
+		clauses = append(clauses, "provider = "+next(f.Provider))
 	}
 	if f.StatusMin > 0 {
-		clauses = append(clauses, "status_code >= ?")
-		args = append(args, f.StatusMin)
+		clauses = append(clauses, "status_code >= "+next(f.StatusMin))
 	}
 	if f.StatusMax > 0 {
-		clauses = append(clauses, "status_code <= ?")
-		args = append(args, f.StatusMax)
+		clauses = append(clauses, "status_code <= "+next(f.StatusMax))
 	}
 	if f.Stream != nil {
-		clauses = append(clauses, "is_stream = ?")
-		args = append(args, boolToInt(*f.Stream))
+		clauses = append(clauses, "is_stream = "+next(*f.Stream))
 	}
 	if !f.Since.IsZero() {
-		clauses = append(clauses, "started_at >= ?")
-		args = append(args, f.Since)
+		clauses = append(clauses, "started_at >= "+next(f.Since))
 	}
 	if !f.Until.IsZero() {
-		clauses = append(clauses, "started_at <= ?")
-		args = append(args, f.Until)
+		clauses = append(clauses, "started_at <= "+next(f.Until))
 	}
 	if f.Search != "" {
-		clauses = append(clauses, "(request_body LIKE ? OR response_body LIKE ? OR error LIKE ?)")
-		needle := "%" + f.Search + "%"
-		args = append(args, needle, needle, needle)
+		// ILIKE keeps the search case-insensitive, which is what the
+		// log viewer's free-text box implies.
+		p := next("%" + f.Search + "%")
+		clauses = append(clauses,
+			"(request_body ILIKE "+p+" OR response_body ILIKE "+p+" OR error ILIKE "+p+")")
 	}
 	if len(clauses) == 0 {
 		return "", nil
@@ -227,22 +234,19 @@ func buildRequestLogWhere(f RequestLogFilter) (string, []any) {
 // *sql.Row and *sql.Rows via the package-level scanner interface.
 func scanRequestLog(sc scanner) (RequestLog, error) {
 	var (
-		l                   RequestLog
-		streamInt, cacheInt int
-		firstByteAt         sql.NullTime
+		l           RequestLog
+		firstByteAt sql.NullTime
 	)
 	if err := sc.Scan(
 		&l.ID, &l.VirtualKeyID, &l.StartedAt, &firstByteAt, &l.CompletedAt,
 		&l.Endpoint, &l.Method, &l.ModelRequested, &l.ModelResolved, &l.Provider,
-		&streamInt, &cacheInt, &l.StatusCode, &l.Error,
+		&l.IsStream, &l.CacheHit, &l.StatusCode, &l.Error,
 		&l.PromptTokens, &l.CompletionTokens, &l.TotalTokens, &l.CostUSD,
 		&l.LatencyMs, &l.TTFTMs, &l.RequestBody, &l.ResponseBody,
 		&l.ClientIP, &l.UserAgent,
 	); err != nil {
 		return RequestLog{}, err
 	}
-	l.IsStream = streamInt != 0
-	l.CacheHit = cacheInt != 0
 	if firstByteAt.Valid {
 		t := firstByteAt.Time
 		l.FirstByteAt = &t

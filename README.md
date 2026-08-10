@@ -133,17 +133,25 @@ protocol itself is incompatible.
 
 ## Quick Start
 
+Fluxa needs a Postgres database and nothing else. Schema migrations run
+automatically at startup.
+
+### Docker Compose
+
+Brings up Postgres and the gateway together:
+
+```bash
+docker compose up -d
+```
+
 ### Docker
 
 ```bash
 docker run -d \
   --name fluxa \
   -p 8080:8080 \
-  -e OPENAI_API_KEY=sk-xxx \
-  -e ANTHROPIC_API_KEY=sk-ant-xxx \
-  -e DEEPSEEK_API_KEY=sk-xxx \
-  -e FLUXA_MASTER_KEY=your-admin-key \
-  -v ./fluxa.db:/app/fluxa.db \
+  -e FLUXA_DATABASE_URL="postgres://fluxa:fluxa@postgres:5432/fluxa?sslmode=disable" \
+  -e FLUXA_BOOTSTRAP_PASSWORD=change-me \
   fluxa/fluxa:latest
 ```
 
@@ -154,12 +162,14 @@ docker run -d \
 curl -L https://github.com/yourname/fluxa/releases/latest/download/fluxa-linux-amd64 -o fluxa
 chmod +x fluxa
 
-# Create config
-cp fluxa.example.yaml fluxa.yaml
-# Edit fluxa.yaml — add your provider keys
-
+# Point it at Postgres and go — no config file to write
+export FLUXA_DATABASE_URL="postgres://fluxa:fluxa@localhost:5432/fluxa?sslmode=disable"
 ./fluxa
 ```
+
+Sign in at `/admin/auth/login` with the bootstrap account
+(`admin` / `admin` unless overridden) and change the password
+immediately.
 
 ### Connect your app
 
@@ -205,29 +215,33 @@ curl http://localhost:8080/v1/chat/completions \
 
 ## Configuration
 
-Providers and routes live in the SQLite database referenced by
-`database.path`. The YAML file only carries server, logging and database
-bootstrap settings — on first run the gateway will seed the database from
-the `providers` / `routes` sections of the file, and thereafter the
-`/admin` REST API is the source of truth. See [`configs/fluxa.example.yaml`](configs/fluxa.example.yaml)
-for a complete seed.
+There is no configuration file. Providers, routes, virtual keys, model
+aliases and DLP rules all live in Postgres and the `/admin` REST API is
+the only way to change them — every write hot-reloads the router. The
+process itself is configured entirely through environment variables.
 
-```yaml
-# fluxa.yaml
-
-server:
-  host: 0.0.0.0
-  port: 8080
-  master_key: ${FLUXA_MASTER_KEY}   # required to enable /admin
-
-database:
-  path: ./fluxa.db                  # providers + routes live here
-
-logging:
-  level: info
-  format: json
-  store_content: false
-```
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `FLUXA_DATABASE_URL` | — | Full Postgres DSN. When set, the discrete `FLUXA_DB_*` vars below are ignored |
+| `FLUXA_DB_HOST` | `localhost` | Postgres host |
+| `FLUXA_DB_PORT` | `5432` | Postgres port |
+| `FLUXA_DB_USER` | `fluxa` | Postgres role |
+| `FLUXA_DB_PASSWORD` | — | Role password |
+| `FLUXA_DB_NAME` | `fluxa` | Database name |
+| `FLUXA_DB_SSLMODE` | `disable` | libpq sslmode |
+| `FLUXA_DB_MAX_OPEN_CONNS` | `25` | Connection pool ceiling |
+| `FLUXA_DB_MAX_IDLE_CONNS` | `5` | Idle connections kept open |
+| `FLUXA_DB_CONN_MAX_LIFETIME` | `1h` | Recycle connections older than this |
+| `FLUXA_DB_CONN_MAX_IDLETIME` | `10m` | Close connections idle longer than this |
+| `FLUXA_HOST` / `FLUXA_PORT` | `0.0.0.0` / `8080` | Listen address |
+| `FLUXA_READ_TIMEOUT` | `30s` | HTTP read timeout |
+| `FLUXA_WRITE_TIMEOUT` | `5m` | HTTP write timeout (long enough for streaming) |
+| `FLUXA_SHUTDOWN_TIMEOUT` | `20s` | Graceful shutdown budget |
+| `FLUXA_LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+| `FLUXA_LOG_FORMAT` | `json` | `json` \| `text` |
+| `FLUXA_STORE_CONTENT` | `false` | Persist request/response bodies in `request_logs` |
+| `FLUXA_BOOTSTRAP_USER` | `admin` | First-run admin username (only used when `admin_users` is empty) |
+| `FLUXA_BOOTSTRAP_PASSWORD` | `admin` | First-run admin password |
 
 ### Managing providers and routes at runtime
 
@@ -237,23 +251,23 @@ zero downtime:
 ```bash
 # Add a new provider
 curl -X POST http://localhost:8080/admin/providers \
-  -H "Authorization: Bearer $FLUXA_MASTER_KEY" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"deepseek","kind":"deepseek","api_key":"sk-xxx"}'
 
 # Attach a route with a fallback chain
 curl -X PUT http://localhost:8080/admin/routes/gpt-4o \
-  -H "Authorization: Bearer $FLUXA_MASTER_KEY" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"provider":"openai","fallback":["deepseek"]}'
 
 # Remove a route
 curl -X DELETE http://localhost:8080/admin/routes/gpt-4o \
-  -H "Authorization: Bearer $FLUXA_MASTER_KEY"
+  -H "Authorization: Bearer $TOKEN"
 
 # Force a reload from the database
 curl -X POST http://localhost:8080/admin/reload \
-  -H "Authorization: Bearer $FLUXA_MASTER_KEY"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---

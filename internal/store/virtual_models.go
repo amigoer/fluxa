@@ -89,22 +89,20 @@ func (s *Store) ListVirtualModels(ctx context.Context) ([]VirtualModel, error) {
 	for rows.Next() {
 		var (
 			vm           VirtualModel
-			enabledInt   int
 			rID          sql.NullString
 			rWeight      sql.NullInt64
 			rTargetType  sql.NullString
 			rTargetModel sql.NullString
 			rProvider    sql.NullString
-			rEnabled     sql.NullInt64
+			rEnabled     sql.NullBool
 			rPosition    sql.NullInt64
 		)
 		if err := rows.Scan(
-			&vm.ID, &vm.Name, &vm.Description, &enabledInt, &vm.CreatedAt, &vm.UpdatedAt,
+			&vm.ID, &vm.Name, &vm.Description, &vm.Enabled, &vm.CreatedAt, &vm.UpdatedAt,
 			&rID, &rWeight, &rTargetType, &rTargetModel, &rProvider, &rEnabled, &rPosition,
 		); err != nil {
 			return nil, err
 		}
-		vm.Enabled = enabledInt == 1
 		i, ok := idx[vm.ID]
 		if !ok {
 			out = append(out, vm)
@@ -118,7 +116,7 @@ func (s *Store) ListVirtualModels(ctx context.Context) ([]VirtualModel, error) {
 				TargetType:  rTargetType.String,
 				TargetModel: rTargetModel.String,
 				Provider:    rProvider.String,
-				Enabled:     rEnabled.Int64 == 1,
+				Enabled:     rEnabled.Bool,
 				Position:    int(rPosition.Int64),
 			})
 		}
@@ -131,38 +129,30 @@ func (s *Store) ListVirtualModels(ctx context.Context) ([]VirtualModel, error) {
 // returns successfully with an empty Routes slice (the router treats
 // that as "unresolvable" but the store layer stays neutral).
 func (s *Store) GetVirtualModel(ctx context.Context, name string) (VirtualModel, error) {
-	var (
-		vm         VirtualModel
-		enabledInt int
-	)
+	var vm VirtualModel
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, description, enabled, created_at, updated_at
-		FROM virtual_models WHERE name = ?`, name)
-	if err := row.Scan(&vm.ID, &vm.Name, &vm.Description, &enabledInt, &vm.CreatedAt, &vm.UpdatedAt); err != nil {
+		FROM virtual_models WHERE name = $1`, name)
+	if err := row.Scan(&vm.ID, &vm.Name, &vm.Description, &vm.Enabled, &vm.CreatedAt, &vm.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return VirtualModel{}, ErrNotFound
 		}
 		return VirtualModel{}, err
 	}
-	vm.Enabled = enabledInt == 1
 
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, weight, target_type, target_model, provider, enabled, position
-		FROM virtual_model_routes WHERE virtual_model_id = ?
+		FROM virtual_model_routes WHERE virtual_model_id = $1
 		ORDER BY position`, vm.ID)
 	if err != nil {
 		return VirtualModel{}, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var (
-			r          VirtualModelRoute
-			enabledInt int
-		)
-		if err := rows.Scan(&r.ID, &r.Weight, &r.TargetType, &r.TargetModel, &r.Provider, &enabledInt, &r.Position); err != nil {
+		var r VirtualModelRoute
+		if err := rows.Scan(&r.ID, &r.Weight, &r.TargetType, &r.TargetModel, &r.Provider, &r.Enabled, &r.Position); err != nil {
 			return VirtualModel{}, err
 		}
-		r.Enabled = enabledInt == 1
 		vm.Routes = append(vm.Routes, r)
 	}
 	return vm, rows.Err()
@@ -208,7 +198,7 @@ func (s *Store) UpsertVirtualModel(ctx context.Context, vm VirtualModel) (Virtua
 	// row already exists we keep its id (so external references stay
 	// stable) and bump updated_at; otherwise we mint a new id.
 	var existingID string
-	err = tx.QueryRowContext(ctx, `SELECT id FROM virtual_models WHERE name = ?`, vm.Name).Scan(&existingID)
+	err = tx.QueryRowContext(ctx, `SELECT id FROM virtual_models WHERE name = $1`, vm.Name).Scan(&existingID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return VirtualModel{}, err
 	}
@@ -216,19 +206,19 @@ func (s *Store) UpsertVirtualModel(ctx context.Context, vm VirtualModel) (Virtua
 		vm.ID = newID()
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO virtual_models (id, name, description, enabled, created_at, updated_at)
-			VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-			vm.ID, vm.Name, vm.Description, boolToInt(vm.Enabled)); err != nil {
+			VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			vm.ID, vm.Name, vm.Description, vm.Enabled); err != nil {
 			return VirtualModel{}, err
 		}
 	} else {
 		vm.ID = existingID
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE virtual_models
-			SET description = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
-			WHERE id = ?`, vm.Description, boolToInt(vm.Enabled), vm.ID); err != nil {
+			SET description = $1, enabled = $2, updated_at = CURRENT_TIMESTAMP
+			WHERE id = $3`, vm.Description, vm.Enabled, vm.ID); err != nil {
 			return VirtualModel{}, err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM virtual_model_routes WHERE virtual_model_id = ?`, vm.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM virtual_model_routes WHERE virtual_model_id = $1`, vm.ID); err != nil {
 			return VirtualModel{}, err
 		}
 	}
@@ -239,9 +229,9 @@ func (s *Store) UpsertVirtualModel(ctx context.Context, vm VirtualModel) (Virtua
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO virtual_model_routes (
 				id, virtual_model_id, weight, target_type, target_model, provider, enabled, position
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 			vm.Routes[i].ID, vm.ID, vm.Routes[i].Weight, vm.Routes[i].TargetType,
-			vm.Routes[i].TargetModel, vm.Routes[i].Provider, boolToInt(vm.Routes[i].Enabled),
+			vm.Routes[i].TargetModel, vm.Routes[i].Provider, vm.Routes[i].Enabled,
 			vm.Routes[i].Position); err != nil {
 			return VirtualModel{}, err
 		}
@@ -257,7 +247,7 @@ func (s *Store) UpsertVirtualModel(ctx context.Context, vm VirtualModel) (Virtua
 // DeleteVirtualModel removes a virtual model and (via ON DELETE
 // CASCADE) all of its child routes.
 func (s *Store) DeleteVirtualModel(ctx context.Context, name string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM virtual_models WHERE name = ?`, name)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM virtual_models WHERE name = $1`, name)
 	if err != nil {
 		return err
 	}

@@ -47,17 +47,13 @@ func (s *Store) ListRegexModels(ctx context.Context) ([]RegexModel, error) {
 
 	var out []RegexModel
 	for rows.Next() {
-		var (
-			r          RegexModel
-			enabledInt int
-		)
+		var r RegexModel
 		if err := rows.Scan(
 			&r.ID, &r.Pattern, &r.Priority, &r.TargetType, &r.TargetModel,
-			&r.Provider, &r.Description, &enabledInt, &r.CreatedAt, &r.UpdatedAt,
+			&r.Provider, &r.Description, &r.Enabled, &r.CreatedAt, &r.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
-		r.Enabled = enabledInt == 1
 		out = append(out, r)
 	}
 	return out, rows.Err()
@@ -65,24 +61,20 @@ func (s *Store) ListRegexModels(ctx context.Context) ([]RegexModel, error) {
 
 // GetRegexModel loads one row by id.
 func (s *Store) GetRegexModel(ctx context.Context, id string) (RegexModel, error) {
-	var (
-		r          RegexModel
-		enabledInt int
-	)
+	var r RegexModel
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, pattern, priority, target_type, target_model, provider,
 		       description, enabled, created_at, updated_at
-		FROM regex_models WHERE id = ?`, id)
+		FROM regex_models WHERE id = $1`, id)
 	if err := row.Scan(
 		&r.ID, &r.Pattern, &r.Priority, &r.TargetType, &r.TargetModel,
-		&r.Provider, &r.Description, &enabledInt, &r.CreatedAt, &r.UpdatedAt,
+		&r.Provider, &r.Description, &r.Enabled, &r.CreatedAt, &r.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return RegexModel{}, ErrNotFound
 		}
 		return RegexModel{}, err
 	}
-	r.Enabled = enabledInt == 1
 	return r, nil
 }
 
@@ -121,9 +113,9 @@ func (s *Store) CreateRegexModel(ctx context.Context, r RegexModel) (RegexModel,
 		INSERT INTO regex_models (
 			id, pattern, priority, target_type, target_model, provider,
 			description, enabled, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
 		r.ID, r.Pattern, r.Priority, r.TargetType, r.TargetModel, r.Provider,
-		r.Description, boolToInt(r.Enabled)); err != nil {
+		r.Description, r.Enabled); err != nil {
 		return RegexModel{}, err
 	}
 	return s.GetRegexModel(ctx, r.ID)
@@ -139,17 +131,17 @@ func (s *Store) UpdateRegexModel(ctx context.Context, r RegexModel) (RegexModel,
 	}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE regex_models SET
-			pattern      = ?,
-			priority     = ?,
-			target_type  = ?,
-			target_model = ?,
-			provider     = ?,
-			description  = ?,
-			enabled      = ?,
+			pattern      = $1,
+			priority     = $2,
+			target_type  = $3,
+			target_model = $4,
+			provider     = $5,
+			description  = $6,
+			enabled      = $7,
 			updated_at   = CURRENT_TIMESTAMP
-		WHERE id = ?`,
+		WHERE id = $8`,
 		r.Pattern, r.Priority, r.TargetType, r.TargetModel, r.Provider,
-		r.Description, boolToInt(r.Enabled), r.ID)
+		r.Description, r.Enabled, r.ID)
 	if err != nil {
 		return RegexModel{}, err
 	}
@@ -165,8 +157,8 @@ func (s *Store) UpdateRegexModel(ctx context.Context, r RegexModel) (RegexModel,
 // the row (and risk a race with a concurrent edit).
 func (s *Store) UpdateRegexModelPriority(ctx context.Context, id string, priority int) error {
 	res, err := s.db.ExecContext(ctx, `
-		UPDATE regex_models SET priority = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`, priority, id)
+		UPDATE regex_models SET priority = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2`, priority, id)
 	if err != nil {
 		return err
 	}
@@ -178,7 +170,7 @@ func (s *Store) UpdateRegexModelPriority(ctx context.Context, id string, priorit
 
 // DeleteRegexModel removes one row by id.
 func (s *Store) DeleteRegexModel(ctx context.Context, id string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM regex_models WHERE id = ?`, id)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM regex_models WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}

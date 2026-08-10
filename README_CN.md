@@ -133,17 +133,24 @@ OpenAI 时才需要新建 adapter 包。
 
 ## 快速开始
 
-### Docker 启动（推荐）
+Fluxa 只依赖一个 Postgres 数据库，启动时会自动执行 schema 迁移。
+
+### Docker Compose 启动（推荐）
+
+一条命令同时拉起 Postgres 和网关：
+
+```bash
+docker compose up -d
+```
+
+### Docker 启动
 
 ```bash
 docker run -d \
   --name fluxa \
   -p 8080:8080 \
-  -e OPENAI_API_KEY=sk-xxx \
-  -e ANTHROPIC_API_KEY=sk-ant-xxx \
-  -e DEEPSEEK_API_KEY=sk-xxx \
-  -e FLUXA_MASTER_KEY=your-admin-key \
-  -v ./fluxa.db:/app/fluxa.db \
+  -e FLUXA_DATABASE_URL="postgres://fluxa:fluxa@postgres:5432/fluxa?sslmode=disable" \
+  -e FLUXA_BOOTSTRAP_PASSWORD=change-me \
   fluxa/fluxa:latest
 ```
 
@@ -154,12 +161,13 @@ docker run -d \
 curl -L https://github.com/yourname/fluxa/releases/latest/download/fluxa-linux-amd64 -o fluxa
 chmod +x fluxa
 
-# 创建配置文件
-cp fluxa.example.yaml fluxa.yaml
-# 编辑 fluxa.yaml，填入你的 Provider API Key
-
+# 指向 Postgres 即可启动，无需任何配置文件
+export FLUXA_DATABASE_URL="postgres://fluxa:fluxa@localhost:5432/fluxa?sslmode=disable"
 ./fluxa
 ```
+
+首次启动会创建引导管理员账号（默认 `admin` / `admin`），通过
+`/admin/auth/login` 登录后请立刻修改密码。
 
 ### 接入你的应用
 
@@ -204,30 +212,34 @@ curl http://localhost:8080/v1/chat/completions \
 
 ---
 
-## 配置文件
+## 配置
 
-从 v1.1 起，`providers` 和 `routes` 已迁移至 SQLite 数据库（位置由
-`database.path` 指定）。YAML 文件只保留服务端、日志和数据库路径等启动配置。
-首次启动且数据库为空时，网关会把 YAML 中的 `providers` / `routes` 作为
-种子数据写入数据库；此后数据库即为唯一事实来源，所有增删改通过 `/admin`
-REST API 完成，无需重启。完整示例见 [`configs/fluxa.example.yaml`](configs/fluxa.example.yaml)。
+没有配置文件。Provider、Route、虚拟密钥、模型别名、DLP 规则全部存放在
+Postgres 中，唯一的修改入口是 `/admin` REST API，每次写入都会热加载路由器。
+进程本身完全由环境变量配置。
 
-```yaml
-# fluxa.yaml
-
-server:
-  host: 0.0.0.0
-  port: 8080
-  master_key: ${FLUXA_MASTER_KEY}   # 启用 /admin 管理 API 必填
-
-database:
-  path: ./fluxa.db                  # providers + routes 存储于此
-
-logging:
-  level: info
-  format: json
-  store_content: false              # 是否存储 Prompt 内容（隐私敏感场景建议关闭）
-```
+| 变量 | 默认值 | 作用 |
+| --- | --- | --- |
+| `FLUXA_DATABASE_URL` | — | 完整 Postgres DSN；设置后下面的 `FLUXA_DB_*` 全部忽略 |
+| `FLUXA_DB_HOST` | `localhost` | Postgres 主机 |
+| `FLUXA_DB_PORT` | `5432` | Postgres 端口 |
+| `FLUXA_DB_USER` | `fluxa` | 数据库角色 |
+| `FLUXA_DB_PASSWORD` | — | 角色密码 |
+| `FLUXA_DB_NAME` | `fluxa` | 数据库名 |
+| `FLUXA_DB_SSLMODE` | `disable` | libpq sslmode |
+| `FLUXA_DB_MAX_OPEN_CONNS` | `25` | 连接池上限 |
+| `FLUXA_DB_MAX_IDLE_CONNS` | `5` | 保持的空闲连接数 |
+| `FLUXA_DB_CONN_MAX_LIFETIME` | `1h` | 连接最大存活时间 |
+| `FLUXA_DB_CONN_MAX_IDLETIME` | `10m` | 空闲连接最大存活时间 |
+| `FLUXA_HOST` / `FLUXA_PORT` | `0.0.0.0` / `8080` | 监听地址 |
+| `FLUXA_READ_TIMEOUT` | `30s` | HTTP 读超时 |
+| `FLUXA_WRITE_TIMEOUT` | `5m` | HTTP 写超时（需覆盖流式响应） |
+| `FLUXA_SHUTDOWN_TIMEOUT` | `20s` | 优雅退出等待时间 |
+| `FLUXA_LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+| `FLUXA_LOG_FORMAT` | `json` | `json` \| `text` |
+| `FLUXA_STORE_CONTENT` | `false` | 是否把请求/响应正文写入 `request_logs`（隐私敏感场景建议关闭） |
+| `FLUXA_BOOTSTRAP_USER` | `admin` | 首次启动创建的管理员用户名（仅在 `admin_users` 为空时生效） |
+| `FLUXA_BOOTSTRAP_PASSWORD` | `admin` | 首次启动创建的管理员密码 |
 
 ### 运行时管理 Provider 与 Route
 
@@ -236,23 +248,23 @@ logging:
 ```bash
 # 新增一个 Provider
 curl -X POST http://localhost:8080/admin/providers \
-  -H "Authorization: Bearer $FLUXA_MASTER_KEY" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"deepseek","kind":"deepseek","api_key":"sk-xxx"}'
 
 # 绑定模型路由及 fallback 链
 curl -X PUT http://localhost:8080/admin/routes/gpt-4o \
-  -H "Authorization: Bearer $FLUXA_MASTER_KEY" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"provider":"openai","fallback":["deepseek"]}'
 
 # 删除一条路由
 curl -X DELETE http://localhost:8080/admin/routes/gpt-4o \
-  -H "Authorization: Bearer $FLUXA_MASTER_KEY"
+  -H "Authorization: Bearer $TOKEN"
 
 # 强制从数据库重新加载
 curl -X POST http://localhost:8080/admin/reload \
-  -H "Authorization: Bearer $FLUXA_MASTER_KEY"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---

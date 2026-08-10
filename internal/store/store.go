@@ -1,10 +1,12 @@
-// Package store persists Fluxa provider and route configuration in a
-// SQLite database. It replaces the static YAML provider/route sections so
-// operators can mutate the gateway live through the admin API without
-// restarting the process.
+// Package store persists Fluxa's gateway state in Postgres: providers,
+// routes, virtual keys, usage, admin accounts, model aliases, DLP rules
+// and request logs. It replaces static configuration files entirely —
+// operators mutate every one of these tables live through the admin API
+// without restarting the process.
 //
-// The store uses modernc.org/sqlite, a pure-Go driver, so the single-binary
-// distribution still builds with CGO_ENABLED=0.
+// Postgres is the only supported backend. The driver is pgx in its
+// database/sql compatibility mode, which is pure Go, so the binary
+// still builds with CGO_ENABLED=0.
 package store
 
 import (
@@ -15,14 +17,23 @@ import (
 	"fmt"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/amigoer/fluxa/internal/config"
 )
 
 // ErrNotFound is returned when a lookup by primary key fails.
 var ErrNotFound = errors.New("store: not found")
 
-// Store wraps a *sql.DB handle and exposes typed CRUD helpers for the
-// providers and routes tables.
+// migrationLockKey is the advisory lock every process takes before
+// running migrations. Several replicas booting at once would otherwise
+// race inside CREATE TABLE IF NOT EXISTS, which is not atomic against
+// a concurrent create in Postgres and fails with a duplicate pg_type
+// error. The value is arbitrary but must stay stable across releases.
+const migrationLockKey int64 = 0x666C7578_61 // "flux" + 'a'
+
+// Store wraps a *sql.DB handle and exposes typed CRUD helpers for every
+// gateway table.
 type Store struct {
 	db *sql.DB
 }
@@ -61,25 +72,45 @@ type Route struct {
 	UpdatedAt time.Time
 }
 
-// Open opens (and migrates) the SQLite database at path. Pass ":memory:"
-// for a transient in-process database, useful in tests.
-func Open(path string) (*Store, error) {
-	dsn := path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
-	if path == ":memory:" {
-		dsn = path
+// Open connects to Postgres, verifies the connection, and applies the
+// schema migrations. The returned Store owns its pool; call Close when
+// the process shuts down.
+func Open(ctx context.Context, cfg config.DatabaseConfig) (*Store, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("store: %w", err)
 	}
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("pgx", cfg.DSN())
 	if err != nil {
-		return nil, fmt.Errorf("store: open %q: %w", path, err)
+		return nil, fmt.Errorf("store: open %s: %w", cfg.Redacted(), err)
 	}
-	db.SetMaxOpenConns(1) // SQLite writer serialisation; readers still go through WAL.
+	if cfg.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(cfg.MaxOpenConns)
+	}
+	if cfg.MaxIdleConns > 0 {
+		db.SetMaxIdleConns(cfg.MaxIdleConns)
+	}
+	if cfg.ConnMaxLifetime > 0 {
+		db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	}
+	if cfg.ConnMaxIdleTime > 0 {
+		db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("store: connect %s: %w", cfg.Redacted(), err)
+	}
 	s := &Store{db: db}
-	if err := s.migrate(context.Background()); err != nil {
+	if err := s.Migrate(ctx); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
 	return s, nil
 }
+
+// New wraps an already-open Postgres handle. It exists for callers that
+// manage the pool themselves (tests, embedding Fluxa in a larger app);
+// they are responsible for closing the handle and for calling Migrate.
+func New(db *sql.DB) *Store { return &Store{db: db} }
 
 // Close releases the underlying database handle.
 func (s *Store) Close() error { return s.db.Close() }
@@ -87,228 +118,235 @@ func (s *Store) Close() error { return s.db.Close() }
 // DB exposes the raw handle for advanced callers (tests, admin tooling).
 func (s *Store) DB() *sql.DB { return s.db }
 
-// migrate creates the schema on an empty database. The migrations are
-// idempotent; every statement uses IF NOT EXISTS so restarting on an
-// existing database is a no-op.
-func (s *Store) migrate(ctx context.Context) error {
-	stmts := []string{
-		`CREATE TABLE IF NOT EXISTS providers (
-			name            TEXT PRIMARY KEY,
-			kind            TEXT NOT NULL,
-			api_key         TEXT NOT NULL DEFAULT '',
-			base_url        TEXT NOT NULL DEFAULT '',
-			api_version     TEXT NOT NULL DEFAULT '',
-			region          TEXT NOT NULL DEFAULT '',
-			access_key      TEXT NOT NULL DEFAULT '',
-			secret_key      TEXT NOT NULL DEFAULT '',
-			session_token   TEXT NOT NULL DEFAULT '',
-			deployments     TEXT NOT NULL DEFAULT '{}',
-			models          TEXT NOT NULL DEFAULT '[]',
-			headers         TEXT NOT NULL DEFAULT '{}',
-			timeout_sec     INTEGER NOT NULL DEFAULT 0,
-			enabled         INTEGER NOT NULL DEFAULT 1,
-			created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS routes (
-			model           TEXT PRIMARY KEY,
-			provider        TEXT NOT NULL,
-			fallback        TEXT NOT NULL DEFAULT '[]',
-			created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (provider) REFERENCES providers(name) ON UPDATE CASCADE
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_routes_provider ON routes(provider)`,
-		`CREATE TABLE IF NOT EXISTS virtual_keys (
-			id                    TEXT PRIMARY KEY,
-			name                  TEXT NOT NULL,
-			description           TEXT NOT NULL DEFAULT '',
-			models                TEXT NOT NULL DEFAULT '[]',
-			ip_allowlist          TEXT NOT NULL DEFAULT '[]',
-			budget_tokens_daily   INTEGER NOT NULL DEFAULT 0,
-			budget_tokens_monthly INTEGER NOT NULL DEFAULT 0,
-			budget_usd_daily      REAL NOT NULL DEFAULT 0,
-			budget_usd_monthly    REAL NOT NULL DEFAULT 0,
-			rpm_limit             INTEGER NOT NULL DEFAULT 0,
-			enabled               INTEGER NOT NULL DEFAULT 1,
-			expires_at            DATETIME,
-			created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS usage_records (
-			id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-			virtual_key_id     TEXT NOT NULL,
-			ts                 DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			model              TEXT NOT NULL,
-			provider           TEXT NOT NULL,
-			prompt_tokens      INTEGER NOT NULL DEFAULT 0,
-			completion_tokens  INTEGER NOT NULL DEFAULT 0,
-			total_tokens       INTEGER NOT NULL DEFAULT 0,
-			cost_usd           REAL NOT NULL DEFAULT 0,
-			latency_ms         INTEGER NOT NULL DEFAULT 0,
-			status             INTEGER NOT NULL DEFAULT 0,
-			FOREIGN KEY (virtual_key_id) REFERENCES virtual_keys(id) ON DELETE CASCADE
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_usage_vk_ts ON usage_records(virtual_key_id, ts)`,
-		`CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_records(ts)`,
-		// admin_users / admin_sessions back the dashboard login flow.
-		// Passwords are bcrypt hashes — never store anything reversible
-		// here. Sessions are opaque random tokens with a TTL; the
-		// requireAuth middleware joins on user_id to look up the caller.
-		`CREATE TABLE IF NOT EXISTS admin_users (
-			id            INTEGER PRIMARY KEY AUTOINCREMENT,
-			username      TEXT NOT NULL UNIQUE,
-			password_hash TEXT NOT NULL,
-			created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS admin_sessions (
-			token       TEXT PRIMARY KEY,
-			user_id     INTEGER NOT NULL,
-			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			expires_at  DATETIME NOT NULL,
-			FOREIGN KEY (user_id) REFERENCES admin_users(id) ON DELETE CASCADE
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON admin_sessions(expires_at)`,
-		// virtual_models is the "user-facing model name" alias table
-		// added in v2.4. A virtual model fans out to one or more real
-		// (or virtual) targets with weighted traffic splitting; the
-		// resolver in internal/router/model_resolver.go evaluates the
-		// chain at request time. ON DELETE CASCADE on the child table
-		// keeps an admin "delete virtual model" call from leaving
-		// orphaned route rows behind.
-		`CREATE TABLE IF NOT EXISTS virtual_models (
-			id          TEXT PRIMARY KEY,
-			name        TEXT NOT NULL UNIQUE,
-			description TEXT NOT NULL DEFAULT '',
-			enabled     INTEGER NOT NULL DEFAULT 1,
-			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS virtual_model_routes (
-			id               TEXT PRIMARY KEY,
-			virtual_model_id TEXT NOT NULL,
-			weight           INTEGER NOT NULL CHECK(weight > 0),
-			target_type      TEXT NOT NULL CHECK(target_type IN ('real','virtual')),
-			target_model     TEXT NOT NULL,
-			provider         TEXT NOT NULL DEFAULT '',
-			enabled          INTEGER NOT NULL DEFAULT 1,
-			position         INTEGER NOT NULL DEFAULT 0,
-			FOREIGN KEY (virtual_model_id) REFERENCES virtual_models(id) ON DELETE CASCADE
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_vmr_parent ON virtual_model_routes(virtual_model_id)`,
-		// regex_models is the pattern-based model alias table. priority
-		// is ASC = highest first; ties break by insertion order which
-		// is fine because admins can edit it. We pre-compile patterns
-		// at router reload time so the request path never pays a
-		// regexp.MustCompile cost.
-		`CREATE TABLE IF NOT EXISTS regex_models (
-			id           TEXT PRIMARY KEY,
-			pattern      TEXT NOT NULL,
-			priority     INTEGER NOT NULL DEFAULT 100,
-			target_type  TEXT NOT NULL CHECK(target_type IN ('real','virtual')),
-			target_model TEXT NOT NULL,
-			provider     TEXT NOT NULL DEFAULT '',
-			description  TEXT NOT NULL DEFAULT '',
-			enabled      INTEGER NOT NULL DEFAULT 1,
-			created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_regex_models_priority ON regex_models(priority ASC)`,
-
-		// dlp_rules stores admin-defined content inspection rules.
-		// Each rule carries a keyword or regex pattern that is matched
-		// against request/response message content. The action column
-		// determines what happens on a match: block (403), mask
-		// (replace with ***), or log (allow but record).
-		`CREATE TABLE IF NOT EXISTS dlp_rules (
-			id            TEXT PRIMARY KEY,
-			name          TEXT NOT NULL,
-			pattern       TEXT NOT NULL,
-			pattern_type  TEXT NOT NULL CHECK(pattern_type IN ('keyword','regex')),
-			scope         TEXT NOT NULL CHECK(scope IN ('request','response','both')),
-			action        TEXT NOT NULL CHECK(action IN ('block','mask','log')),
-			priority      INTEGER NOT NULL DEFAULT 100,
-			model_pattern TEXT NOT NULL DEFAULT '',
-			description   TEXT NOT NULL DEFAULT '',
-			enabled       INTEGER NOT NULL DEFAULT 1,
-			created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_dlp_rules_priority ON dlp_rules(priority ASC)`,
-
-		// dlp_violations is an append-only audit log of every DLP
-		// match. rule_name is denormalised so entries remain readable
-		// after the originating rule is deleted.
-		`CREATE TABLE IF NOT EXISTS dlp_violations (
-			id            INTEGER PRIMARY KEY AUTOINCREMENT,
-			rule_id       TEXT NOT NULL,
-			rule_name     TEXT NOT NULL,
-			key_id        TEXT NOT NULL DEFAULT '',
-			model         TEXT NOT NULL DEFAULT '',
-			direction     TEXT NOT NULL CHECK(direction IN ('request','response')),
-			matched_text  TEXT NOT NULL DEFAULT '',
-			action_taken  TEXT NOT NULL,
-			created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_dlp_violations_ts ON dlp_violations(created_at)`,
-		`CREATE INDEX IF NOT EXISTS idx_dlp_violations_rule ON dlp_violations(rule_id)`,
-
-		// request_logs is the per-call raw log: one row per incoming
-		// /v1/chat/completions or /v1/messages request, whether it
-		// succeeded, failed, or was blocked by DLP. request_body and
-		// response_body hold the full payloads so operators can
-		// reproduce calls and audit what data left the network.
-		// usage_records remains the aggregation table (budgets,
-		// dashboards); request_logs is the raw stream and is expected
-		// to be pruned by a retention job in a later iteration.
-		`CREATE TABLE IF NOT EXISTS request_logs (
-			id                TEXT PRIMARY KEY,
-			virtual_key_id    TEXT NOT NULL DEFAULT '',
-			started_at        DATETIME NOT NULL,
-			first_byte_at     DATETIME,
-			completed_at      DATETIME NOT NULL,
-			endpoint          TEXT NOT NULL DEFAULT '',
-			method            TEXT NOT NULL DEFAULT 'POST',
-			model_requested   TEXT NOT NULL DEFAULT '',
-			model_resolved    TEXT NOT NULL DEFAULT '',
-			provider          TEXT NOT NULL DEFAULT '',
-			is_stream         INTEGER NOT NULL DEFAULT 0,
-			cache_hit         INTEGER NOT NULL DEFAULT 0,
-			status_code       INTEGER NOT NULL DEFAULT 0,
-			error             TEXT NOT NULL DEFAULT '',
-			prompt_tokens     INTEGER NOT NULL DEFAULT 0,
-			completion_tokens INTEGER NOT NULL DEFAULT 0,
-			total_tokens      INTEGER NOT NULL DEFAULT 0,
-			cost_usd          REAL NOT NULL DEFAULT 0,
-			latency_ms        INTEGER NOT NULL DEFAULT 0,
-			ttft_ms           INTEGER NOT NULL DEFAULT 0,
-			request_body      TEXT NOT NULL DEFAULT '',
-			response_body     TEXT NOT NULL DEFAULT '',
-			client_ip         TEXT NOT NULL DEFAULT '',
-			user_agent        TEXT NOT NULL DEFAULT ''
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_request_logs_started ON request_logs(started_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_request_logs_key ON request_logs(virtual_key_id, started_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_request_logs_status ON request_logs(status_code)`,
-		`CREATE INDEX IF NOT EXISTS idx_request_logs_model ON request_logs(model_resolved)`,
+// Migrate creates the schema on an empty database. Every statement is
+// idempotent, so running it against an existing database is a no-op and
+// a restart never needs a separate migration step. Concurrent callers
+// serialise on a session-level advisory lock.
+func (s *Store) Migrate(ctx context.Context) error {
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
 	}
-	for _, stmt := range stmts {
-		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
+	defer conn.Close()
+
+	// The lock is taken on this specific connection and released on the
+	// same one, so a crash mid-migration frees it when the session dies.
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, migrationLockKey); err != nil {
+		return fmt.Errorf("store: migrate: acquire lock: %w", err)
+	}
+	defer func() {
+		_, _ = conn.ExecContext(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1)`, migrationLockKey)
+	}()
+
+	for _, stmt := range schemaStatements {
+		if _, err := conn.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 	}
-
-	// Safe schema upgrades for v2.5
-	upgrades := []string{
-		`ALTER TABLE admin_users ADD COLUMN nickname TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE admin_users ADD COLUMN email TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE admin_users ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''`,
-	}
-	for _, stmt := range upgrades {
-		_, _ = s.db.ExecContext(ctx, stmt) // ignore "duplicate column name" errors
-	}
 	return nil
+}
+
+// schemaStatements is the full schema in dependency order. JSON-shaped
+// columns are JSONB so operators can query them directly in psql; the
+// Go layer still marshals and unmarshals them as opaque documents.
+var schemaStatements = []string{
+	`CREATE TABLE IF NOT EXISTS providers (
+		name            TEXT PRIMARY KEY,
+		kind            TEXT NOT NULL,
+		api_key         TEXT NOT NULL DEFAULT '',
+		base_url        TEXT NOT NULL DEFAULT '',
+		api_version     TEXT NOT NULL DEFAULT '',
+		region          TEXT NOT NULL DEFAULT '',
+		access_key      TEXT NOT NULL DEFAULT '',
+		secret_key      TEXT NOT NULL DEFAULT '',
+		session_token   TEXT NOT NULL DEFAULT '',
+		deployments     JSONB NOT NULL DEFAULT '{}'::jsonb,
+		models          JSONB NOT NULL DEFAULT '[]'::jsonb,
+		headers         JSONB NOT NULL DEFAULT '{}'::jsonb,
+		timeout_sec     INTEGER NOT NULL DEFAULT 0,
+		enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+		created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS routes (
+		model           TEXT PRIMARY KEY,
+		provider        TEXT NOT NULL,
+		fallback        JSONB NOT NULL DEFAULT '[]'::jsonb,
+		created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (provider) REFERENCES providers(name) ON UPDATE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_routes_provider ON routes(provider)`,
+	`CREATE TABLE IF NOT EXISTS virtual_keys (
+		id                    TEXT PRIMARY KEY,
+		name                  TEXT NOT NULL,
+		description           TEXT NOT NULL DEFAULT '',
+		models                JSONB NOT NULL DEFAULT '[]'::jsonb,
+		ip_allowlist          JSONB NOT NULL DEFAULT '[]'::jsonb,
+		budget_tokens_daily   BIGINT NOT NULL DEFAULT 0,
+		budget_tokens_monthly BIGINT NOT NULL DEFAULT 0,
+		budget_usd_daily      DOUBLE PRECISION NOT NULL DEFAULT 0,
+		budget_usd_monthly    DOUBLE PRECISION NOT NULL DEFAULT 0,
+		rpm_limit             INTEGER NOT NULL DEFAULT 0,
+		enabled               BOOLEAN NOT NULL DEFAULT TRUE,
+		expires_at            TIMESTAMPTZ,
+		created_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS usage_records (
+		id                 BIGSERIAL PRIMARY KEY,
+		virtual_key_id     TEXT NOT NULL,
+		ts                 TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		model              TEXT NOT NULL,
+		provider           TEXT NOT NULL,
+		prompt_tokens      INTEGER NOT NULL DEFAULT 0,
+		completion_tokens  INTEGER NOT NULL DEFAULT 0,
+		total_tokens       INTEGER NOT NULL DEFAULT 0,
+		cost_usd           DOUBLE PRECISION NOT NULL DEFAULT 0,
+		latency_ms         INTEGER NOT NULL DEFAULT 0,
+		status             INTEGER NOT NULL DEFAULT 0,
+		FOREIGN KEY (virtual_key_id) REFERENCES virtual_keys(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_usage_vk_ts ON usage_records(virtual_key_id, ts)`,
+	`CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_records(ts)`,
+	// admin_users / admin_sessions back the dashboard login flow.
+	// Passwords are bcrypt hashes — never store anything reversible
+	// here. Sessions are opaque random tokens with a TTL; the
+	// requireAuth middleware joins on user_id to look up the caller.
+	`CREATE TABLE IF NOT EXISTS admin_users (
+		id            BIGSERIAL PRIMARY KEY,
+		username      TEXT NOT NULL UNIQUE,
+		password_hash TEXT NOT NULL,
+		nickname      TEXT NOT NULL DEFAULT '',
+		email         TEXT NOT NULL DEFAULT '',
+		avatar_url    TEXT NOT NULL DEFAULT '',
+		created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS admin_sessions (
+		token       TEXT PRIMARY KEY,
+		user_id     BIGINT NOT NULL,
+		created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		expires_at  TIMESTAMPTZ NOT NULL,
+		FOREIGN KEY (user_id) REFERENCES admin_users(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON admin_sessions(expires_at)`,
+	// virtual_models is the "user-facing model name" alias table. A
+	// virtual model fans out to one or more real (or virtual) targets
+	// with weighted traffic splitting; the resolver in
+	// internal/router/model_resolver.go evaluates the chain at request
+	// time. ON DELETE CASCADE on the child table keeps an admin
+	// "delete virtual model" call from leaving orphaned route rows.
+	`CREATE TABLE IF NOT EXISTS virtual_models (
+		id          TEXT PRIMARY KEY,
+		name        TEXT NOT NULL UNIQUE,
+		description TEXT NOT NULL DEFAULT '',
+		enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+		created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS virtual_model_routes (
+		id               TEXT PRIMARY KEY,
+		virtual_model_id TEXT NOT NULL,
+		weight           INTEGER NOT NULL CHECK (weight > 0),
+		target_type      TEXT NOT NULL CHECK (target_type IN ('real','virtual')),
+		target_model     TEXT NOT NULL,
+		provider         TEXT NOT NULL DEFAULT '',
+		enabled          BOOLEAN NOT NULL DEFAULT TRUE,
+		position         INTEGER NOT NULL DEFAULT 0,
+		FOREIGN KEY (virtual_model_id) REFERENCES virtual_models(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_vmr_parent ON virtual_model_routes(virtual_model_id)`,
+	// regex_models is the pattern-based model alias table. priority is
+	// ASC = highest first; ties break by created_at. Patterns are
+	// pre-compiled at router reload time so the request path never pays
+	// a regexp.Compile cost.
+	`CREATE TABLE IF NOT EXISTS regex_models (
+		id           TEXT PRIMARY KEY,
+		pattern      TEXT NOT NULL,
+		priority     INTEGER NOT NULL DEFAULT 100,
+		target_type  TEXT NOT NULL CHECK (target_type IN ('real','virtual')),
+		target_model TEXT NOT NULL,
+		provider     TEXT NOT NULL DEFAULT '',
+		description  TEXT NOT NULL DEFAULT '',
+		enabled      BOOLEAN NOT NULL DEFAULT TRUE,
+		created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_regex_models_priority ON regex_models(priority ASC)`,
+	// dlp_rules stores admin-defined content inspection rules. Each rule
+	// carries a keyword or regex pattern matched against request or
+	// response content. The action column decides what happens on a
+	// match: block (403), mask (replace with ***), or log (allow but
+	// record).
+	`CREATE TABLE IF NOT EXISTS dlp_rules (
+		id            TEXT PRIMARY KEY,
+		name          TEXT NOT NULL,
+		pattern       TEXT NOT NULL,
+		pattern_type  TEXT NOT NULL CHECK (pattern_type IN ('keyword','regex')),
+		scope         TEXT NOT NULL CHECK (scope IN ('request','response','both')),
+		action        TEXT NOT NULL CHECK (action IN ('block','mask','log')),
+		priority      INTEGER NOT NULL DEFAULT 100,
+		model_pattern TEXT NOT NULL DEFAULT '',
+		description   TEXT NOT NULL DEFAULT '',
+		enabled       BOOLEAN NOT NULL DEFAULT TRUE,
+		created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_dlp_rules_priority ON dlp_rules(priority ASC)`,
+	// dlp_violations is an append-only audit log of every DLP match.
+	// rule_name is denormalised so entries remain readable after the
+	// originating rule is deleted.
+	`CREATE TABLE IF NOT EXISTS dlp_violations (
+		id            BIGSERIAL PRIMARY KEY,
+		rule_id       TEXT NOT NULL,
+		rule_name     TEXT NOT NULL,
+		key_id        TEXT NOT NULL DEFAULT '',
+		model         TEXT NOT NULL DEFAULT '',
+		direction     TEXT NOT NULL CHECK (direction IN ('request','response')),
+		matched_text  TEXT NOT NULL DEFAULT '',
+		action_taken  TEXT NOT NULL,
+		created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_dlp_violations_ts ON dlp_violations(created_at)`,
+	`CREATE INDEX IF NOT EXISTS idx_dlp_violations_rule ON dlp_violations(rule_id)`,
+	// request_logs is the per-call raw log: one row per incoming
+	// /v1/chat/completions or /v1/messages request, whether it
+	// succeeded, failed, or was blocked by DLP. request_body and
+	// response_body hold the full payloads so operators can reproduce
+	// calls and audit what data left the network. usage_records remains
+	// the aggregation table (budgets, dashboards); request_logs is the
+	// raw stream and is expected to be pruned by a retention job.
+	`CREATE TABLE IF NOT EXISTS request_logs (
+		id                TEXT PRIMARY KEY,
+		virtual_key_id    TEXT NOT NULL DEFAULT '',
+		started_at        TIMESTAMPTZ NOT NULL,
+		first_byte_at     TIMESTAMPTZ,
+		completed_at      TIMESTAMPTZ NOT NULL,
+		endpoint          TEXT NOT NULL DEFAULT '',
+		method            TEXT NOT NULL DEFAULT 'POST',
+		model_requested   TEXT NOT NULL DEFAULT '',
+		model_resolved    TEXT NOT NULL DEFAULT '',
+		provider          TEXT NOT NULL DEFAULT '',
+		is_stream         BOOLEAN NOT NULL DEFAULT FALSE,
+		cache_hit         BOOLEAN NOT NULL DEFAULT FALSE,
+		status_code       INTEGER NOT NULL DEFAULT 0,
+		error             TEXT NOT NULL DEFAULT '',
+		prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+		completion_tokens INTEGER NOT NULL DEFAULT 0,
+		total_tokens      INTEGER NOT NULL DEFAULT 0,
+		cost_usd          DOUBLE PRECISION NOT NULL DEFAULT 0,
+		latency_ms        INTEGER NOT NULL DEFAULT 0,
+		ttft_ms           INTEGER NOT NULL DEFAULT 0,
+		request_body      TEXT NOT NULL DEFAULT '',
+		response_body     TEXT NOT NULL DEFAULT '',
+		client_ip         TEXT NOT NULL DEFAULT '',
+		user_agent        TEXT NOT NULL DEFAULT ''
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_request_logs_started ON request_logs(started_at DESC)`,
+	`CREATE INDEX IF NOT EXISTS idx_request_logs_key ON request_logs(virtual_key_id, started_at DESC)`,
+	`CREATE INDEX IF NOT EXISTS idx_request_logs_status ON request_logs(status_code)`,
+	`CREATE INDEX IF NOT EXISTS idx_request_logs_model ON request_logs(model_resolved)`,
 }
 
 // -- providers ----------------------------------------------------------
@@ -343,7 +381,7 @@ func (s *Store) GetProvider(ctx context.Context, name string) (Provider, error) 
 		SELECT name, kind, api_key, base_url, api_version, region,
 		       access_key, secret_key, session_token, deployments, models,
 		       headers, timeout_sec, enabled, created_at, updated_at
-		FROM providers WHERE name = ?`, name)
+		FROM providers WHERE name = $1`, name)
 	p, err := scanProvider(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Provider{}, ErrNotFound
@@ -365,8 +403,8 @@ func (s *Store) UpsertProvider(ctx context.Context, p Provider) error {
 			name, kind, api_key, base_url, api_version, region,
 			access_key, secret_key, session_token, deployments, models,
 			headers, timeout_sec, enabled, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(name) DO UPDATE SET
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+		ON CONFLICT (name) DO UPDATE SET
 			kind          = excluded.kind,
 			api_key       = excluded.api_key,
 			base_url      = excluded.base_url,
@@ -383,7 +421,7 @@ func (s *Store) UpsertProvider(ctx context.Context, p Provider) error {
 			updated_at    = CURRENT_TIMESTAMP`,
 		p.Name, p.Kind, p.APIKey, p.BaseURL, p.APIVersion, p.Region,
 		p.AccessKey, p.SecretKey, p.SessionToken, string(deployments),
-		string(models), string(headers), p.TimeoutSec, boolToInt(p.Enabled))
+		string(models), string(headers), p.TimeoutSec, p.Enabled)
 	return err
 }
 
@@ -391,7 +429,7 @@ func (s *Store) UpsertProvider(ctx context.Context, p Provider) error {
 // place; the router reload will surface the dangling reference as a
 // validation error so operators notice.
 func (s *Store) DeleteProvider(ctx context.Context, name string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM providers WHERE name = ?`, name)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM providers WHERE name = $1`, name)
 	if err != nil {
 		return err
 	}
@@ -427,7 +465,7 @@ func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 func (s *Store) GetRoute(ctx context.Context, model string) (Route, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT model, provider, fallback, created_at, updated_at
-		FROM routes WHERE model = ?`, model)
+		FROM routes WHERE model = $1`, model)
 	r, err := scanRoute(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Route{}, ErrNotFound
@@ -443,8 +481,8 @@ func (s *Store) UpsertRoute(ctx context.Context, r Route) error {
 	fallback, _ := json.Marshal(nilSlice(r.Fallback))
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO routes (model, provider, fallback, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(model) DO UPDATE SET
+		VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+		ON CONFLICT (model) DO UPDATE SET
 			provider   = excluded.provider,
 			fallback   = excluded.fallback,
 			updated_at = CURRENT_TIMESTAMP`,
@@ -454,7 +492,7 @@ func (s *Store) UpsertRoute(ctx context.Context, r Route) error {
 
 // DeleteRoute removes a route row.
 func (s *Store) DeleteRoute(ctx context.Context, model string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM routes WHERE model = ?`, model)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM routes WHERE model = $1`, model)
 	if err != nil {
 		return err
 	}
@@ -474,28 +512,26 @@ type scanner interface {
 
 func scanProvider(sc scanner) (Provider, error) {
 	var (
-		p                               Provider
-		deployments, models, headers    string
-		enabledInt                      int
-		createdAt, updatedAt            time.Time
+		p                            Provider
+		deployments, models, headers []byte
+		createdAt, updatedAt         time.Time
 	)
 	if err := sc.Scan(
 		&p.Name, &p.Kind, &p.APIKey, &p.BaseURL, &p.APIVersion, &p.Region,
 		&p.AccessKey, &p.SecretKey, &p.SessionToken, &deployments, &models,
-		&headers, &p.TimeoutSec, &enabledInt, &createdAt, &updatedAt,
+		&headers, &p.TimeoutSec, &p.Enabled, &createdAt, &updatedAt,
 	); err != nil {
 		return Provider{}, err
 	}
-	if deployments != "" {
-		_ = json.Unmarshal([]byte(deployments), &p.Deployments)
+	if len(deployments) > 0 {
+		_ = json.Unmarshal(deployments, &p.Deployments)
 	}
-	if models != "" {
-		_ = json.Unmarshal([]byte(models), &p.Models)
+	if len(models) > 0 {
+		_ = json.Unmarshal(models, &p.Models)
 	}
-	if headers != "" {
-		_ = json.Unmarshal([]byte(headers), &p.Headers)
+	if len(headers) > 0 {
+		_ = json.Unmarshal(headers, &p.Headers)
 	}
-	p.Enabled = enabledInt != 0
 	p.CreatedAt = createdAt
 	p.UpdatedAt = updatedAt
 	return p, nil
@@ -504,14 +540,14 @@ func scanProvider(sc scanner) (Provider, error) {
 func scanRoute(sc scanner) (Route, error) {
 	var (
 		r                    Route
-		fallback             string
+		fallback             []byte
 		createdAt, updatedAt time.Time
 	)
 	if err := sc.Scan(&r.Model, &r.Provider, &fallback, &createdAt, &updatedAt); err != nil {
 		return Route{}, err
 	}
-	if fallback != "" {
-		_ = json.Unmarshal([]byte(fallback), &r.Fallback)
+	if len(fallback) > 0 {
+		_ = json.Unmarshal(fallback, &r.Fallback)
 	}
 	r.CreatedAt = createdAt
 	r.UpdatedAt = updatedAt
@@ -530,11 +566,4 @@ func nilSlice(s []string) []string {
 		return []string{}
 	}
 	return s
-}
-
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }

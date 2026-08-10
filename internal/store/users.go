@@ -1,16 +1,14 @@
 // users.go — admin user accounts and login sessions for the dashboard.
 //
-// Starting with v2.2 the admin surface is no longer guarded by a static
-// FLUXA_MASTER_KEY env var. Operators sign in with a username and a
-// bcrypt-hashed password, exchanging credentials for an opaque session
-// token that lives in the admin_sessions table. Tokens are random 32-byte
-// hex strings with a configurable TTL (one week by default), refreshed on
-// every successful auth check.
+// Operators sign in with a username and a bcrypt-hashed password,
+// exchanging credentials for an opaque session token that lives in the
+// admin_sessions table. Tokens are random 32-byte hex strings with a
+// TTL (one week by default).
 //
-// Keeping the auth state in SQLite means a redeploy never logs anyone
-// out, multi-replica setups can share a single users table, and
-// passwords can be rotated through the same admin REST surface as the
-// rest of the gateway.
+// Keeping the auth state in Postgres means a redeploy never logs anyone
+// out, every replica shares one users table, and passwords can be
+// rotated through the same admin REST surface as the rest of the
+// gateway.
 
 package store
 
@@ -96,14 +94,15 @@ func (s *Store) CreateAdminUser(ctx context.Context, username, password string) 
 	if err != nil {
 		return AdminUser{}, err
 	}
-	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO admin_users (username, password_hash) VALUES (?, ?)`,
+	// Postgres has no LastInsertId; RETURNING is the idiomatic way to
+	// get the generated key back in the same round trip.
+	var id int64
+	if err := s.db.QueryRowContext(ctx,
+		`INSERT INTO admin_users (username, password_hash) VALUES ($1, $2) RETURNING id`,
 		username, hash,
-	)
-	if err != nil {
+	).Scan(&id); err != nil {
 		return AdminUser{}, fmt.Errorf("create admin user: %w", err)
 	}
-	id, _ := res.LastInsertId()
 	return s.GetAdminUserByID(ctx, id)
 }
 
@@ -111,7 +110,7 @@ func (s *Store) CreateAdminUser(ctx context.Context, username, password string) 
 func (s *Store) GetAdminUserByID(ctx context.Context, id int64) (AdminUser, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, username, password_hash, nickname, email, avatar_url, created_at, updated_at
-		 FROM admin_users WHERE id = ?`, id)
+		 FROM admin_users WHERE id = $1`, id)
 	return scanAdminUser(row)
 }
 
@@ -120,7 +119,7 @@ func (s *Store) GetAdminUserByUsername(ctx context.Context, username string) (Ad
 	username = strings.ToLower(strings.TrimSpace(username))
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, username, password_hash, nickname, email, avatar_url, created_at, updated_at
-		 FROM admin_users WHERE username = ?`, username)
+		 FROM admin_users WHERE username = $1`, username)
 	return scanAdminUser(row)
 }
 
@@ -154,7 +153,7 @@ func (s *Store) UpdateAdminPassword(ctx context.Context, userID int64, newPasswo
 		return err
 	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE admin_users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		`UPDATE admin_users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
 		hash, userID,
 	)
 	if err != nil {
@@ -165,14 +164,14 @@ func (s *Store) UpdateAdminPassword(ctx context.Context, userID int64, newPasswo
 	}
 	// Invalidate every existing session for this user so a stolen token
 	// is useless after a password rotation.
-	_, _ = s.db.ExecContext(ctx, `DELETE FROM admin_sessions WHERE user_id = ?`, userID)
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM admin_sessions WHERE user_id = $1`, userID)
 	return nil
 }
 
 // UpdateAdminProfile updates the display profile of an existing admin user.
 func (s *Store) UpdateAdminProfile(ctx context.Context, userID int64, nickname, email, avatarURL string) error {
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE admin_users SET nickname = ?, email = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		`UPDATE admin_users SET nickname = $1, email = $2, avatar_url = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
 		nickname, email, avatarURL, userID,
 	)
 	if err != nil {
@@ -194,7 +193,7 @@ func (s *Store) CreateSession(ctx context.Context, userID int64) (AdminSession, 
 	token := hex.EncodeToString(tokenBytes)
 	expires := time.Now().Add(DefaultSessionTTL).UTC()
 	if _, err := s.db.ExecContext(ctx,
-		`INSERT INTO admin_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`,
+		`INSERT INTO admin_sessions (token, user_id, expires_at) VALUES ($1, $2, $3)`,
 		token, userID, expires,
 	); err != nil {
 		return AdminSession{}, err
@@ -219,7 +218,7 @@ func (s *Store) LookupSession(ctx context.Context, token string) (AdminUser, err
 		SELECT u.id, u.username, u.password_hash, u.nickname, u.email, u.avatar_url, u.created_at, u.updated_at, sess.expires_at
 		FROM admin_sessions sess
 		JOIN admin_users u ON u.id = sess.user_id
-		WHERE sess.token = ?`, token)
+		WHERE sess.token = $1`, token)
 	var (
 		user      AdminUser
 		expiresAt time.Time
@@ -231,7 +230,7 @@ func (s *Store) LookupSession(ctx context.Context, token string) (AdminUser, err
 		return AdminUser{}, err
 	}
 	if time.Now().After(expiresAt) {
-		_, _ = s.db.ExecContext(ctx, `DELETE FROM admin_sessions WHERE token = ?`, token)
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM admin_sessions WHERE token = $1`, token)
 		return AdminUser{}, ErrInvalidCredentials
 	}
 	return user, nil
@@ -239,7 +238,7 @@ func (s *Store) LookupSession(ctx context.Context, token string) (AdminUser, err
 
 // DeleteSession revokes one specific token (logout flow).
 func (s *Store) DeleteSession(ctx context.Context, token string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM admin_sessions WHERE token = ?`, token)
+	_, err := s.db.ExecContext(ctx, `DELETE FROM admin_sessions WHERE token = $1`, token)
 	return err
 }
 

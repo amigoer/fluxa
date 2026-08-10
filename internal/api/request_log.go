@@ -27,7 +27,8 @@ import (
 
 // MaxRequestLogBodyBytes caps how much of the request and response
 // payloads we persist. Logs are debugging aids, not blobs: a multi-MB
-// SSE stream would balloon the SQLite file and slow listing queries.
+// SSE stream would bloat the request_logs table and slow listing
+// queries.
 // Anything beyond the cap is truncated with an explicit marker so the
 // reader knows the payload was clipped.
 const MaxRequestLogBodyBytes = 256 << 10 // 256 KiB

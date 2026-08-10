@@ -11,7 +11,7 @@
 // Usage counters for budgets are computed by asking the store to
 // SUM(usage_records) over the current day / month window. The query is
 // cheap thanks to the (virtual_key_id, ts) index, and the keyring caches
-// the last result for a few seconds so we do not hammer SQLite on every
+// the last result for a few seconds so we do not hammer Postgres on every
 // request — see cachedUsage below.
 package keys
 
@@ -61,7 +61,7 @@ type Keyring struct {
 	byID    map[string]store.VirtualKey
 	limiter *Limiter
 
-	// cached usage totals per key, with small TTL to avoid hammering SQLite.
+	// cached usage totals per key, with small TTL to avoid hammering Postgres.
 	usageMu sync.Mutex
 	usage   map[string]cachedUsage
 }
