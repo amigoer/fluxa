@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Typography
+   ---------------------------------------------------------------------------
+   Inter for UI, JetBrains Mono for anything an operator might copy: keys,
+   ids, model names, payloads. Both are vendored as latin-only variable
+   subsets (47 KB + 39 KB) under the SIL Open Font License, from
+   @fontsource-variable. Only latin is bundled on purpose — a CJK webfont
+   is several megabytes, so Chinese text falls through to the system faces
+   below, which is what every Chinese-language product does anyway.
+--------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("./assets/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("./assets/fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2-variations");
+}
+
 /* ThemeProvider toggles class="dark" on <html> (see
    src/components/theme-provider.tsx); this teaches Tailwind v4's dark:
    variant to follow that class instead of the OS media query. */
@@ -103,6 +129,17 @@
   --sidebar-ring: hsl(243 75% 52%);
 
   --radius: 0.625rem;
+
+  /* Elevation. Shadows are tinted with the neutral hue rather than pure
+     black — black shadows on a warm canvas read as grime. */
+  --shadow-xs: 0 1px 2px 0 hsl(30 15% 12% / 0.05);
+  --shadow-sm: 0 1px 3px 0 hsl(30 15% 12% / 0.07), 0 1px 2px -1px hsl(30 15% 12% / 0.05);
+  --shadow-md: 0 6px 16px -4px hsl(30 15% 12% / 0.1), 0 2px 6px -2px hsl(30 15% 12% / 0.06);
+
+  /* Sunken panels: the toolbar strip inside a card, code blocks, chart
+     backdrops. Having a named surface stops every page inventing its own grey. */
+  --surface-sunken: hsl(40 14% 97%);
+  --surface-overlay: hsl(0 0% 100%);
 }
 
 .dark {
@@ -173,6 +210,15 @@
   --sidebar-accent-foreground: hsl(240 90% 92%);
   --sidebar-border: hsl(240 6% 18%);
   --sidebar-ring: hsl(239 84% 70%);
+
+  /* On dark surfaces a drop shadow is nearly invisible, so elevation is
+     carried by a top highlight plus a deeper, larger shadow. */
+  --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.4);
+  --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.5), inset 0 1px 0 0 hsl(0 0% 100% / 0.03);
+  --shadow-md: 0 8px 24px -6px hsl(0 0% 0% / 0.6), inset 0 1px 0 0 hsl(0 0% 100% / 0.04);
+
+  --surface-sunken: hsl(240 8% 7%);
+  --surface-overlay: hsl(240 8% 11%);
 }
 
 /* ---------------------------------------------------------------------------
@@ -180,6 +226,20 @@
    border-border and friends simply do not exist in v4.
 --------------------------------------------------------------------------- */
 @theme inline {
+  --font-sans:
+    "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono:
+    "JetBrains Mono Variable", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    monospace;
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-overlay: var(--surface-overlay);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -270,8 +330,82 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Inter's defaults leave gaps at UI sizes; these are the settings
+       rsms recommends for interface use. */
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Headings tighten as they grow — the standard optical correction that
+     keeps a 30px figure from looking loose next to 13px labels. */
+  h1,
+  h2,
+  h3,
+  [data-slot="card-title"] {
+    letter-spacing: -0.015em;
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+    font-feature-settings: normal;
+  }
+
+  /* Cards and popovers get real elevation instead of a flat hairline. */
+  [data-slot="card"] {
+    box-shadow: var(--shadow-xs);
+  }
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="select-content"] {
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Column headers read as labels, not data. */
+  [data-slot="table-head"] {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* Rows respond to the pointer so a wide table stays trackable. */
+  [data-slot="table-body"] [data-slot="table-row"]:hover {
+    background-color: var(--surface-sunken);
+  }
+
+  /* The active nav item carries an accent bar on the rail. Without it the
+     selected state is just a slightly different grey. */
+  [data-slot="sidebar-menu-button"][data-active="true"] {
+    position: relative;
+    font-weight: 600;
+  }
+  [data-slot="sidebar-menu-button"][data-active="true"]::before {
+    content: "";
+    position: absolute;
+    inset-block: 0.35rem;
+    inset-inline-start: -0.5rem;
+    width: 3px;
+    border-radius: 9999px;
+    background-color: var(--sidebar-primary);
+  }
+  [data-slot="sidebar-menu-button"][data-active="true"] svg {
+    color: var(--sidebar-primary);
+  }
+
+  /* Group labels are signposts, not content. */
+  [data-slot="sidebar-group-label"] {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   /* Figures line up in columns and stop jittering as they update — this

@@ -49,9 +49,11 @@ export function StatCard({
     <Card className="gap-0 overflow-hidden py-0">
       <CardHeader className="gap-0 px-5 pt-5 pb-0">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-            <Icon className="size-4" />
-            {label}
+          <div className="flex items-center gap-2.5 text-sm font-medium">
+            <span className="bg-primary-subtle text-primary flex size-7 items-center justify-center rounded-md">
+              <Icon className="size-4" />
+            </span>
+            <span className="text-muted-foreground">{label}</span>
           </div>
           {delta !== null ? (
             <span
@@ -74,7 +76,7 @@ export function StatCard({
             </span>
           ) : null}
         </div>
-        <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">{value}</div>
+        <div className="mt-3 text-[1.75rem] leading-none font-semibold tabular-nums">{value}</div>
       </CardHeader>
 
       <CardContent className="px-5 pt-1 pb-5">

@@ -39,6 +39,10 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
+// Surfaced next to the wordmark so a screenshot in a bug report always
+// says which build it came from.
+const APP_VERSION = "v0.1";
+
 const GROUPS: {
   label: TranslationKey;
   items: { title: TranslationKey; url: string; icon: typeof GaugeIcon }[];
@@ -83,8 +87,15 @@ export function AppSidebar() {
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   <ZapIcon className="size-4" />
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{t("app.name")}</span>
+                <div className="grid flex-1 text-left leading-tight">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold tracking-tight">
+                      {t("app.name")}
+                    </span>
+                    <span className="bg-muted text-muted-foreground rounded px-1 py-px font-mono text-[10px]">
+                      {APP_VERSION}
+                    </span>
+                  </span>
                   <span className="text-muted-foreground truncate text-xs">{t("app.subtitle")}</span>
                 </div>
               </NavLink>
