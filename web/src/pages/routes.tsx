@@ -34,10 +34,12 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useResource } from "@/hooks/use-resource";
+import { useT } from "@/lib/i18n";
 import { api, type Route } from "@/lib/api";
 import { parseList } from "@/lib/format";
 
 export function RoutesPage() {
+  const t = useT();
   const routes = useResource(() => api.listRoutes());
   const providers = useResource(() => api.listProviders());
   const [editing, setEditing] = useState<Route | null>(null);
@@ -48,8 +50,8 @@ export function RoutesPage() {
   return (
     <>
       <PageHeader
-        title="Routes"
-        description="Maps an incoming model name to a primary provider plus an ordered fallback chain."
+        title={t("routes.title")}
+        description={t("routes.description")}
         action={
           <Button
             onClick={() => {
@@ -59,32 +61,30 @@ export function RoutesPage() {
             disabled={providerNames.length === 0}
           >
             <PlusIcon />
-            Add route
+            {t("routes.add")}
           </Button>
         }
       />
 
       {providerNames.length === 0 && !providers.loading ? (
-        <p className="text-muted-foreground text-sm">
-          Add a provider first — a route has to point somewhere.
-        </p>
+<p className="text-muted-foreground text-sm">{t("routes.needProvider")}</p>
       ) : null}
 
       <DataState
         loading={routes.loading}
         error={routes.error}
         empty={(routes.data ?? []).length === 0}
-        emptyMessage="No routes yet. Requests fall through to the resolver and provider defaults."
+        emptyMessage={t("routes.empty")}
       >
         <Card>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Primary provider</TableHead>
-                  <TableHead>Fallback chain</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
+                  <TableHead>{t("common.model")}</TableHead>
+                  <TableHead>{t("routes.colPrimary")}</TableHead>
+                  <TableHead>{t("routes.colFallback")}</TableHead>
+                  <TableHead className="w-24 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -104,7 +104,7 @@ export function RoutesPage() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">none</span>
+                        <span className="text-muted-foreground">{t("common.none")}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -118,12 +118,12 @@ export function RoutesPage() {
                           }}
                         >
                           <PencilIcon />
-                          <span className="sr-only">Edit {route.model}</span>
+                          <span className="sr-only">{t("common.editSr", { name: route.model })}</span>
                         </Button>
                         <ConfirmButton
-                          title={`Delete route for ${route.model}?`}
-                          description="Requests for this model will fall back to resolver rules or fail."
-                          successMessage={`Deleted ${route.model}`}
+                          title={t("routes.deleteTitle", { model: route.model })}
+                          description={t("routes.deleteDescription")}
+                          successMessage={t("routes.deleted", { model: route.model })}
                           onConfirm={async () => {
                             await api.deleteRoute(route.model);
                             routes.reload();
@@ -131,7 +131,7 @@ export function RoutesPage() {
                           trigger={
                             <Button variant="ghost" size="icon">
                               <Trash2Icon />
-                              <span className="sr-only">Delete {route.model}</span>
+                              <span className="sr-only">{t("common.deleteSr", { name: route.model })}</span>
                             </Button>
                           }
                         />
@@ -175,6 +175,7 @@ function RouteDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<Route>(route);
   const [fallbackText, setFallbackText] = useState((route.fallback ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
@@ -184,7 +185,7 @@ function RouteDialog({
     setBusy(true);
     try {
       await api.upsertRoute({ ...draft, fallback: parseList(fallbackText) });
-      toast.success(`Saved route for ${draft.model}`);
+      toast.success(t("routes.saved", { model: draft.model }));
       onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -198,15 +199,15 @@ function RouteDialog({
       <DialogContent>
         <form onSubmit={save}>
           <DialogHeader>
-            <DialogTitle>{isNew ? "Add route" : `Edit ${draft.model}`}</DialogTitle>
-            <DialogDescription>
-              The fallback chain is tried in order when the primary provider fails.
-            </DialogDescription>
+            <DialogTitle>
+              {isNew ? t("routes.dialogAdd") : t("routes.dialogEdit", { model: draft.model })}
+            </DialogTitle>
+<DialogDescription>{t("routes.dialogDescription")}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
+              <Label htmlFor="model">{t("common.model")}</Label>
               <Input
                 id="model"
                 placeholder="gpt-4o"
@@ -218,13 +219,13 @@ function RouteDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="provider">Primary provider</Label>
+              <Label htmlFor="provider">{t("routes.colPrimary")}</Label>
               <Select
                 value={draft.provider}
                 onValueChange={(value) => setDraft({ ...draft, provider: value })}
               >
                 <SelectTrigger id="provider" className="w-full">
-                  <SelectValue placeholder="Select a provider" />
+                  <SelectValue placeholder={t("routes.selectProvider")} />
                 </SelectTrigger>
                 <SelectContent>
                   {providers.map((name) => (
@@ -237,11 +238,11 @@ function RouteDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="fallback">Fallback providers</Label>
+              <Label htmlFor="fallback">{t("routes.fallbackLabel")}</Label>
               <Textarea
                 id="fallback"
                 rows={3}
-                placeholder="One provider name per line, in priority order."
+                placeholder={t("routes.fallbackPlaceholder")}
                 value={fallbackText}
                 onChange={(event) => setFallbackText(event.target.value)}
               />
@@ -250,10 +251,10 @@ function RouteDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={busy || !draft.provider}>
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>

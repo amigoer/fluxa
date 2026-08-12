@@ -1,12 +1,13 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 
 import { useTheme, type Theme } from "@/components/theme-provider";
+import { useT, type TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
-  { value: "system", label: "System", Icon: Monitor },
+const OPTIONS: { value: Theme; label: TranslationKey; Icon: typeof Sun }[] = [
+  { value: "light", label: "theme.light", Icon: Sun },
+  { value: "dark", label: "theme.dark", Icon: Moon },
+  { value: "system", label: "theme.system", Icon: Monitor },
 ];
 
 /**
@@ -15,12 +16,13 @@ const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
  * OS" without clearing site data.
  */
 export function ModeToggle() {
+  const t = useT();
   const { theme, setTheme } = useTheme();
 
   return (
     <div
       role="radiogroup"
-      aria-label="Color theme"
+      aria-label={t("theme.label")}
       className="border-border bg-muted/50 inline-flex items-center gap-0.5 rounded-md border p-0.5"
     >
       {OPTIONS.map(({ value, label, Icon }) => (
@@ -28,8 +30,8 @@ export function ModeToggle() {
           key={value}
           role="radio"
           aria-checked={theme === value}
-          aria-label={label}
-          title={label}
+          aria-label={t(label)}
+          title={t(label)}
           onClick={() => setTheme(value)}
           className={cn(
             "rounded-sm p-1.5 transition-colors",

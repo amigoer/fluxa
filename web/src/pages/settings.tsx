@@ -8,15 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { useT } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 
 export function SettingsPage() {
+  const t = useT();
   const { user, refresh } = useAuth();
 
   return (
     <>
-      <PageHeader title="Settings" description="Your administrator account." />
+      <PageHeader title={t("settings.title")} description={t("settings.description")} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <ProfileCard
@@ -34,10 +36,8 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Router</CardTitle>
-          <CardDescription>
-            Writes reload the router automatically; use this if you changed data out of band.
-          </CardDescription>
+          <CardTitle>{t("settings.routerTitle")}</CardTitle>
+<CardDescription>{t("settings.routerDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button
@@ -45,13 +45,13 @@ export function SettingsPage() {
             onClick={async () => {
               try {
                 await api.reload();
-                toast.success("Router reloaded");
+                toast.success(t("settings.routerReloaded"));
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : String(err));
               }
             }}
           >
-            Reload router
+            {t("settings.reloadRouter")}
           </Button>
         </CardContent>
       </Card>
@@ -70,6 +70,7 @@ function ProfileCard({
   createdAt?: string;
   onSaved: () => Promise<void>;
 }) {
+  const t = useT();
   const [form, setForm] = useState(initial);
   const [busy, setBusy] = useState(false);
 
@@ -79,7 +80,7 @@ function ProfileCard({
     try {
       await api.updateProfile(form);
       await onSaved();
-      toast.success("Profile updated");
+      toast.success(t("settings.profileUpdated"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
@@ -90,16 +91,17 @@ function ProfileCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profile</CardTitle>
+        <CardTitle>{t("settings.profileTitle")}</CardTitle>
         <CardDescription>
-          Signed in as {username}
-          {createdAt ? ` · joined ${formatDateTime(createdAt)}` : ""}
+          {createdAt
+            ? t("settings.profileJoined", { username, date: formatDateTime(createdAt) })
+            : t("settings.profileSignedIn", { username })}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="nickname">Display name</Label>
+            <Label htmlFor="nickname">{t("settings.displayName")}</Label>
             <Input
               id="nickname"
               value={form.nickname}
@@ -107,7 +109,7 @@ function ProfileCard({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("settings.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -117,7 +119,7 @@ function ProfileCard({
           </div>
           <Separator />
           <Button type="submit" disabled={busy}>
-            {busy ? "Saving…" : "Save profile"}
+            {busy ? t("common.saving") : t("settings.saveProfile")}
           </Button>
         </form>
       </CardContent>
@@ -126,6 +128,7 @@ function ProfileCard({
 }
 
 function PasswordCard() {
+  const t = useT();
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -140,7 +143,7 @@ function PasswordCard() {
       await api.changePassword(oldPassword, newPassword);
       // The gateway revokes every session on a password change, so the
       // next request will 401 and bounce us to the login screen.
-      toast.success("Password changed — sign in again with the new one");
+      toast.success(t("settings.passwordChanged"));
       setOldPassword("");
       setNewPassword("");
       setConfirm("");
@@ -154,13 +157,13 @@ function PasswordCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Password</CardTitle>
-        <CardDescription>Changing it signs out every other active session.</CardDescription>
+        <CardTitle>{t("settings.passwordTitle")}</CardTitle>
+        <CardDescription>{t("settings.passwordDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="old-password">Current password</Label>
+            <Label htmlFor="old-password">{t("settings.currentPassword")}</Label>
             <Input
               id="old-password"
               type="password"
@@ -171,7 +174,7 @@ function PasswordCard() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="new-password">New password</Label>
+            <Label htmlFor="new-password">{t("settings.newPassword")}</Label>
             <Input
               id="new-password"
               type="password"
@@ -182,7 +185,7 @@ function PasswordCard() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm new password</Label>
+            <Label htmlFor="confirm-password">{t("settings.confirmPassword")}</Label>
             <Input
               id="confirm-password"
               type="password"
@@ -192,11 +195,11 @@ function PasswordCard() {
               aria-invalid={mismatch}
               required
             />
-            {mismatch ? <p className="text-destructive text-xs">Passwords do not match</p> : null}
+            {mismatch ? <p className="text-destructive text-xs">{t("settings.mismatch")}</p> : null}
           </div>
           <Separator />
           <Button type="submit" disabled={busy || mismatch || !newPassword}>
-            {busy ? "Changing…" : "Change password"}
+            {busy ? t("settings.changing") : t("settings.changePassword")}
           </Button>
         </form>
       </CardContent>

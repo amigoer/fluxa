@@ -34,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useResource } from "@/hooks/use-resource";
+import { useT } from "@/lib/i18n";
 import { api, type RegexModel } from "@/lib/api";
 
 const EMPTY: RegexModel = {
@@ -47,6 +48,7 @@ const EMPTY: RegexModel = {
 };
 
 export function RegexModelsPage() {
+  const t = useT();
   const rules = useResource(() => api.listRegexModels());
   const providers = useResource(() => api.listProviders());
   const [editing, setEditing] = useState<RegexModel | null>(null);
@@ -54,12 +56,12 @@ export function RegexModelsPage() {
   return (
     <>
       <PageHeader
-        title="Regex Models"
-        description="Pattern-based interception. Lower priority runs first and the first match wins."
+        title={t("regexModels.title")}
+        description={t("regexModels.description")}
         action={
           <Button onClick={() => setEditing({ ...EMPTY })}>
             <PlusIcon />
-            Add rule
+            {t("regexModels.add")}
           </Button>
         }
       />
@@ -70,18 +72,18 @@ export function RegexModelsPage() {
         loading={rules.loading}
         error={rules.error}
         empty={(rules.data ?? []).length === 0}
-        emptyMessage="No pattern rules yet."
+        emptyMessage={t("regexModels.empty")}
       >
         <Card>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-20">Priority</TableHead>
-                  <TableHead>Pattern</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
+                  <TableHead className="w-20">{t("common.priority")}</TableHead>
+                  <TableHead>{t("regexModels.colPattern")}</TableHead>
+                  <TableHead>{t("regexModels.colTarget")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="w-24 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -99,25 +101,27 @@ export function RegexModelsPage() {
                         <Badge variant="outline">{rule.target_type}</Badge>
                         <span className="text-sm">{rule.target_model}</span>
                         {rule.provider ? (
-                          <span className="text-muted-foreground text-xs">via {rule.provider}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {t("regexModels.via", { provider: rule.provider })}
+                          </span>
                         ) : null}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={rule.enabled === false ? "outline" : "secondary"}>
-                        {rule.enabled === false ? "disabled" : "enabled"}
+                        {rule.enabled === false ? t("common.disabled") : t("common.enabled")}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => setEditing({ ...rule })}>
                           <PencilIcon />
-                          <span className="sr-only">Edit rule</span>
+                          <span className="sr-only">{t("regexModels.editSr")}</span>
                         </Button>
                         <ConfirmButton
-                          title="Delete this rule?"
-                          description={`Requests matching ${rule.pattern} will no longer be redirected.`}
-                          successMessage="Rule deleted"
+                          title={t("regexModels.deleteTitle")}
+                          description={t("regexModels.deleteDescription", { pattern: rule.pattern })}
+                          successMessage={t("regexModels.deleted")}
                           onConfirm={async () => {
                             await api.deleteRegexModel(rule.id!);
                             rules.reload();
@@ -125,7 +129,7 @@ export function RegexModelsPage() {
                           trigger={
                             <Button variant="ghost" size="icon">
                               <Trash2Icon />
-                              <span className="sr-only">Delete rule</span>
+                              <span className="sr-only">{t("regexModels.deleteSr")}</span>
                             </Button>
                           }
                         />
@@ -158,6 +162,7 @@ export function RegexModelsPage() {
 /** Runs a model name through the live resolver so a rule can be checked
     against the real chain rather than by eyeballing the regex. */
 function ResolveTester() {
+  const t = useT();
   const [model, setModel] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -177,10 +182,8 @@ function ResolveTester() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Resolve tester</CardTitle>
-        <CardDescription>
-          Ask the gateway what a model name resolves to right now.
-        </CardDescription>
+        <CardTitle className="text-base">{t("regexModels.testerTitle")}</CardTitle>
+<CardDescription>{t("regexModels.testerDescription")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <form onSubmit={run} className="flex gap-2">
@@ -191,7 +194,7 @@ function ResolveTester() {
             required
           />
           <Button type="submit" variant="secondary" disabled={busy || !model}>
-            {busy ? "Resolving…" : "Resolve"}
+            {busy ? t("regexModels.resolving") : t("regexModels.resolve")}
           </Button>
         </form>
         {result ? (
@@ -213,6 +216,7 @@ function RegexDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<RegexModel>(rule);
   const [busy, setBusy] = useState(false);
 
@@ -231,7 +235,7 @@ function RegexDialog({
     try {
       if (draft.id) await api.updateRegexModel(draft);
       else await api.createRegexModel(draft);
-      toast.success("Rule saved");
+      toast.success(t("regexModels.saved"));
       onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -245,15 +249,13 @@ function RegexDialog({
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={save}>
           <DialogHeader>
-            <DialogTitle>{draft.id ? "Edit rule" : "Add rule"}</DialogTitle>
-            <DialogDescription>
-              Patterns use Go's RE2 syntax; anchors like ^ and $ behave as expected.
-            </DialogDescription>
+            <DialogTitle>{draft.id ? t("regexModels.dialogEdit") : t("regexModels.dialogAdd")}</DialogTitle>
+<DialogDescription>{t("regexModels.dialogDescription")}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="pattern">Pattern</Label>
+              <Label htmlFor="pattern">{t("regexModels.pattern")}</Label>
               <Input
                 id="pattern"
                 placeholder="^gpt-4.*"
@@ -269,7 +271,7 @@ function RegexDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="target-type">Target type</Label>
+                <Label htmlFor="target-type">{t("regexModels.targetType")}</Label>
                 <Select
                   value={draft.target_type}
                   onValueChange={(value) =>
@@ -286,7 +288,7 @@ function RegexDialog({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
+                <Label htmlFor="priority">{t("common.priority")}</Label>
                 <Input
                   id="priority"
                   type="number"
@@ -298,7 +300,7 @@ function RegexDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="target-model">Target model</Label>
+                <Label htmlFor="target-model">{t("regexModels.targetModel")}</Label>
                 <Input
                   id="target-model"
                   value={draft.target_model}
@@ -307,7 +309,7 @@ function RegexDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="regex-provider">Provider</Label>
+                <Label htmlFor="regex-provider">{t("common.provider")}</Label>
                 <Select
                   value={draft.provider || "__none__"}
                   onValueChange={(value) =>
@@ -331,7 +333,7 @@ function RegexDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="regex-description">Description</Label>
+              <Label htmlFor="regex-description">{t("common.description")}</Label>
               <Input
                 id="regex-description"
                 value={draft.description ?? ""}
@@ -345,16 +347,16 @@ function RegexDialog({
                 checked={draft.enabled !== false}
                 onCheckedChange={(checked) => setDraft({ ...draft, enabled: checked })}
               />
-              <Label htmlFor="regex-enabled">Enabled</Label>
+              <Label htmlFor="regex-enabled">{t("common.enabled")}</Label>
             </div>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={busy || patternError !== null}>
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>

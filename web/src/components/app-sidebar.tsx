@@ -16,6 +16,7 @@ import { NavLink, useLocation } from "react-router";
 
 import { useAuth } from "@/components/auth-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useT, type TranslationKey } from "@/lib/i18n";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,33 +39,37 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-const GROUPS = [
+const GROUPS: {
+  label: TranslationKey;
+  items: { title: TranslationKey; url: string; icon: typeof GaugeIcon }[];
+}[] = [
   {
-    label: "Gateway",
+    label: "nav.group.gateway",
     items: [
-      { title: "Overview", url: "/", icon: GaugeIcon },
-      { title: "Providers", url: "/providers", icon: ServerIcon },
-      { title: "Routes", url: "/routes", icon: RouteIcon },
+      { title: "nav.overview", url: "/", icon: GaugeIcon },
+      { title: "nav.providers", url: "/providers", icon: ServerIcon },
+      { title: "nav.routes", url: "/routes", icon: RouteIcon },
     ],
   },
   {
-    label: "Model resolution",
+    label: "nav.group.resolution",
     items: [
-      { title: "Virtual Models", url: "/virtual-models", icon: WaypointsIcon },
-      { title: "Regex Models", url: "/regex-models", icon: RegexIcon },
+      { title: "nav.virtualModels", url: "/virtual-models", icon: WaypointsIcon },
+      { title: "nav.regexModels", url: "/regex-models", icon: RegexIcon },
     ],
   },
   {
-    label: "Access & audit",
+    label: "nav.group.access",
     items: [
-      { title: "Virtual Keys", url: "/keys", icon: KeyRoundIcon },
-      { title: "Request Logs", url: "/logs", icon: ScrollTextIcon },
-      { title: "DLP", url: "/dlp", icon: ShieldIcon },
+      { title: "nav.keys", url: "/keys", icon: KeyRoundIcon },
+      { title: "nav.logs", url: "/logs", icon: ScrollTextIcon },
+      { title: "nav.dlp", url: "/dlp", icon: ShieldIcon },
     ],
   },
 ];
 
 export function AppSidebar() {
+  const t = useT();
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
 
@@ -79,8 +84,8 @@ export function AppSidebar() {
                   <ZapIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Fluxa</span>
-                  <span className="text-muted-foreground truncate text-xs">AI Gateway</span>
+                  <span className="truncate font-medium">{t("app.name")}</span>
+                  <span className="text-muted-foreground truncate text-xs">{t("app.subtitle")}</span>
                 </div>
               </NavLink>
             </SidebarMenuButton>
@@ -91,7 +96,7 @@ export function AppSidebar() {
       <SidebarContent>
         {GROUPS.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupLabel>{t(group.label)}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (
@@ -99,11 +104,11 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={pathname === item.url}
-                      tooltip={item.title}
+                      tooltip={t(item.title)}
                     >
                       <NavLink to={item.url}>
                         <item.icon />
-                        <span>{item.title}</span>
+                        <span>{t(item.title)}</span>
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -130,25 +135,25 @@ export function AppSidebar() {
                       {user?.nickname || user?.username}
                     </span>
                     <span className="text-muted-foreground truncate text-xs">
-                      {user?.email || "No email set"}
+                      {user?.email || t("nav.noEmail")}
                     </span>
                   </div>
                   <ChevronsUpDownIcon className="ml-auto size-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" className="w-56">
-                <DropdownMenuLabel>Signed in as {user?.username}</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("nav.signedInAs", { username: user?.username ?? "" })}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <NavLink to="/settings">
                     <SettingsIcon />
-                    Settings
+                    {t("nav.settings")}
                   </NavLink>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => void logout()}>
                   <LogOutIcon />
-                  Sign out
+                  {t("nav.signOut")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -28,12 +28,14 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useResource } from "@/hooks/use-resource";
+import { useT } from "@/lib/i18n";
 import { api, type Provider } from "@/lib/api";
 import { parseList } from "@/lib/format";
 
 const EMPTY: Provider = { name: "", kind: "", enabled: true };
 
 export function ProvidersPage() {
+  const t = useT();
   const providers = useResource(() => api.listProviders());
   const [editing, setEditing] = useState<Provider | null>(null);
   // A provider is keyed by name, so renaming would create a second row
@@ -52,12 +54,12 @@ export function ProvidersPage() {
   return (
     <>
       <PageHeader
-        title="Providers"
-        description="Upstream vendors the gateway can forward to. Credentials never leave the server."
+        title={t("providers.title")}
+        description={t("providers.description")}
         action={
           <Button onClick={openCreate}>
             <PlusIcon />
-            Add provider
+            {t("providers.add")}
           </Button>
         }
       />
@@ -66,19 +68,19 @@ export function ProvidersPage() {
         loading={providers.loading}
         error={providers.error}
         empty={(providers.data ?? []).length === 0}
-        emptyMessage="No providers yet. Add one to bring the data plane online."
+        emptyMessage={t("providers.empty")}
       >
         <Card>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Base URL</TableHead>
-                  <TableHead>Models</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("providers.colKind")}</TableHead>
+                  <TableHead>{t("providers.colBaseUrl")}</TableHead>
+                  <TableHead>{t("providers.colModels")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="w-24 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -87,26 +89,28 @@ export function ProvidersPage() {
                     <TableCell className="font-medium">{provider.name}</TableCell>
                     <TableCell className="text-muted-foreground">{provider.kind}</TableCell>
                     <TableCell className="text-muted-foreground max-w-[22rem] truncate">
-                      {provider.base_url || "default"}
+                      {provider.base_url || t("providers.baseUrlDefault")}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {provider.models?.length ? `${provider.models.length} listed` : "any"}
+                      {provider.models?.length
+                        ? t("providers.modelsListed", { count: provider.models.length })
+                        : t("common.any")}
                     </TableCell>
                     <TableCell>
                       <Badge variant={provider.enabled === false ? "outline" : "secondary"}>
-                        {provider.enabled === false ? "disabled" : "enabled"}
+                        {provider.enabled === false ? t("common.disabled") : t("common.enabled")}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => openEdit(provider)}>
                           <PencilIcon />
-                          <span className="sr-only">Edit {provider.name}</span>
+                          <span className="sr-only">{t("common.editSr", { name: provider.name })}</span>
                         </Button>
                         <ConfirmButton
-                          title={`Delete ${provider.name}?`}
-                          description="Routes pointing at this provider will stop resolving until they are repointed."
-                          successMessage={`Deleted ${provider.name}`}
+                          title={t("providers.deleteTitle", { name: provider.name })}
+                          description={t("providers.deleteDescription")}
+                          successMessage={t("providers.deleted", { name: provider.name })}
                           onConfirm={async () => {
                             await api.deleteProvider(provider.name);
                             providers.reload();
@@ -114,7 +118,7 @@ export function ProvidersPage() {
                           trigger={
                             <Button variant="ghost" size="icon">
                               <Trash2Icon />
-                              <span className="sr-only">Delete {provider.name}</span>
+                              <span className="sr-only">{t("common.deleteSr", { name: provider.name })}</span>
                             </Button>
                           }
                         />
@@ -157,6 +161,7 @@ function ProviderDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<Provider>(provider);
   const [modelsText, setModelsText] = useState((provider.models ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
@@ -170,7 +175,7 @@ function ProviderDialog({
         kind: draft.kind || draft.name,
         models: parseList(modelsText),
       });
-      toast.success(`Saved ${draft.name}`);
+      toast.success(t("providers.saved", { name: draft.name }));
       onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -184,16 +189,16 @@ function ProviderDialog({
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={save}>
           <DialogHeader>
-            <DialogTitle>{isNew ? "Add provider" : `Edit ${draft.name}`}</DialogTitle>
-            <DialogDescription>
-              Anything left blank falls back to the vendor default baked into the router.
-            </DialogDescription>
+            <DialogTitle>
+              {isNew ? t("providers.dialogAdd") : t("providers.dialogEdit", { name: draft.name })}
+            </DialogTitle>
+<DialogDescription>{t("providers.dialogDescription")}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">{t("common.name")}</Label>
                 <Input
                   id="name"
                   value={draft.name}
@@ -203,10 +208,10 @@ function ProviderDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="kind">Kind</Label>
+                <Label htmlFor="kind">{t("providers.kind")}</Label>
                 <Input
                   id="kind"
-                  placeholder="defaults to name"
+                  placeholder={t("providers.kindPlaceholder")}
                   value={draft.kind}
                   onChange={(event) => setDraft({ ...draft, kind: event.target.value })}
                 />
@@ -214,7 +219,7 @@ function ProviderDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="api_key">API key</Label>
+              <Label htmlFor="api_key">{t("providers.apiKey")}</Label>
               <Input
                 id="api_key"
                 type="password"
@@ -225,7 +230,7 @@ function ProviderDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="base_url">Base URL</Label>
+              <Label htmlFor="base_url">{t("providers.baseUrl")}</Label>
               <Input
                 id="base_url"
                 placeholder="https://api.vendor.com/v1"
@@ -235,11 +240,11 @@ function ProviderDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="models">Models</Label>
+              <Label htmlFor="models">{t("providers.models")}</Label>
               <Textarea
                 id="models"
                 rows={3}
-                placeholder="One per line. Leave empty to allow any model."
+                placeholder={t("providers.modelsPlaceholder")}
                 value={modelsText}
                 onChange={(event) => setModelsText(event.target.value)}
               />
@@ -247,7 +252,7 @@ function ProviderDialog({
 
             <div className="grid grid-cols-2 items-end gap-4">
               <div className="space-y-2">
-                <Label htmlFor="timeout">Timeout (seconds)</Label>
+                <Label htmlFor="timeout">{t("providers.timeout")}</Label>
                 <Input
                   id="timeout"
                   type="number"
@@ -264,17 +269,17 @@ function ProviderDialog({
                   checked={draft.enabled !== false}
                   onCheckedChange={(checked) => setDraft({ ...draft, enabled: checked })}
                 />
-                <Label htmlFor="enabled">Enabled</Label>
+                <Label htmlFor="enabled">{t("common.enabled")}</Label>
               </div>
             </div>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={busy}>
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>

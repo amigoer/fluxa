@@ -34,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useResource } from "@/hooks/use-resource";
+import { useT } from "@/lib/i18n";
 import { api, type VirtualModel, type VirtualModelRoute } from "@/lib/api";
 
 const EMPTY_TARGET: VirtualModelRoute = {
@@ -45,6 +46,7 @@ const EMPTY_TARGET: VirtualModelRoute = {
 };
 
 export function VirtualModelsPage() {
+  const t = useT();
   const models = useResource(() => api.listVirtualModels());
   const providers = useResource(() => api.listProviders());
   const [editing, setEditing] = useState<VirtualModel | null>(null);
@@ -53,8 +55,8 @@ export function VirtualModelsPage() {
   return (
     <>
       <PageHeader
-        title="Virtual Models"
-        description="One caller-facing name that fans out to weighted targets. Weights drive a random pick per request."
+        title={t("virtualModels.title")}
+        description={t("virtualModels.description")}
         action={
           <Button
             onClick={() => {
@@ -63,7 +65,7 @@ export function VirtualModelsPage() {
             }}
           >
             <PlusIcon />
-            Add virtual model
+            {t("virtualModels.add")}
           </Button>
         }
       />
@@ -72,17 +74,17 @@ export function VirtualModelsPage() {
         loading={models.loading}
         error={models.error}
         empty={(models.data ?? []).length === 0}
-        emptyMessage="No virtual models yet."
+        emptyMessage={t("virtualModels.empty")}
       >
         <Card>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Targets</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("virtualModels.colTargets")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="w-24 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -113,7 +115,7 @@ export function VirtualModelsPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={model.enabled === false ? "outline" : "secondary"}>
-                          {model.enabled === false ? "disabled" : "enabled"}
+                          {model.enabled === false ? t("common.disabled") : t("common.enabled")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -127,12 +129,12 @@ export function VirtualModelsPage() {
                             }}
                           >
                             <PencilIcon />
-                            <span className="sr-only">Edit {model.name}</span>
+                            <span className="sr-only">{t("common.editSr", { name: model.name })}</span>
                           </Button>
                           <ConfirmButton
-                            title={`Delete ${model.name}?`}
-                            description="Requests using this alias will stop resolving."
-                            successMessage={`Deleted ${model.name}`}
+                            title={t("virtualModels.deleteTitle", { name: model.name })}
+                            description={t("virtualModels.deleteDescription")}
+                            successMessage={t("virtualModels.deleted", { name: model.name })}
                             onConfirm={async () => {
                               await api.deleteVirtualModel(model.name);
                               models.reload();
@@ -140,7 +142,7 @@ export function VirtualModelsPage() {
                             trigger={
                               <Button variant="ghost" size="icon">
                                 <Trash2Icon />
-                                <span className="sr-only">Delete {model.name}</span>
+                                <span className="sr-only">{t("common.deleteSr", { name: model.name })}</span>
                               </Button>
                             }
                           />
@@ -185,6 +187,7 @@ function VirtualModelDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<VirtualModel>(model);
   const [busy, setBusy] = useState(false);
 
@@ -199,7 +202,7 @@ function VirtualModelDialog({
     setBusy(true);
     try {
       await api.upsertVirtualModel(draft);
-      toast.success(`Saved ${draft.name}`);
+      toast.success(t("virtualModels.saved", { name: draft.name }));
       onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -213,17 +216,18 @@ function VirtualModelDialog({
       <DialogContent className="sm:max-w-2xl">
         <form onSubmit={save}>
           <DialogHeader>
-            <DialogTitle>{isNew ? "Add virtual model" : `Edit ${draft.name}`}</DialogTitle>
-            <DialogDescription>
-              A target of type "real" needs a provider; "virtual" points at another alias and is
-              resolved recursively.
-            </DialogDescription>
+            <DialogTitle>
+              {isNew
+                ? t("virtualModels.dialogAdd")
+                : t("virtualModels.dialogEdit", { name: draft.name })}
+            </DialogTitle>
+<DialogDescription>{t("virtualModels.dialogDescription")}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="vm-name">Name</Label>
+                <Label htmlFor="vm-name">{t("common.name")}</Label>
                 <Input
                   id="vm-name"
                   placeholder="qwen-latest"
@@ -234,7 +238,7 @@ function VirtualModelDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="vm-description">Description</Label>
+                <Label htmlFor="vm-description">{t("common.description")}</Label>
                 <Input
                   id="vm-description"
                   value={draft.description ?? ""}
@@ -249,12 +253,12 @@ function VirtualModelDialog({
                 checked={draft.enabled !== false}
                 onCheckedChange={(checked) => setDraft({ ...draft, enabled: checked })}
               />
-              <Label htmlFor="vm-enabled">Enabled</Label>
+              <Label htmlFor="vm-enabled">{t("common.enabled")}</Label>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Targets</Label>
+                <Label>{t("virtualModels.targets")}</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -262,7 +266,7 @@ function VirtualModelDialog({
                   onClick={() => setDraft({ ...draft, routes: [...draft.routes, { ...EMPTY_TARGET }] })}
                 >
                   <PlusIcon />
-                  Add target
+                  {t("virtualModels.addTarget")}
                 </Button>
               </div>
 
@@ -273,7 +277,7 @@ function VirtualModelDialog({
                     className="grid items-end gap-2 rounded-md border p-3 sm:grid-cols-[7rem_1fr_1fr_5rem_auto]"
                   >
                     <div className="space-y-1">
-                      <Label className="text-xs">Type</Label>
+                      <Label className="text-xs">{t("virtualModels.targetType")}</Label>
                       <Select
                         value={route.target_type}
                         onValueChange={(value) =>
@@ -291,7 +295,7 @@ function VirtualModelDialog({
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs">Target model</Label>
+                      <Label className="text-xs">{t("virtualModels.targetModel")}</Label>
                       <Input
                         value={route.target_model}
                         onChange={(event) =>
@@ -302,7 +306,7 @@ function VirtualModelDialog({
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs">Provider</Label>
+                      <Label className="text-xs">{t("common.provider")}</Label>
                       <Select
                         value={route.provider || "__none__"}
                         onValueChange={(value) =>
@@ -325,7 +329,7 @@ function VirtualModelDialog({
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs">Weight</Label>
+                      <Label className="text-xs">{t("virtualModels.weight")}</Label>
                       <Input
                         type="number"
                         min={1}
@@ -346,7 +350,7 @@ function VirtualModelDialog({
                       }
                     >
                       <XIcon />
-                      <span className="sr-only">Remove target</span>
+                      <span className="sr-only">{t("virtualModels.removeTarget")}</span>
                     </Button>
                   </div>
                 ))}
@@ -356,10 +360,10 @@ function VirtualModelDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={busy}>
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>

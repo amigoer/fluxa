@@ -2,6 +2,7 @@ import { AlertCircleIcon } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/lib/i18n";
 
 /** Title block shared by every page, with room for a primary action. */
 export function PageHeader({
@@ -29,7 +30,7 @@ export function DataState({
   loading,
   error,
   empty,
-  emptyMessage = "Nothing here yet.",
+  emptyMessage,
   children,
   rows = 4,
 }: {
@@ -40,11 +41,13 @@ export function DataState({
   children: React.ReactNode;
   rows?: number;
 }) {
+  const t = useT();
+
   if (error) {
     return (
       <Alert variant="destructive">
         <AlertCircleIcon />
-        <AlertTitle>Request failed</AlertTitle>
+        <AlertTitle>{t("common.requestFailed")}</AlertTitle>
         <AlertDescription>{error}</AlertDescription>
       </Alert>
     );
@@ -61,7 +64,7 @@ export function DataState({
   if (empty) {
     return (
       <div className="border-border text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-        {emptyMessage}
+        {emptyMessage ?? t("common.empty")}
       </div>
     );
   }

@@ -12,6 +12,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 
 /**
  * Wraps a destructive action in a confirmation dialog and reports the
@@ -20,7 +21,7 @@ import { Button } from "@/components/ui/button";
 export function ConfirmButton({
   title,
   description,
-  confirmLabel = "Delete",
+  confirmLabel,
   onConfirm,
   trigger,
   successMessage,
@@ -32,6 +33,7 @@ export function ConfirmButton({
   trigger: React.ReactNode;
   successMessage?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -57,11 +59,11 @@ export function ConfirmButton({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={busy}>{t("common.cancel")}</AlertDialogCancel>
           {/* Not AlertDialogAction: that closes the dialog on click, which
               would hide the error if the request fails. */}
           <Button variant="destructive" disabled={busy} onClick={run} asChild={false}>
-            {busy ? "Working…" : confirmLabel}
+            {busy ? t("common.working") : (confirmLabel ?? t("common.delete"))}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

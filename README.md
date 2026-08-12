@@ -152,6 +152,11 @@ The Go gateway lives at the repository root; the admin console is in `web/`
 console into `web/dist`, embeds it with `go:embed`, and writes a single
 binary to `bin/`.
 
+The console speaks English and Chinese, picked from the browser on first
+visit and switchable in the header. Strings live in
+`web/src/lib/i18n/en.ts`; every other locale is typed against it, so a
+missing translation fails the build rather than leaking English.
+
 ```bash
 docker compose up -d postgres
 

@@ -146,6 +146,10 @@ Go 网关在仓库根目录，管理控制台在 `web/`（React 19 + Vite + Tail
 shadcn/ui）。`make build` 会先把控制台编译到 `web/dist`，再用 `go:embed`
 打进 `bin/` 下的单个二进制。
 
+控制台支持中英双语，首次访问按浏览器语言自动选择，之后可在顶栏切换。
+文案集中在 `web/src/lib/i18n/en.ts`，其他语言按它做类型约束——漏翻一条会
+直接构建失败，而不是在界面上漏出英文。
+
 ```bash
 docker compose up -d postgres
 

@@ -28,33 +28,35 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useResource } from "@/hooks/use-resource";
+import { useT } from "@/lib/i18n";
 import { api, type VirtualKey } from "@/lib/api";
 import { formatDateTime, formatNumber, formatUSD, parseList } from "@/lib/format";
 
 const EMPTY: VirtualKey = { name: "", description: "", enabled: true };
 
 export function KeysPage() {
+  const t = useT();
   const keys = useResource(() => api.listKeys());
   const [editing, setEditing] = useState<VirtualKey | null>(null);
 
   const copy = async (id: string) => {
     try {
       await navigator.clipboard.writeText(id);
-      toast.success("Key copied to clipboard");
+      toast.success(t("keys.copied"));
     } catch {
-      toast.error("Clipboard unavailable — select the value and copy manually");
+      toast.error(t("keys.copyFailed"));
     }
   };
 
   return (
     <>
       <PageHeader
-        title="Virtual Keys"
-        description="Per-project credentials with their own budgets and limits. Real provider keys stay on the server."
+        title={t("keys.title")}
+        description={t("keys.description")}
         action={
           <Button onClick={() => setEditing({ ...EMPTY })}>
             <PlusIcon />
-            Create key
+            {t("keys.create")}
           </Button>
         }
       />
@@ -63,19 +65,19 @@ export function KeysPage() {
         loading={keys.loading}
         error={keys.error}
         empty={(keys.data ?? []).length === 0}
-        emptyMessage="No virtual keys yet."
+        emptyMessage={t("keys.empty")}
       >
         <Card>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Key</TableHead>
-                  <TableHead>Limits</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-28 text-right">Actions</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("keys.colKey")}</TableHead>
+                  <TableHead>{t("keys.colLimits")}</TableHead>
+                  <TableHead>{t("keys.colExpires")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="w-28 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -92,36 +94,38 @@ export function KeysPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       <div>
-                        {key.rpm_limit ? `${formatNumber(key.rpm_limit)} rpm` : "unlimited rpm"}
+                        {key.rpm_limit
+                          ? t("keys.rpm", { count: formatNumber(key.rpm_limit) })
+                          : t("keys.rpmUnlimited")}
                       </div>
                       <div>
                         {key.budget_usd_daily
-                          ? `${formatUSD(key.budget_usd_daily)} / day`
-                          : "no daily budget"}
+                          ? t("keys.perDay", { amount: formatUSD(key.budget_usd_daily) })
+                          : t("keys.noDailyBudget")}
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {key.expires_at ? formatDateTime(key.expires_at) : "never"}
+                      {key.expires_at ? formatDateTime(key.expires_at) : t("common.never")}
                     </TableCell>
                     <TableCell>
                       <Badge variant={key.enabled === false ? "outline" : "secondary"}>
-                        {key.enabled === false ? "disabled" : "enabled"}
+                        {key.enabled === false ? t("common.disabled") : t("common.enabled")}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => void copy(key.id!)}>
                           <CopyIcon />
-                          <span className="sr-only">Copy key</span>
+                          <span className="sr-only">{t("keys.copy")}</span>
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => setEditing({ ...key })}>
                           <PencilIcon />
-                          <span className="sr-only">Edit {key.name}</span>
+                          <span className="sr-only">{t("common.editSr", { name: key.name })}</span>
                         </Button>
                         <ConfirmButton
-                          title={`Delete ${key.name}?`}
-                          description="Applications using this key will start receiving 401s immediately. Usage history is removed with it."
-                          successMessage={`Deleted ${key.name}`}
+                          title={t("keys.deleteTitle", { name: key.name })}
+                          description={t("keys.deleteDescription")}
+                          successMessage={t("keys.deleted", { name: key.name })}
                           onConfirm={async () => {
                             await api.deleteKey(key.id!);
                             keys.reload();
@@ -129,7 +133,7 @@ export function KeysPage() {
                           trigger={
                             <Button variant="ghost" size="icon">
                               <Trash2Icon />
-                              <span className="sr-only">Delete {key.name}</span>
+                              <span className="sr-only">{t("common.deleteSr", { name: key.name })}</span>
                             </Button>
                           }
                         />
@@ -167,6 +171,7 @@ function KeyDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<VirtualKey>(entry);
   const [modelsText, setModelsText] = useState((entry.models ?? []).join("\n"));
   const [ipsText, setIpsText] = useState((entry.ip_allowlist ?? []).join("\n"));
@@ -182,7 +187,9 @@ function KeyDialog({
         ip_allowlist: parseList(ipsText),
       };
       const saved = draft.id ? await api.updateKey(payload) : await api.createKey(payload);
-      toast.success(draft.id ? `Saved ${saved.name}` : `Created ${saved.id}`);
+      toast.success(
+        draft.id ? t("keys.saved", { name: saved.name }) : t("keys.created", { id: saved.id ?? "" }),
+      );
       onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -216,16 +223,16 @@ function KeyDialog({
       <DialogContent className="sm:max-w-2xl">
         <form onSubmit={save}>
           <DialogHeader>
-            <DialogTitle>{draft.id ? `Edit ${draft.name}` : "Create virtual key"}</DialogTitle>
-            <DialogDescription>
-              Zero means unlimited for every budget and rate field.
-            </DialogDescription>
+            <DialogTitle>
+              {draft.id ? t("keys.dialogEdit", { name: draft.name }) : t("keys.dialogCreate")}
+            </DialogTitle>
+<DialogDescription>{t("keys.dialogDescription")}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="key-name">Name</Label>
+                <Label htmlFor="key-name">{t("common.name")}</Label>
                 <Input
                   id="key-name"
                   value={draft.name}
@@ -234,7 +241,7 @@ function KeyDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="key-description">Description</Label>
+                <Label htmlFor="key-description">{t("common.description")}</Label>
                 <Input
                   id="key-description"
                   value={draft.description ?? ""}
@@ -245,21 +252,21 @@ function KeyDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="key-models">Allowed models</Label>
+                <Label htmlFor="key-models">{t("keys.allowedModels")}</Label>
                 <Textarea
                   id="key-models"
                   rows={3}
-                  placeholder="One per line. Empty allows every model."
+                  placeholder={t("keys.allowedModelsPlaceholder")}
                   value={modelsText}
                   onChange={(event) => setModelsText(event.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="key-ips">IP allowlist</Label>
+                <Label htmlFor="key-ips">{t("keys.ipAllowlist")}</Label>
                 <Textarea
                   id="key-ips"
                   rows={3}
-                  placeholder="One address per line. Empty allows any IP."
+                  placeholder={t("keys.ipPlaceholder")}
                   value={ipsText}
                   onChange={(event) => setIpsText(event.target.value)}
                 />
@@ -267,13 +274,13 @@ function KeyDialog({
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {numberField("rpm_limit", "Requests / minute", "0 = unlimited")}
-              {numberField("budget_tokens_daily", "Daily tokens", "0 = unlimited")}
-              {numberField("budget_tokens_monthly", "Monthly tokens", "0 = unlimited")}
-              {numberField("budget_usd_daily", "Daily budget (USD)", "0 = unlimited", "0.01")}
-              {numberField("budget_usd_monthly", "Monthly budget (USD)", "0 = unlimited", "0.01")}
+              {numberField("rpm_limit", t("keys.rpmLimit"), t("keys.zeroUnlimited"))}
+              {numberField("budget_tokens_daily", t("keys.dailyTokens"), t("keys.zeroUnlimited"))}
+              {numberField("budget_tokens_monthly", t("keys.monthlyTokens"), t("keys.zeroUnlimited"))}
+              {numberField("budget_usd_daily", t("keys.dailyBudget"), t("keys.zeroUnlimited"), "0.01")}
+              {numberField("budget_usd_monthly", t("keys.monthlyBudget"), t("keys.zeroUnlimited"), "0.01")}
               <div className="space-y-2">
-                <Label htmlFor="key-expires">Expires at</Label>
+                <Label htmlFor="key-expires">{t("keys.expiresAt")}</Label>
                 <Input
                   id="key-expires"
                   type="datetime-local"
@@ -287,7 +294,7 @@ function KeyDialog({
                     })
                   }
                 />
-                <p className="text-muted-foreground text-xs">Empty = never expires</p>
+                <p className="text-muted-foreground text-xs">{t("keys.emptyNever")}</p>
               </div>
             </div>
 
@@ -297,16 +304,16 @@ function KeyDialog({
                 checked={draft.enabled !== false}
                 onCheckedChange={(checked) => setDraft({ ...draft, enabled: checked })}
               />
-              <Label htmlFor="key-enabled">Enabled</Label>
+              <Label htmlFor="key-enabled">{t("common.enabled")}</Label>
             </div>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={busy}>
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>

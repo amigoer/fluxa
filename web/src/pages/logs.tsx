@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useResource } from "@/hooks/use-resource";
+import { useT } from "@/lib/i18n";
 import { api, type RequestLog, type RequestLogFilter } from "@/lib/api";
 import { formatDateTime, formatNumber, formatUSD, prettyJSON } from "@/lib/format";
 
@@ -47,6 +48,7 @@ const STATUS_FILTERS = {
 type StatusFilter = keyof typeof STATUS_FILTERS;
 
 export function LogsPage() {
+  const t = useT();
   const [search, setSearch] = useState("");
   const [applied, setApplied] = useState("");
   const [model, setModel] = useState("");
@@ -81,12 +83,12 @@ export function LogsPage() {
   return (
     <>
       <PageHeader
-        title="Request Logs"
-        description="Every call through /v1, with the payloads the upstream actually saw."
+        title={t("logs.title")}
+        description={t("logs.description")}
         action={
           <Button variant="outline" onClick={logs.reload}>
             <RotateCwIcon />
-            Refresh
+            {t("common.refresh")}
           </Button>
         }
       />
@@ -101,42 +103,42 @@ export function LogsPage() {
               setApplied(search);
             }}
           >
-            <Label htmlFor="log-search">Search bodies</Label>
+            <Label htmlFor="log-search">{t("logs.searchLabel")}</Label>
             <Input
               id="log-search"
-              placeholder="Press Enter to search"
+              placeholder={t("logs.searchPlaceholder")}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
           </form>
 
           <div className="space-y-2">
-            <Label htmlFor="log-model">Model</Label>
+            <Label htmlFor="log-model">{t("common.model")}</Label>
             <Input
               id="log-model"
-              placeholder="exact match"
+              placeholder={t("logs.modelPlaceholder")}
               value={model}
               onChange={(event) => resetAnd(setModel)(event.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="log-status">Status</Label>
+            <Label htmlFor="log-status">{t("logs.statusLabel")}</Label>
             <Select value={status} onValueChange={resetAnd((v) => setStatus(v as StatusFilter))}>
               <SelectTrigger id="log-status" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="success">2xx success</SelectItem>
-                <SelectItem value="client">4xx client error</SelectItem>
-                <SelectItem value="server">5xx server error</SelectItem>
+                <SelectItem value="all">{t("logs.statusAll")}</SelectItem>
+                <SelectItem value="success">{t("logs.status2xx")}</SelectItem>
+                <SelectItem value="client">{t("logs.status4xx")}</SelectItem>
+                <SelectItem value="server">{t("logs.status5xx")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="log-stream">Streaming</Label>
+            <Label htmlFor="log-stream">{t("logs.streamLabel")}</Label>
             <Select
               value={stream}
               onValueChange={resetAnd((v) => setStream(v as "all" | "true" | "false"))}
@@ -145,9 +147,9 @@ export function LogsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="true">Streaming only</SelectItem>
-                <SelectItem value="false">Non-streaming only</SelectItem>
+                <SelectItem value="all">{t("logs.streamAll")}</SelectItem>
+                <SelectItem value="true">{t("logs.streamOnly")}</SelectItem>
+                <SelectItem value="false">{t("logs.nonStreamOnly")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -158,7 +160,7 @@ export function LogsPage() {
         loading={logs.loading}
         error={logs.error}
         empty={(logs.data?.data ?? []).length === 0}
-        emptyMessage="No requests match this filter."
+        emptyMessage={t("logs.empty")}
         rows={6}
       >
         <Card>
@@ -166,13 +168,13 @@ export function LogsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead className="text-right">Tokens</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead className="text-right">Latency</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
+                  <TableHead>{t("logs.colStarted")}</TableHead>
+                  <TableHead>{t("common.model")}</TableHead>
+                  <TableHead>{t("common.provider")}</TableHead>
+                  <TableHead className="text-right">{t("logs.colTokens")}</TableHead>
+                  <TableHead className="text-right">{t("logs.colCost")}</TableHead>
+                  <TableHead className="text-right">{t("logs.colLatency")}</TableHead>
+                  <TableHead className="text-right">{t("common.status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -189,7 +191,7 @@ export function LogsPage() {
                       {log.model_resolved || log.model_requested || "—"}
                       {log.is_stream ? (
                         <Badge variant="outline" className="ml-2">
-                          stream
+                          {t("logs.streamBadge")}
                         </Badge>
                       ) : null}
                     </TableCell>
@@ -214,7 +216,11 @@ export function LogsPage() {
 
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-sm">
-          {formatNumber(total)} requests · page {page + 1} of {pageCount}
+          {t("logs.pagination", {
+            total: formatNumber(total),
+            page: page + 1,
+            pages: pageCount,
+          })}
         </p>
         <div className="flex gap-2">
           <Button
@@ -223,7 +229,7 @@ export function LogsPage() {
             disabled={page === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
           >
-            Previous
+            {t("common.previous")}
           </Button>
           <Button
             variant="outline"
@@ -231,7 +237,7 @@ export function LogsPage() {
             disabled={page + 1 >= pageCount}
             onClick={() => setPage((p) => p + 1)}
           >
-            Next
+            {t("common.next")}
           </Button>
         </div>
       </div>
@@ -248,6 +254,7 @@ function StatusBadge({ log }: { log: RequestLog }) {
 }
 
 function LogDetailSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const t = useT();
   // Only fetch once a row is picked; the id doubles as the cache key.
   const detail = useResource(
     () => (id ? api.getLog(id) : Promise.resolve(null)),
@@ -260,9 +267,9 @@ function LogDetailSheet({ id, onClose }: { id: string | null; onClose: () => voi
     <Sheet open={id !== null} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full gap-0 sm:max-w-2xl">
         <SheetHeader>
-          <SheetTitle>Request detail</SheetTitle>
+          <SheetTitle>{t("logs.detailTitle")}</SheetTitle>
           <SheetDescription>
-            {log ? `${log.method} ${log.endpoint}` : "Loading…"}
+            {log ? `${log.method} ${log.endpoint}` : t("logs.detailLoading")}
           </SheetDescription>
         </SheetHeader>
 
@@ -275,29 +282,35 @@ function LogDetailSheet({ id, onClose }: { id: string | null; onClose: () => voi
               {log ? (
                 <>
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <Field label="Status" value={String(log.status_code)} />
-                    <Field label="Started" value={formatDateTime(log.started_at)} />
-                    <Field label="Model requested" value={log.model_requested || "—"} />
-                    <Field label="Model resolved" value={log.model_resolved || "—"} />
-                    <Field label="Provider" value={log.provider || "—"} />
-                    <Field label="Virtual key" value={log.virtual_key_id || "—"} />
-                    <Field label="Tokens" value={formatNumber(log.total_tokens)} />
-                    <Field label="Cost" value={formatUSD(log.cost_usd)} />
-                    <Field label="Latency" value={`${log.latency_ms} ms`} />
-                    <Field label="TTFT" value={log.ttft_ms ? `${log.ttft_ms} ms` : "—"} />
-                    <Field label="Client IP" value={log.client_ip || "—"} />
-                    <Field label="Stream" value={log.is_stream ? "yes" : "no"} />
+                    <Field label={t("common.status")} value={String(log.status_code)} />
+                    <Field label={t("logs.fieldStarted")} value={formatDateTime(log.started_at)} />
+                    <Field
+                      label={t("logs.fieldModelRequested")}
+                      value={log.model_requested || "—"}
+                    />
+                    <Field label={t("logs.fieldModelResolved")} value={log.model_resolved || "—"} />
+                    <Field label={t("common.provider")} value={log.provider || "—"} />
+                    <Field label={t("logs.fieldVirtualKey")} value={log.virtual_key_id || "—"} />
+                    <Field label={t("logs.colTokens")} value={formatNumber(log.total_tokens)} />
+                    <Field label={t("logs.fieldCost")} value={formatUSD(log.cost_usd)} />
+                    <Field label={t("logs.colLatency")} value={`${log.latency_ms} ms`} />
+                    <Field label={t("logs.fieldTtft")} value={log.ttft_ms ? `${log.ttft_ms} ms` : "—"} />
+                    <Field label={t("logs.fieldClientIp")} value={log.client_ip || "—"} />
+                    <Field
+                      label={t("logs.fieldStream")}
+                      value={log.is_stream ? t("common.yes") : t("common.no")}
+                    />
                   </dl>
 
                   {log.error ? (
                     <div>
-                      <h3 className="mb-2 text-sm font-medium">Error</h3>
+                      <h3 className="mb-2 text-sm font-medium">{t("logs.error")}</h3>
                       <p className="text-destructive text-sm">{log.error}</p>
                     </div>
                   ) : null}
 
-                  <Payload title="Request body" body={log.request_body} />
-                  <Payload title="Response body" body={log.response_body} />
+                  <Payload title={t("logs.requestBody")} body={log.request_body} />
+                  <Payload title={t("logs.responseBody")} body={log.response_body} />
                 </>
               ) : null}
             </DataState>
@@ -318,6 +331,7 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 function Payload({ title, body }: { title: string; body: string }) {
+  const t = useT();
   return (
     <div>
       <h3 className="mb-2 text-sm font-medium">{title}</h3>
@@ -326,9 +340,7 @@ function Payload({ title, body }: { title: string; body: string }) {
           {prettyJSON(body)}
         </pre>
       ) : (
-        <p className="text-muted-foreground text-sm">
-          Not captured. Set FLUXA_STORE_CONTENT=true to record payloads.
-        </p>
+        <p className="text-muted-foreground text-sm">{t("logs.bodyNotCaptured")}</p>
       )}
     </div>
   );

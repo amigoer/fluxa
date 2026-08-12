@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useT } from "@/lib/i18n";
 
 export function LoginPage() {
+  const t = useT();
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -45,20 +47,18 @@ export function LoginPage() {
           <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-lg">
             <ZapIcon className="size-5" />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Fluxa</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{t("app.name")}</h1>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
-            <CardDescription>
-              Use the administrator account configured on the gateway.
-            </CardDescription>
+            <CardTitle>{t("login.title")}</CardTitle>
+<CardDescription>{t("login.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username">{t("login.username")}</Label>
                 <Input
                   id="username"
                   autoComplete="username"
@@ -69,7 +69,7 @@ export function LoginPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("login.password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -88,7 +88,7 @@ export function LoginPage() {
               ) : null}
 
               <Button type="submit" className="w-full" disabled={busy}>
-                {busy ? "Signing in…" : "Sign in"}
+                {busy ? t("login.submitting") : t("login.submit")}
               </Button>
             </form>
           </CardContent>

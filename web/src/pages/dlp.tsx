@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useResource } from "@/hooks/use-resource";
+import { useT } from "@/lib/i18n";
 import { api, type DLPRule } from "@/lib/api";
 import { formatDateTime, formatNumber } from "@/lib/format";
 
@@ -51,25 +52,26 @@ const EMPTY: DLPRule = {
 };
 
 export function DLPPage() {
+  const t = useT();
   const [editing, setEditing] = useState<DLPRule | null>(null);
 
   return (
     <>
       <PageHeader
-        title="Data Loss Prevention"
-        description="Content rules applied to request and response bodies before they leave the network."
+        title={t("dlp.title")}
+        description={t("dlp.description")}
         action={
           <Button onClick={() => setEditing({ ...EMPTY })}>
             <PlusIcon />
-            Add rule
+            {t("dlp.add")}
           </Button>
         }
       />
 
       <Tabs defaultValue="rules">
         <TabsList>
-          <TabsTrigger value="rules">Rules</TabsTrigger>
-          <TabsTrigger value="violations">Violations</TabsTrigger>
+          <TabsTrigger value="rules">{t("dlp.tabRules")}</TabsTrigger>
+          <TabsTrigger value="violations">{t("dlp.tabViolations")}</TabsTrigger>
         </TabsList>
         <TabsContent value="rules" className="mt-4">
           <RulesTab onEdit={setEditing} editing={editing} onCloseEdit={() => setEditing(null)} />
@@ -91,6 +93,7 @@ function RulesTab({
   onEdit: (rule: DLPRule) => void;
   onCloseEdit: () => void;
 }) {
+  const t = useT();
   const rules = useResource(() => api.listDLPRules());
 
   return (
@@ -99,19 +102,19 @@ function RulesTab({
         loading={rules.loading}
         error={rules.error}
         empty={(rules.data ?? []).length === 0}
-        emptyMessage="No DLP rules configured — nothing is being inspected."
+        emptyMessage={t("dlp.rulesEmpty")}
       >
         <Card>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-20">Priority</TableHead>
-                  <TableHead>Rule</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
+                  <TableHead className="w-20">{t("common.priority")}</TableHead>
+                  <TableHead>{t("dlp.colRule")}</TableHead>
+                  <TableHead>{t("dlp.colScope")}</TableHead>
+                  <TableHead>{t("dlp.colAction")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="w-24 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -133,19 +136,19 @@ function RulesTab({
                     </TableCell>
                     <TableCell>
                       <Badge variant={rule.enabled === false ? "outline" : "secondary"}>
-                        {rule.enabled === false ? "disabled" : "enabled"}
+                        {rule.enabled === false ? t("common.disabled") : t("common.enabled")}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => onEdit({ ...rule })}>
                           <PencilIcon />
-                          <span className="sr-only">Edit {rule.name}</span>
+                          <span className="sr-only">{t("common.editSr", { name: rule.name })}</span>
                         </Button>
                         <ConfirmButton
-                          title={`Delete ${rule.name}?`}
-                          description="Traffic will no longer be inspected against this pattern. Past violations stay in the audit log."
-                          successMessage={`Deleted ${rule.name}`}
+                          title={t("dlp.deleteTitle", { name: rule.name })}
+                          description={t("dlp.deleteDescription")}
+                          successMessage={t("dlp.deleted", { name: rule.name })}
                           onConfirm={async () => {
                             await api.deleteDLPRule(rule.id!);
                             rules.reload();
@@ -153,7 +156,7 @@ function RulesTab({
                           trigger={
                             <Button variant="ghost" size="icon">
                               <Trash2Icon />
-                              <span className="sr-only">Delete {rule.name}</span>
+                              <span className="sr-only">{t("common.deleteSr", { name: rule.name })}</span>
                             </Button>
                           }
                         />
@@ -183,6 +186,7 @@ function RulesTab({
 }
 
 function ViolationsTab() {
+  const t = useT();
   const violations = useResource(() => api.listDLPViolations(50, 0));
 
   return (
@@ -190,22 +194,22 @@ function ViolationsTab() {
       loading={violations.loading}
       error={violations.error}
       empty={(violations.data?.data ?? []).length === 0}
-      emptyMessage="No violations recorded."
+      emptyMessage={t("dlp.violationsEmpty")}
     >
       <Card>
         <CardContent>
           <p className="text-muted-foreground mb-3 text-sm">
-            {formatNumber(violations.data?.total ?? 0)} total violations
+            {t("dlp.violationsTotal", { count: formatNumber(violations.data?.total ?? 0) })}
           </p>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>When</TableHead>
-                <TableHead>Rule</TableHead>
-                <TableHead>Model</TableHead>
-                <TableHead>Direction</TableHead>
-                <TableHead>Matched</TableHead>
-                <TableHead>Action</TableHead>
+                <TableHead>{t("dlp.colWhen")}</TableHead>
+                <TableHead>{t("dlp.colRule")}</TableHead>
+                <TableHead>{t("common.model")}</TableHead>
+                <TableHead>{t("dlp.colDirection")}</TableHead>
+                <TableHead>{t("dlp.colMatched")}</TableHead>
+                <TableHead>{t("dlp.colAction")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -246,6 +250,7 @@ function RuleDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<DLPRule>(rule);
   const [busy, setBusy] = useState(false);
 
@@ -264,7 +269,7 @@ function RuleDialog({
     try {
       if (draft.id) await api.updateDLPRule(draft);
       else await api.createDLPRule(draft);
-      toast.success(`Saved ${draft.name}`);
+      toast.success(t("dlp.saved", { name: draft.name }));
       onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -278,16 +283,16 @@ function RuleDialog({
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={save}>
           <DialogHeader>
-            <DialogTitle>{draft.id ? `Edit ${draft.name}` : "Add DLP rule"}</DialogTitle>
-            <DialogDescription>
-              block rejects the call, mask replaces the match, log records it and lets it through.
-            </DialogDescription>
+            <DialogTitle>
+              {draft.id ? t("dlp.dialogEdit", { name: draft.name }) : t("dlp.dialogAdd")}
+            </DialogTitle>
+<DialogDescription>{t("dlp.dialogDescription")}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="dlp-name">Name</Label>
+                <Label htmlFor="dlp-name">{t("common.name")}</Label>
                 <Input
                   id="dlp-name"
                   value={draft.name}
@@ -296,7 +301,7 @@ function RuleDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dlp-priority">Priority</Label>
+                <Label htmlFor="dlp-priority">{t("common.priority")}</Label>
                 <Input
                   id="dlp-priority"
                   type="number"
@@ -307,7 +312,7 @@ function RuleDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dlp-pattern">Pattern</Label>
+              <Label htmlFor="dlp-pattern">{t("dlp.pattern")}</Label>
               <Input
                 id="dlp-pattern"
                 value={draft.pattern}
@@ -320,7 +325,7 @@ function RuleDialog({
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="dlp-type">Type</Label>
+                <Label htmlFor="dlp-type">{t("dlp.type")}</Label>
                 <Select
                   value={draft.pattern_type}
                   onValueChange={(value) =>
@@ -337,7 +342,7 @@ function RuleDialog({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dlp-scope">Scope</Label>
+                <Label htmlFor="dlp-scope">{t("dlp.scope")}</Label>
                 <Select
                   value={draft.scope}
                   onValueChange={(value) =>
@@ -355,7 +360,7 @@ function RuleDialog({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dlp-action">Action</Label>
+                <Label htmlFor="dlp-action">{t("dlp.action")}</Label>
                 <Select
                   value={draft.action}
                   onValueChange={(value) =>
@@ -375,17 +380,17 @@ function RuleDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dlp-model">Model scope</Label>
+              <Label htmlFor="dlp-model">{t("dlp.modelScope")}</Label>
               <Input
                 id="dlp-model"
-                placeholder="Optional regex — empty applies the rule to every model"
+                placeholder={t("dlp.modelScopePlaceholder")}
                 value={draft.model_pattern ?? ""}
                 onChange={(event) => setDraft({ ...draft, model_pattern: event.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dlp-description">Description</Label>
+              <Label htmlFor="dlp-description">{t("common.description")}</Label>
               <Input
                 id="dlp-description"
                 value={draft.description ?? ""}
@@ -399,16 +404,16 @@ function RuleDialog({
                 checked={draft.enabled !== false}
                 onCheckedChange={(checked) => setDraft({ ...draft, enabled: checked })}
               />
-              <Label htmlFor="dlp-enabled">Enabled</Label>
+              <Label htmlFor="dlp-enabled">{t("common.enabled")}</Label>
             </div>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={busy || patternError !== null}>
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>
