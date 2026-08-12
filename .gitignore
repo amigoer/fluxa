@@ -13,10 +13,11 @@ plan/
 *.db-shm
 /data/
 
-# Editor
+# Editor / local tooling
 .vscode/
 .idea/
 .DS_Store
+.claude/
 
 # local go caches
 .gocache/
