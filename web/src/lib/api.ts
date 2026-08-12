@@ -183,6 +183,40 @@ export type UsageTotals = {
 
 export type UsageSummary = { key_id: string; daily: UsageTotals; monthly: UsageTotals };
 
+/** One day of the overview trend line; days with no traffic are zero-filled. */
+export type AnalyticsBucket = {
+  date: string;
+  requests: number;
+  tokens: number;
+  cost_usd: number;
+  errors: number;
+};
+
+export type AnalyticsBreakdown = {
+  name: string;
+  requests: number;
+  tokens: number;
+  cost_usd: number;
+};
+
+export type AnalyticsTotals = {
+  requests: number;
+  tokens: number;
+  cost_usd: number;
+  errors: number;
+};
+
+/** Everything the overview renders, in one round trip. */
+export type AnalyticsOverview = {
+  days: number;
+  totals: AnalyticsTotals;
+  /** Equal-length window immediately before `totals`, for trend deltas. */
+  previous: AnalyticsTotals;
+  series: AnalyticsBucket[];
+  by_provider: AnalyticsBreakdown[];
+  by_model: AnalyticsBreakdown[];
+};
+
 export type RequestLog = {
   id: string;
   virtual_key_id: string;
@@ -300,6 +334,9 @@ export const api = {
 
   usageSummary: (keyID?: string) =>
     get<UsageSummary>(`/admin/usage/summary${query({ key_id: keyID })}`),
+
+  analyticsOverview: (days: number) =>
+    get<AnalyticsOverview>(`/admin/analytics/overview${query({ days })}`),
 
   listLogs: (filter: RequestLogFilter) =>
     get<{ data: RequestLog[]; total: number; limit: number; offset: number }>(

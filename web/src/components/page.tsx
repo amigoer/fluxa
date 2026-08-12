@@ -6,10 +6,13 @@ import { useT } from "@/lib/i18n";
 
 /** Title block shared by every page, with room for a primary action. */
 export function PageHeader({
+  eyebrow,
   title,
   description,
   action,
 }: {
+  /** Small kicker above the title, for section context. */
+  eyebrow?: string;
   title: string;
   description?: string;
   action?: React.ReactNode;
@@ -17,6 +20,11 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="space-y-1">
+        {eyebrow ? (
+          <p className="text-muted-foreground text-xs font-medium tracking-widest uppercase">
+            {eyebrow}
+          </p>
+        ) : null}
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
       </div>
