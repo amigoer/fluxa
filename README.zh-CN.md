@@ -11,7 +11,7 @@
 [![Release](https://img.shields.io/github/v/release/yourname/fluxa)](https://github.com/yourname/fluxa/releases)
 [![Docker](https://img.shields.io/docker/pulls/fluxa/fluxa)](https://hub.docker.com/r/fluxa/fluxa)
 
-[English](README.md) · [中文](README_CN.md)
+[English](README.md) · [中文](README.zh-CN.md)
 
 </div>
 
@@ -57,15 +57,15 @@ Fluxa 用一个自托管网关解决上面所有问题。
 ### 📊 用量可观测
 - 每次请求完整记录：模型、Provider、Token 数、延迟、费用估算
 - 内置各主流模型定价表，自动换算美元费用
-- Web Dashboard：今日用量、本月费用、各 Key 用量明细、趋势图表
-- 用量达到预算阈值时 Webhook / 钉钉 / 飞书通知
+- Web 控制台：今日 / 本月用量与费用、可筛选的请求日志、Provider 状态
+- 每次调用的完整请求与响应正文都可留存，便于复现和审计
 
 ### 🛡️ AI Firewall（v5.0）
 - 内置 20+ DLP 规则：手机号、身份证、银行卡、邮箱等 PII 检测
 - 凭证泄露检测：API Key、数据库密码、私钥等格式识别
 - 企业自定义敏感词库，支持通配符匹配
-- 三种处置策略：`block`（拒绝）/ `mask`（脱敏放行）/ `alert`（放行并告警）
-- 观察模式：先记录不拦截，评估误报率后再开启强制模式
+- 三种处置策略：`block`（拒绝）/ `mask`（脱敏放行）/ `log`（放行并记录）
+- `log` 即观察模式：先只记录不拦截，评估误报率后再切到强制模式
 
 ### ⚡ 高性能
 - Go 语言实现，网关额外延迟 P99 < 5ms，远优于 Python 方案的 50–200ms
@@ -320,7 +320,6 @@ curl -X POST http://localhost:8080/admin/keys \
 | **v5.0** | AI Firewall | DLP + 内容安全 + 告警通知 | 📋 规划中 |
 | **v6.0** | 企业治理 | RBAC + SSO + 审计日志 + 集群部署 | 📋 规划中 |
 
-完整的功能规划详见 [docs/PLANNING.md](docs/PLANNING.md)。
 
 ---
 

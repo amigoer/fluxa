@@ -11,7 +11,7 @@ Unified routing · Virtual key management · Token tracking · DLP firewall
 [![Release](https://img.shields.io/github/v/release/yourname/fluxa)](https://github.com/yourname/fluxa/releases)
 [![Docker](https://img.shields.io/docker/pulls/fluxa/fluxa)](https://hub.docker.com/r/fluxa/fluxa)
 
-[English](README.md) · [中文](README_CN.md)
+[English](README.md) · [中文](README.zh-CN.md)
 
 </div>
 
@@ -55,15 +55,15 @@ Fluxa fixes all of this with one self-hosted binary.
 ### 📊 Observability
 - Every request logged: model, provider, token count, latency, cost
 - Built-in cost estimation with up-to-date pricing tables
-- Dashboard with usage trends, per-key breakdowns, and provider health
-- Export usage data as CSV for finance or reporting
+- Console with today/month totals, a searchable request log and provider status
+- Full request and response bodies captured per call for replay and audit
 
 ### 🛡️ AI Firewall (v5.0)
 - DLP rules engine: phone numbers, ID cards, bank cards, email addresses, and 20+ built-in patterns
 - Credential leak detection: API keys, private keys, tokens
 - Custom keyword blocklists for internal project names and sensitive terms
-- Three enforcement modes: `block`, `mask`, or `alert`
-- Observation mode for rule validation before enforcement
+- Three enforcement modes: `block`, `mask`, or `log`
+- `log` doubles as observation mode: record matches without blocking while tuning rules
 
 ### ⚡ Built for Performance
 - Written in Go — gateway overhead under 5ms P99
@@ -307,7 +307,6 @@ curl -X POST http://localhost:8080/admin/keys \
 | **v5.0** | AI Firewall — DLP + content security | Q3 2026 |
 | **v6.0** | Enterprise — RBAC + SSO + audit logs + clustering | Q4 2026 |
 
-See [PLANNING.md](docs/PLANNING.md) for detailed feature breakdown per version.
 
 ---
 
