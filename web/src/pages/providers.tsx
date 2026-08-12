@@ -3,6 +3,7 @@ import { PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmButton } from "@/components/confirm-button";
+import { ProviderLogo } from "@/components/provider-logo";
 import { DataState, PageHeader } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,13 +122,11 @@ export function ProvidersPage() {
                 {rows.map((provider) => (
                   <TableRow key={provider.name}>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <span
-                          aria-hidden
-                          className={cn(
-                            "size-1.5 rounded-full",
-                            provider.enabled === false ? "bg-muted-foreground/40" : "bg-success",
-                          )}
+                      <div className="flex items-center gap-2.5">
+                        <ProviderLogo
+                          kind={provider.kind}
+                          name={provider.name}
+                          className={cn(provider.enabled === false && "opacity-45 grayscale")}
                         />
                         {provider.name}
                       </div>

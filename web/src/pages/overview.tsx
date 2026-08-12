@@ -5,6 +5,7 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { DataState, PageHeader } from "@/components/page";
 import { SegmentedGroup, SegmentedItem } from "@/components/segmented";
+import { ProviderLogo } from "@/components/provider-logo";
 import { normalise, StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -212,7 +213,7 @@ export function OverviewPage() {
               emptyMessage={t("overview.noTraffic")}
               rows={3}
             >
-              <ShareList rows={data?.by_provider ?? []} />
+              <ShareList rows={data?.by_provider ?? []} marks />
             </DataState>
           </CardContent>
         </Card>
@@ -318,7 +319,7 @@ export function OverviewPage() {
  * confirmation — easier to scan than a donut when the labels are long
  * model identifiers.
  */
-function ShareList({ rows }: { rows: AnalyticsBreakdown[] }) {
+function ShareList({ rows, marks = false }: { rows: AnalyticsBreakdown[]; marks?: boolean }) {
   const t = useT();
   const total = rows.reduce((sum, row) => sum + row.requests, 0) || 1;
 
@@ -328,8 +329,13 @@ function ShareList({ rows }: { rows: AnalyticsBreakdown[] }) {
         const percent = (row.requests / total) * 100;
         return (
           <div key={row.name} className="space-y-1.5">
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="truncate font-medium">{row.name}</span>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="flex min-w-0 items-center gap-2">
+                {marks ? (
+                  <ProviderLogo name={row.name} className="size-5 rounded-[5px]" />
+                ) : null}
+                <span className="truncate font-medium">{row.name}</span>
+              </span>
               <span className="text-muted-foreground shrink-0 tabular-nums">
                 {formatNumber(row.requests)}
               </span>
