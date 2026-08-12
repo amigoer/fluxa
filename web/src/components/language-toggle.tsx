@@ -1,40 +1,30 @@
-import { LanguagesIcon } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { SegmentedGroup, SegmentedItem } from "@/components/segmented";
 import { LOCALES, useI18n } from "@/lib/i18n";
 
 /**
- * Language picker. Each option is written in its own language rather
- * than translated, which is the convention that lets someone stuck in
- * the wrong locale find their way out.
+ * With only two locales a dropdown costs a click and a popover to do what
+ * two buttons do inline, so this is a segmented switch matching the theme
+ * control beside it. Each label is written in its own language — the
+ * convention that lets someone stranded in the wrong locale find the way
+ * back. Revisit if a third language lands: past two or three options this
+ * should become a menu again.
  */
 export function LanguageToggle() {
   const { locale, setLocale, t } = useI18n();
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={t("common.language")}>
-          <LanguagesIcon className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {LOCALES.map((option) => (
-          <DropdownMenuCheckboxItem
-            key={option.value}
-            checked={locale === option.value}
-            onCheckedChange={() => setLocale(option.value)}
-          >
-            {option.label}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <SegmentedGroup label={t("common.language")}>
+      {LOCALES.map((option) => (
+        <SegmentedItem
+          key={option.value}
+          checked={locale === option.value}
+          onSelect={() => setLocale(option.value)}
+          label={option.label}
+          className="px-2"
+        >
+          {option.short}
+        </SegmentedItem>
+      ))}
+    </SegmentedGroup>
   );
 }

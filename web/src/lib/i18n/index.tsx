@@ -18,9 +18,10 @@ import { zhCN } from "./zh-CN";
 
 export type Locale = "en" | "zh-CN";
 
-export const LOCALES: { value: Locale; label: string }[] = [
-  { value: "en", label: "English" },
-  { value: "zh-CN", label: "中文" },
+/** `label` is the full name (tooltips, menus); `short` fits the header switch. */
+export const LOCALES: { value: Locale; label: string; short: string }[] = [
+  { value: "en", label: "English", short: "EN" },
+  { value: "zh-CN", label: "中文", short: "中" },
 ];
 
 const STORAGE_KEY = "fluxa-locale";
