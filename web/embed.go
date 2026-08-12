@@ -1,16 +1,16 @@
-// Package web serves the embedded admin dashboard.
+// Package web serves the embedded admin console.
 //
-// The dashboard front-end is built into web/dist and embedded directly
-// into the Go binary so Fluxa keeps its single-file deployment story —
-// operators download one executable and get both the gateway and the
-// admin UI. `make build` and `make run` compile the dashboard
-// automatically when a front-end is present under web/.
+// The console is a React + Vite single-page app under web/src. Vite
+// builds it into web/dist and it is embedded directly into the Go binary
+// so Fluxa keeps its single-file deployment story — operators download
+// one executable and get both the gateway and the admin UI. `make build`
+// and `make run` compile the console automatically.
 //
-// The previous React dashboard was removed pending a rewrite, so right
-// now web/dist holds only the tracked .gitkeep placeholder that keeps
-// the embed directive matching at least one file. With no index.html to
-// serve, the handler falls back to an inline HTML stub — the gateway
-// and the /admin REST API run normally regardless.
+// The repository keeps an empty web/dist/.gitkeep so the embed directive
+// matches at least one file even on a fresh clone that has not built the
+// console yet. In that case the handler serves an inline HTML stub that
+// tells the operator how to build the real bundle — the gateway and the
+// /admin REST API run normally regardless.
 //
 // Routing: the handler falls back to index.html on any path that does
 // not map to a file in dist/, which is the standard single-page-app
@@ -27,6 +27,11 @@ import (
 
 //go:embed all:dist
 var dist embed.FS
+
+// assetsDir is the subdirectory Vite writes content-hashed bundles into
+// (build.assetsDir in web/vite.config.ts). Requests below it are treated
+// as static assets rather than SPA routes.
+const assetsDir = "assets"
 
 // Handler returns an http.Handler rooted at the given URL prefix
 // (typically "/"). It serves static assets for real files and falls
@@ -51,8 +56,24 @@ func Handler(prefix string) http.Handler {
 			return
 		}
 		if _, err := fs.Stat(sub, rel); err != nil {
+			// A miss under assets/ is a stale or mistyped bundle URL, not
+			// a client-side route. Falling through to index.html there
+			// would answer a script request with HTML, which surfaces as
+			// a confusing MIME type error in the browser instead of an
+			// honest 404.
+			if strings.HasPrefix(rel, assetsDir+"/") {
+				http.NotFound(w, r)
+				return
+			}
 			serveIndex(w, index)
 			return
+		}
+		// Hashed bundle files are immutable by construction, so let
+		// browsers and proxies keep them for a year. index.html is
+		// deliberately excluded: it is the file that points at the new
+		// hashes after a deploy.
+		if strings.HasPrefix(rel, assetsDir+"/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
 		fileServer.ServeHTTP(w, r)
 	}))
@@ -65,11 +86,10 @@ func serveIndex(w http.ResponseWriter, index []byte) {
 	_, _ = w.Write(index)
 }
 
-// fallbackIndex is served when web/dist contains no index.html — the
-// case while the dashboard front-end is being rewritten, and on a fresh
-// clone that has not run `make build` yet. The page is intentionally
-// self-contained (no external assets) so it renders correctly even when
-// embedded into a stripped binary.
+// fallbackIndex is served when web/dist contains no index.html, which
+// only happens on a fresh clone that has not run `make build` yet. The
+// page is intentionally self-contained (no external assets) so it
+// renders correctly even when embedded into a stripped binary.
 const fallbackIndex = `<!doctype html>
 <html lang="en">
   <head>
@@ -86,18 +106,16 @@ const fallbackIndex = `<!doctype html>
     </style>
   </head>
   <body>
-    <h1>Fluxa admin dashboard</h1>
+    <h1>Fluxa admin console</h1>
     <p class="hint">No compiled bundle found in the embedded filesystem.</p>
-    <p>
-      The dashboard front-end has been removed and is being rewritten, so
-      no UI is embedded in this binary. The admin REST API under
-      <code>/admin/*</code> is live on this port and fully usable in the
-      meantime — the dashboard is only a client on top of it.
-    </p>
-    <p>
-      Once a front-end exists under <code>web/</code>, rebuild with
-      <code>make build</code> to embed it at the root URL:
-    </p>
+    <p>Rebuild the binary with the console included:</p>
     <pre><code>make build</code></pre>
+    <p>
+      This runs <code>npm install &amp;&amp; npm run build</code> inside
+      <code>web/</code> and recompiles the Go binary so the SPA ends up
+      embedded at the root URL. The admin REST API under
+      <code>/admin/*</code> is already live on this port — the console is
+      just a client on top of it.
+    </p>
   </body>
 </html>`

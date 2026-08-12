@@ -325,17 +325,48 @@ See [PLANNING.md](docs/PLANNING.md) for detailed feature breakdown per version.
 
 ---
 
+## Development
+
+The repository holds two things: the Go gateway, and the admin console in
+`web/` (React 19 + Vite + Tailwind v4 + shadcn/ui). `make build` compiles
+the console into `web/dist` and embeds it into the binary via `go:embed`,
+so a release is still a single file.
+
+```bash
+# One-time: a Postgres to develop against
+docker compose up -d postgres
+
+# Terminal 1 — gateway on :8080 (also serves the last built console at /)
+FLUXA_DATABASE_URL="postgres://fluxa:fluxa@localhost:5432/fluxa?sslmode=disable" make run
+
+# Terminal 2 — console with hot reload on :5173, /admin and /v1 proxied to :8080
+cd web && npm install && npm run dev
+```
+
+Use `http://localhost:5173` while working on the UI. `make build` produces
+the embedded production build and `./bin/fluxa` then serves everything from
+one origin on `:8080`.
+
+Tests:
+
+```bash
+make test      # skips database-backed tests when no test DB is configured
+make test-db   # spins up a throwaway Postgres in docker and runs everything
+```
+
+The console uses react-router for client-side routing and stock shadcn/ui
+components with the default theme — no project palette is layered on top
+yet, so a rebrand is a single edit to `web/src/index.css`.
+
 ## Contributing
 
-Contributions are welcome. Please open an issue before submitting a pull request for significant changes.
+Contributions are welcome. Please open an issue before submitting a pull
+request for significant changes.
 
 ```bash
 git clone https://github.com/yourname/fluxa.git
 cd fluxa
-make dev
 ```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ---
 

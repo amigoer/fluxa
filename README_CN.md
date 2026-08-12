@@ -324,6 +324,37 @@ curl -X POST http://localhost:8080/admin/keys \
 
 ---
 
+## 本地开发
+
+仓库里有两部分：Go 网关，以及 `web/` 下的管理控制台（React 19 + Vite +
+Tailwind v4 + shadcn/ui）。`make build` 会先把控制台编译到 `web/dist`，
+再通过 `go:embed` 打进二进制，所以发布产物依然是单个文件。
+
+```bash
+# 一次性：起一个用于开发的 Postgres
+docker compose up -d postgres
+
+# 终端 1 —— 网关跑在 :8080（根路径同时提供上次构建的控制台）
+FLUXA_DATABASE_URL="postgres://fluxa:fluxa@localhost:5432/fluxa?sslmode=disable" make run
+
+# 终端 2 —— 控制台热更新跑在 :5173，/admin 和 /v1 代理到 :8080
+cd web && npm install && npm run dev
+```
+
+开发 UI 时访问 `http://localhost:5173`。`make build` 产出嵌入式生产构建，
+之后 `./bin/fluxa` 会在 `:8080` 单一来源下同时提供 API 和界面。
+
+测试：
+
+```bash
+make test      # 未配置测试库时自动跳过依赖数据库的用例
+make test-db   # 用 docker 起一个一次性 Postgres 跑全量
+```
+
+控制台使用 react-router 做客户端路由，界面全部由 shadcn/ui 原生组件搭建，
+沿用其默认主题——尚未叠加任何项目配色，后续换肤只需改
+`web/src/index.css` 一个文件。
+
 ## 参与贡献
 
 欢迎提交 Issue 和 Pull Request。在提交较大改动的 PR 之前，建议先开 Issue 讨论方案。
@@ -331,10 +362,7 @@ curl -X POST http://localhost:8080/admin/keys \
 ```bash
 git clone https://github.com/yourname/fluxa.git
 cd fluxa
-make dev
 ```
-
-详细的开发环境搭建和贡献指南见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 
