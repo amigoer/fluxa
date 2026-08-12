@@ -2,12 +2,13 @@
 
 # Fluxa
 
-**A high-performance AI gateway written in Go**
+**A self-hosted AI gateway written in Go**
 
-Unified routing · Virtual key management · Token tracking · DLP firewall
+One OpenAI-compatible endpoint in front of every provider you use — with
+per-project keys, budgets, request logs and a DLP firewall.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/go-1.25+-00ADD8.svg)](https://golang.org)
 [![Release](https://img.shields.io/github/v/release/yourname/fluxa)](https://github.com/yourname/fluxa/releases)
 [![Docker](https://img.shields.io/docker/pulls/fluxa/fluxa)](https://hub.docker.com/r/fluxa/fluxa)
 
@@ -17,212 +18,84 @@ Unified routing · Virtual key management · Token tracking · DLP firewall
 
 ---
 
-Fluxa is an open-source AI gateway built in Go, designed for teams and individual developers who manage their own API keys across multiple providers. Instead of scattering keys across projects and losing track of token usage, Fluxa gives you a single OpenAI-compatible endpoint that routes to any provider — OpenAI, Anthropic, DeepSeek, Qwen, Ollama, and more.
+Point your app at Fluxa instead of at OpenAI. It routes each call to the
+right provider, enforces per-key budgets and rate limits, records what was
+sent, and blocks prompts that leak secrets.
 
-**No middlemen. No markup. Your keys talk directly to providers.**
+Your provider keys never leave the server and your traffic goes straight to
+the vendor — Fluxa takes no cut. It ships as a single Go binary with the
+admin console embedded, and needs nothing but a Postgres database.
 
-Fluxa sits in between just long enough to enforce budgets, track usage, and scan for data leaks — then gets out of the way. Ships as a single binary. Runs in one command.
-
----
-
-## Why Fluxa
-
-Most teams hit the same problems as their AI usage grows:
-
-- **Key chaos** — API keys scattered across projects, shared over Slack, no idea who's using what
-- **Zero visibility** — no way to know which team spent $800 last month until the bill arrives
-- **No guardrails** — one engineer pastes a database connection string into a prompt, and it goes straight to OpenAI
-- **Provider lock-in** — switching from GPT-4o to DeepSeek means rewriting integrations
-
-Fluxa fixes all of this with one self-hosted binary.
-
----
-
-## Features
-
-### 🔀 Unified Routing
-- Single OpenAI-compatible endpoint — change `base_url`, nothing else
-- Native Anthropic `/v1/messages` support for Claude Code, Cursor, and similar tools
-- True SSE streaming passthrough — no buffering, no added latency
-- Automatic fallback chains when providers go down
-
-### 🔑 Virtual Key Management
-- Issue isolated virtual keys per project, team, or developer
-- Real provider keys never leave the server
-- Set token budgets, dollar budgets, and rate limits per key
-- Expiry dates, IP allowlists, enable/disable with one API call
-
-### 📊 Observability
-- Every request logged: model, provider, token count, latency, cost
-- Built-in cost estimation with up-to-date pricing tables
-- Console with today/month totals, a searchable request log and provider status
-- Full request and response bodies captured per call for replay and audit
-
-### 🛡️ AI Firewall (v5.0)
-- DLP rules engine: phone numbers, ID cards, bank cards, email addresses, and 20+ built-in patterns
-- Credential leak detection: API keys, private keys, tokens
-- Custom keyword blocklists for internal project names and sensitive terms
-- Three enforcement modes: `block`, `mask`, or `log`
-- `log` doubles as observation mode: record matches without blocking while tuning rules
-
-### ⚡ Built for Performance
-- Written in Go — gateway overhead under 5ms P99
-- Single binary, zero external dependencies
-- Runs on a $5 VPS, handles 10,000+ concurrent connections
-- Cold start under 1 second
-
----
-
-## Supported Providers
-
-| Provider | Models | Kind | Status |
-|----------|--------|------|--------|
-| OpenAI | GPT-4o, GPT-4o-mini, o1, o3 | `openai` | ✅ |
-| Anthropic | Claude 3.5, Claude 3.7 | `anthropic` | ✅ |
-| DeepSeek | deepseek-chat, deepseek-reasoner | `deepseek` | ✅ |
-| 通义千问 (Qwen) | qwen-max, qwen-plus, qwen-turbo | `qwen` | ✅ |
-| Ollama | Any local model | `ollama` | ✅ |
-| Kimi / Moonshot | moonshot-v1, kimi-k2 | `moonshot` | ✅ |
-| 智谱 GLM | glm-4, glm-4-flash | `zhipu` | ✅ |
-| 文心一言 | ernie-4.0, ernie-3.5 | `ernie` | ✅ |
-| 豆包 (Volcengine Ark) | doubao-pro | `doubao` | ✅ |
-| Google Gemini | gemini-1.5-pro, gemini-2.0 | `gemini` | ✅ |
-| AWS Bedrock | Claude, Llama, Titan (Converse API, in-tree SigV4) | `bedrock` | ✅ |
-| Azure OpenAI | Deployment-mapped GPT-4o, GPT-4o-mini | `azure` | ✅ |
-| Mistral | mistral-large, codestral | `mistral` | ✅ |
-| Groq | Llama 3.3, Mixtral (ultra-fast) | `groq` | ✅ |
-| xAI | grok-2, grok-2-mini | `xai` | ✅ |
-| Perplexity | sonar online & chat | `perplexity` | ✅ |
-| Together AI | Llama, Qwen, Mixtral | `together` | ✅ |
-| Fireworks | Llama, Mixtral, DeepSeek | `fireworks` | ✅ |
-| OpenRouter | 300+ aggregated models | `openrouter` | ✅ |
-| Cohere | command-r-plus, command-r | `cohere` | ✅ |
-| NVIDIA NIM | Llama, Mixtral on build.nvidia.com | `nvidia` | ✅ |
-| 硅基流动 (SiliconFlow) | Qwen, DeepSeek, Llama mirrors | `siliconflow` | ✅ |
-| MiniMax | abab6.5s-chat | `minimax` | ✅ |
-| 百川智能 (Baichuan) | Baichuan4 | `baichuan` | ✅ |
-| 阶跃星辰 (StepFun) | step-1, step-2 | `stepfun` | ✅ |
-| 讯飞星火 (Spark) | Spark v3.5 | `spark` | ✅ |
-| 零一万物 (01.AI / Yi) | yi-large, yi-medium | `zero-one` | ✅ |
-| 腾讯混元 (Hunyuan) | hunyuan-pro, hunyuan-standard | `tencent` | ✅ |
-
-> Any OpenAI-compatible vendor not listed above still works out of the box:
-> set `kind: openai` and point `base_url` at the vendor's `/v1` endpoint.
-
-### Adapter architecture: 5 protocols, 29+ vendors
-
-Fluxa splits adapters by **wire protocol**, not by vendor. One well-tested
-code path serves every vendor that speaks the same dialect, so a fix to
-SSE parsing or retry logic benefits all of them at once and the binary
-stays under 15 MiB.
-
-| Adapter package | Handles | Why it is separate |
-|-----------------|---------|--------------------|
-| `internal/adapter/openai` | 22 vendors including OpenAI, DeepSeek, Qwen, Ollama, Moonshot, GLM, Doubao, ERNIE, Mistral, Groq, xAI, Perplexity, Together, Fireworks, OpenRouter, Cohere, NVIDIA, SiliconFlow, MiniMax, Baichuan, StepFun, Spark, Yi, Hunyuan | Shared OpenAI `/v1/chat/completions` dialect — only BaseURL and API key differ, registered as a one-liner in `router.openaiCompatibleDefaults` |
-| `internal/adapter/anthropic` | Anthropic Claude | Native `/v1/messages` format with `thinking` / `tool_use` blocks — byte-level passthrough preserves original fields |
-| `internal/adapter/gemini` | Google Gemini | `contents[].parts[].text`, `systemInstruction`, `generationConfig` — full bidirectional OpenAI ↔ Gemini translation |
-| `internal/adapter/bedrock` | AWS Bedrock | Unified Converse API + in-tree SigV4 signer + binary EventStream parser, zero AWS SDK dependency |
-| `internal/adapter/azure` | Azure OpenAI | URL embeds deployment name, `api-key` header instead of Bearer, `model` field stripped from request body |
-
-**Adding a new vendor is a one-line change** when it speaks an OpenAI-compatible
-API: append `"vendor": "https://api.vendor.com/v1"` to `openaiCompatibleDefaults`
-in `internal/router/router.go`. Only write a new adapter package when the
-protocol itself is incompatible.
-
----
-
-## Quick Start
-
-Fluxa needs a Postgres database and nothing else. Schema migrations run
-automatically at startup.
-
-### Docker Compose
-
-Brings up Postgres and the gateway together:
+## Quick start
 
 ```bash
 docker compose up -d
 ```
 
-### Docker
+Open <http://localhost:8080>, sign in with `admin` / `admin`, and change the
+password. Schema migrations run automatically at startup.
+
+Running the binary against your own Postgres instead:
 
 ```bash
-docker run -d \
-  --name fluxa \
-  -p 8080:8080 \
-  -e FLUXA_DATABASE_URL="postgres://fluxa:fluxa@postgres:5432/fluxa?sslmode=disable" \
-  -e FLUXA_BOOTSTRAP_PASSWORD=change-me \
-  fluxa/fluxa:latest
-```
-
-### Binary
-
-```bash
-# Download the latest release
-curl -L https://github.com/yourname/fluxa/releases/latest/download/fluxa-linux-amd64 -o fluxa
-chmod +x fluxa
-
-# Point it at Postgres and go — no config file to write
 export FLUXA_DATABASE_URL="postgres://fluxa:fluxa@localhost:5432/fluxa?sslmode=disable"
 ./fluxa
 ```
 
-Sign in at `/admin/auth/login` with the bootstrap account
-(`admin` / `admin` unless overridden) and change the password
-immediately.
+## Connect your app
 
-### Connect your app
-
-Change two lines. Everything else stays the same.
+Create a virtual key in the console, then change two lines:
 
 ```python
-# Python
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:8080/v1",  # <- change this
-    api_key="vk-your-virtual-key",        # <- change this
+    base_url="http://localhost:8080/v1",  # ← your gateway
+    api_key="vk-your-virtual-key",        # ← not your provider key
 )
 
-response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[{"role": "user", "content": "Hello"}]
-)
+client.chat.completions.create(model="gpt-4o", messages=[...])
 ```
 
-```typescript
-// TypeScript / Node.js
-import OpenAI from "openai";
+Everything else stays the same, streaming included. Anthropic clients
+(Claude Code, Cursor) can point at `/v1/messages` instead.
 
-const client = new OpenAI({
-  baseURL: "http://localhost:8080/v1",  // <- change this
-  apiKey: "vk-your-virtual-key",        // <- change this
-});
-```
+## How it works
 
-```bash
-# curl
-curl http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer vk-your-virtual-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "Hello"}]
-  }'
-```
+Everything below lives in Postgres and is edited in the console or through
+the `/admin` REST API. Writes hot-reload the router — no restart, no
+dropped requests.
 
----
+| Concept | What it does |
+|---|---|
+| **Provider** | An upstream vendor plus its credentials and base URL |
+| **Route** | Maps a model name to a primary provider and a fallback chain |
+| **Virtual model** | One caller-facing name that fans out to weighted targets |
+| **Regex model** | Pattern rewrite, e.g. `^gpt-4.*` → `gpt-4o` |
+| **Virtual key** | Per-project credential with budgets, rate limit, model allowlist and expiry |
+| **DLP rule** | Keyword or regex over request/response bodies — `block`, `mask` or `log` |
+
+Every call lands in a request log with model, provider, tokens, cost,
+latency and — when `FLUXA_STORE_CONTENT` is on — the full payloads, so you
+can replay and audit it later.
 
 ## Configuration
 
-There is no configuration file. Providers, routes, virtual keys, model
-aliases and DLP rules all live in Postgres and the `/admin` REST API is
-the only way to change them — every write hot-reloads the router. The
-process itself is configured entirely through environment variables.
+There is no config file. The process reads environment variables only.
 
 | Variable | Default | Purpose |
-| --- | --- | --- |
-| `FLUXA_DATABASE_URL` | — | Full Postgres DSN. When set, the discrete `FLUXA_DB_*` vars below are ignored |
+|---|---|---|
+| `FLUXA_DATABASE_URL` | — | Postgres DSN. Overrides the discrete `FLUXA_DB_*` vars |
+| `FLUXA_PORT` | `8080` | Listen port |
+| `FLUXA_STORE_CONTENT` | `false` | Persist request/response bodies in the log |
+| `FLUXA_LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+| `FLUXA_BOOTSTRAP_PASSWORD` | `admin` | First-run admin password |
+
+<details>
+<summary>Every variable</summary>
+
+| Variable | Default | Purpose |
+|---|---|---|
 | `FLUXA_DB_HOST` | `localhost` | Postgres host |
 | `FLUXA_DB_PORT` | `5432` | Postgres port |
 | `FLUXA_DB_USER` | `fluxa` | Postgres role |
@@ -233,150 +106,67 @@ process itself is configured entirely through environment variables.
 | `FLUXA_DB_MAX_IDLE_CONNS` | `5` | Idle connections kept open |
 | `FLUXA_DB_CONN_MAX_LIFETIME` | `1h` | Recycle connections older than this |
 | `FLUXA_DB_CONN_MAX_IDLETIME` | `10m` | Close connections idle longer than this |
-| `FLUXA_HOST` / `FLUXA_PORT` | `0.0.0.0` / `8080` | Listen address |
+| `FLUXA_HOST` | `0.0.0.0` | Listen address |
 | `FLUXA_READ_TIMEOUT` | `30s` | HTTP read timeout |
-| `FLUXA_WRITE_TIMEOUT` | `5m` | HTTP write timeout (long enough for streaming) |
+| `FLUXA_WRITE_TIMEOUT` | `5m` | HTTP write timeout (must cover streaming) |
 | `FLUXA_SHUTDOWN_TIMEOUT` | `20s` | Graceful shutdown budget |
-| `FLUXA_LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
 | `FLUXA_LOG_FORMAT` | `json` | `json` \| `text` |
-| `FLUXA_STORE_CONTENT` | `false` | Persist request/response bodies in `request_logs` |
-| `FLUXA_BOOTSTRAP_USER` | `admin` | First-run admin username (only used when `admin_users` is empty) |
-| `FLUXA_BOOTSTRAP_PASSWORD` | `admin` | First-run admin password |
+| `FLUXA_BOOTSTRAP_USER` | `admin` | First-run admin username |
 
-### Managing providers and routes at runtime
+</details>
 
-Every mutation writes to the database and hot-reloads the router with
-zero downtime:
+## Providers
 
-```bash
-# Add a new provider
-curl -X POST http://localhost:8080/admin/providers \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"deepseek","kind":"deepseek","api_key":"sk-xxx"}'
+OpenAI, Anthropic, Gemini, AWS Bedrock, Azure OpenAI, DeepSeek, Qwen,
+Ollama, Moonshot, GLM, ERNIE, Doubao, Hunyuan, MiniMax, Baichuan, StepFun,
+Spark, Yi, SiliconFlow, Mistral, Groq, xAI, Perplexity, Together,
+Fireworks, OpenRouter, Cohere and NVIDIA NIM.
 
-# Attach a route with a fallback chain
-curl -X PUT http://localhost:8080/admin/routes/gpt-4o \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"provider":"openai","fallback":["deepseek"]}'
+Any other OpenAI-compatible vendor works out of the box: set
+`kind: openai` and point `base_url` at its `/v1` endpoint.
 
-# Remove a route
-curl -X DELETE http://localhost:8080/admin/routes/gpt-4o \
-  -H "Authorization: Bearer $TOKEN"
+<details>
+<summary>Why 29 vendors need only five adapters</summary>
 
-# Force a reload from the database
-curl -X POST http://localhost:8080/admin/reload \
-  -H "Authorization: Bearer $TOKEN"
-```
+Adapters are split by **wire protocol**, not by vendor, so one tested code
+path serves every vendor speaking the same dialect and a fix to SSE parsing
+benefits all of them at once.
 
----
+| Adapter | Handles | Why it is separate |
+|---|---|---|
+| `adapter/openai` | 22 vendors | Shared `/v1/chat/completions` dialect — only base URL and key differ |
+| `adapter/anthropic` | Claude | Native `/v1/messages` with `thinking` / `tool_use` blocks, passed through byte for byte |
+| `adapter/gemini` | Gemini | Different request shape — bidirectional OpenAI ↔ Gemini translation |
+| `adapter/bedrock` | Bedrock | Converse API, in-tree SigV4 signer and binary EventStream parser, no AWS SDK |
+| `adapter/azure` | Azure OpenAI | Deployment name in the URL, `api-key` header, `model` stripped from the body |
 
-## Create a Virtual Key
+Adding an OpenAI-compatible vendor is one line in `openaiCompatibleDefaults`
+(`internal/router/router.go`).
 
-```bash
-# Create a key for your frontend team — GPT-4o only, $50/month limit
-curl -X POST http://localhost:8080/admin/keys \
-  -H "Authorization: Bearer your-admin-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "frontend-team",
-    "models": ["gpt-4o", "gpt-4o-mini"],
-    "budget_usd_monthly": 50.0,
-    "rate_limit_rpm": 100
-  }'
-
-# Response
-{
-  "key": "vk-xxxxxxxxxxxxxx",
-  "name": "frontend-team",
-  "created_at": "2026-04-06T10:00:00Z"
-}
-```
-
----
-
-## Roadmap
-
-| Version | Theme | ETA |
-|---------|-------|-----|
-| **v1.0** | Core routing — multi-provider + streaming | ✅ |
-| **v2.0** | Virtual key management + budget control | Q2 2026 |
-| **v3.0** | Observability — dashboard + usage stats | Q2 2026 |
-| **v4.0** | Reliability — circuit breaker + caching + more providers | Q3 2026 |
-| **v5.0** | AI Firewall — DLP + content security | Q3 2026 |
-| **v6.0** | Enterprise — RBAC + SSO + audit logs + clustering | Q4 2026 |
-
-
----
-
-## vs. Other Tools
-
-| | One API / New API | LiteLLM | Fluxa |
-|---|---|---|---|
-| Purpose | Token reselling | Developer SDK | Self-hosted gateway |
-| Language | JavaScript | Python | **Go** |
-| Deployment | Node environment | Python environment | **Single binary** |
-| Gateway latency | Medium | 50–200ms | **< 5ms** |
-| Chinese models | Partial | Weak | **First-class** |
-| DLP / Firewall | No | No | **Built-in** |
-| Touches your money | Yes | No | **No** |
-
----
+</details>
 
 ## Development
 
-The repository holds two things: the Go gateway, and the admin console in
-`web/` (React 19 + Vite + Tailwind v4 + shadcn/ui). `make build` compiles
-the console into `web/dist` and embeds it into the binary via `go:embed`,
-so a release is still a single file.
+The Go gateway lives at the repository root; the admin console is in `web/`
+(React 19 + Vite + Tailwind v4 + shadcn/ui). `make build` compiles the
+console into `web/dist`, embeds it with `go:embed`, and writes a single
+binary to `bin/`.
 
 ```bash
-# One-time: a Postgres to develop against
 docker compose up -d postgres
 
-# Terminal 1 — gateway on :8080 (also serves the last built console at /)
+# gateway on :8080, serving the last built console at /
 FLUXA_DATABASE_URL="postgres://fluxa:fluxa@localhost:5432/fluxa?sslmode=disable" make run
 
-# Terminal 2 — console with hot reload on :5173, /admin and /v1 proxied to :8080
+# console with hot reload on :5173, /admin and /v1 proxied to :8080
 cd web && npm install && npm run dev
 ```
 
-Use `http://localhost:5173` while working on the UI. `make build` produces
-the embedded production build and `./bin/fluxa` then serves everything from
-one origin on `:8080`.
-
-Tests:
-
 ```bash
-make test      # skips database-backed tests when no test DB is configured
-make test-db   # spins up a throwaway Postgres in docker and runs everything
+make test      # database-backed tests skip unless FLUXA_TEST_DATABASE_URL is set
+make test-db   # runs everything against a throwaway Postgres in docker
 ```
-
-The console uses react-router for client-side routing and stock shadcn/ui
-components with the default theme — no project palette is layered on top
-yet, so a rebrand is a single edit to `web/src/index.css`.
-
-## Contributing
-
-Contributions are welcome. Please open an issue before submitting a pull
-request for significant changes.
-
-```bash
-git clone https://github.com/yourname/fluxa.git
-cd fluxa
-```
-
----
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-
-*Flow Through, Stay in Control*
-
-</div>
+MIT.
