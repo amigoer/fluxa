@@ -52,25 +52,25 @@
 :root {
   /* Surfaces — warm neutral ramp. The canvas is very slightly warm so
      white cards lift off it without needing a heavy shadow. */
-  --background: hsl(60 20% 98%);
-  --foreground: hsl(24 10% 10%);
+  --background: hsl(210 20% 98%);
+  --foreground: hsl(222 22% 11%);
 
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(24 10% 10%);
+  --card-foreground: hsl(222 22% 11%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(24 10% 10%);
+  --popover-foreground: hsl(222 22% 11%);
 
   /* Brand — indigo, deep enough to carry white text at AA. */
-  --primary: hsl(243 75% 52%);
+  --primary: hsl(234 56% 52%);
   --primary-foreground: hsl(0 0% 100%);
-  --primary-subtle: hsl(243 75% 52% / 0.09);
+  --primary-subtle: hsl(234 56% 52% / 0.09);
 
-  --secondary: hsl(30 10% 95.5%);
-  --secondary-foreground: hsl(24 10% 18%);
-  --muted: hsl(30 10% 95.5%);
-  --muted-foreground: hsl(25 6% 45%);
-  --accent: hsl(243 60% 96%);
-  --accent-foreground: hsl(243 60% 32%);
+  --secondary: hsl(220 14% 96%);
+  --secondary-foreground: hsl(222 20% 20%);
+  --muted: hsl(220 14% 96%);
+  --muted-foreground: hsl(220 9% 46%);
+  --accent: hsl(234 60% 96%);
+  --accent-foreground: hsl(234 55% 38%);
 
   /* Status. Each has a -subtle fill for badges and an -emphasis tone
      that is actually readable as text on a light card — the plain hue
@@ -102,68 +102,68 @@
   --quota-warn: hsl(38 92% 50%);
   --quota-critical: hsl(15 86% 52%);
   --quota-exceeded: hsl(0 72% 51%);
-  --quota-track: hsl(30 8% 90%);
+  --quota-track: hsl(220 14% 92%);
 
-  --border: hsl(30 8% 90%);
-  --border-strong: hsl(28 7% 82%);
-  --input: hsl(30 8% 90%);
-  --ring: hsl(243 75% 52%);
+  --border: hsl(222 20% 12% / 0.09);
+  --border-strong: hsl(222 20% 12% / 0.17);
+  --input: hsl(222 20% 12% / 0.13);
+  --ring: hsl(234 56% 52%);
 
   /* Data series. Ordered by how often a chart needs a second colour:
      brand indigo, then hues that stay distinguishable for the common
      forms of colour blindness. */
-  --chart-1: hsl(243 75% 58%);
+  --chart-1: hsl(234 62% 60%);
   --chart-2: hsl(173 70% 38%);
   --chart-3: hsl(38 92% 50%);
   --chart-4: hsl(320 65% 55%);
   --chart-5: hsl(200 90% 45%);
 
   /* Sidebar is a shade darker than the canvas so the app has a spine. */
-  --sidebar: hsl(40 14% 96.5%);
-  --sidebar-foreground: hsl(24 10% 22%);
-  --sidebar-primary: hsl(243 75% 52%);
+  --sidebar: hsl(220 16% 97%);
+  --sidebar-foreground: hsl(222 14% 30%);
+  --sidebar-primary: hsl(234 56% 52%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(243 60% 95%);
-  --sidebar-accent-foreground: hsl(243 65% 38%);
-  --sidebar-border: hsl(30 8% 89%);
-  --sidebar-ring: hsl(243 75% 52%);
+  --sidebar-accent: hsl(234 55% 95%);
+  --sidebar-accent-foreground: hsl(234 55% 38%);
+  --sidebar-border: hsl(222 20% 12% / 0.08);
+  --sidebar-ring: hsl(234 56% 52%);
 
-  --radius: 0.625rem;
+  --radius: 0.5rem;
 
   /* Elevation. Shadows are tinted with the neutral hue rather than pure
      black — black shadows on a warm canvas read as grime. */
-  --shadow-xs: 0 1px 2px 0 hsl(30 15% 12% / 0.05);
-  --shadow-sm: 0 1px 3px 0 hsl(30 15% 12% / 0.07), 0 1px 2px -1px hsl(30 15% 12% / 0.05);
-  --shadow-md: 0 6px 16px -4px hsl(30 15% 12% / 0.1), 0 2px 6px -2px hsl(30 15% 12% / 0.06);
+  --shadow-xs: 0 1px 2px 0 hsl(222 20% 12% / 0.05);
+  --shadow-sm: 0 1px 3px 0 hsl(222 20% 12% / 0.07), 0 1px 2px -1px hsl(222 20% 12% / 0.05);
+  --shadow-md: 0 6px 16px -4px hsl(222 20% 12% / 0.1), 0 2px 6px -2px hsl(222 20% 12% / 0.06);
 
   /* Sunken panels: the toolbar strip inside a card, code blocks, chart
      backdrops. Having a named surface stops every page inventing its own grey. */
-  --surface-sunken: hsl(40 14% 97%);
+  --surface-sunken: hsl(220 16% 97.5%);
   --surface-overlay: hsl(0 0% 100%);
 }
 
 .dark {
   /* Cool, near-black but never pure black: elevation reads as a
      lightness step rather than a shadow. */
-  --background: hsl(240 10% 6%);
-  --foreground: hsl(60 9% 96%);
+  --background: hsl(210 11% 4%);
+  --foreground: hsl(210 17% 98%);
 
-  --card: hsl(240 8% 9%);
-  --card-foreground: hsl(60 9% 96%);
-  --popover: hsl(240 8% 11%);
-  --popover-foreground: hsl(60 9% 96%);
+  --card: hsl(220 10% 7%);
+  --card-foreground: hsl(210 17% 98%);
+  --popover: hsl(220 10% 9.5%);
+  --popover-foreground: hsl(210 17% 98%);
 
   /* Lifted for dark backgrounds; the light-mode indigo goes muddy here. */
-  --primary: hsl(239 84% 70%);
-  --primary-foreground: hsl(244 60% 12%);
-  --primary-subtle: hsl(239 84% 70% / 0.16);
+  --primary: hsl(228 100% 78%);
+  --primary-foreground: hsl(230 45% 12%);
+  --primary-subtle: hsl(228 100% 78% / 0.14);
 
-  --secondary: hsl(240 6% 16%);
-  --secondary-foreground: hsl(60 9% 96%);
-  --muted: hsl(240 6% 15%);
-  --muted-foreground: hsl(30 6% 64%);
-  --accent: hsl(243 40% 20%);
-  --accent-foreground: hsl(240 90% 90%);
+  --secondary: hsl(220 8% 14%);
+  --secondary-foreground: hsl(210 17% 98%);
+  --muted: hsl(220 8% 13%);
+  --muted-foreground: hsl(215 10% 62%);
+  --accent: hsl(228 38% 20%);
+  --accent-foreground: hsl(228 90% 88%);
 
   --destructive: hsl(0 84% 64%);
   --destructive-foreground: hsl(0 60% 12%);
@@ -189,27 +189,27 @@
   --quota-warn: hsl(43 96% 56%);
   --quota-critical: hsl(20 90% 60%);
   --quota-exceeded: hsl(0 84% 64%);
-  --quota-track: hsl(240 6% 20%);
+  --quota-track: hsl(0 0% 100% / 0.1);
 
-  --border: hsl(240 6% 19%);
-  --border-strong: hsl(240 5% 28%);
-  --input: hsl(240 6% 22%);
-  --ring: hsl(239 84% 70%);
+  --border: hsl(0 0% 100% / 0.08);
+  --border-strong: hsl(0 0% 100% / 0.15);
+  --input: hsl(0 0% 100% / 0.12);
+  --ring: hsl(228 100% 78%);
 
-  --chart-1: hsl(239 84% 70%);
-  --chart-2: hsl(172 66% 50%);
-  --chart-3: hsl(43 96% 56%);
-  --chart-4: hsl(320 70% 68%);
-  --chart-5: hsl(198 93% 60%);
+  --chart-1: hsl(228 100% 78%);
+  --chart-2: hsl(172 60% 62%);
+  --chart-3: hsl(38 95% 70%);
+  --chart-4: hsl(320 75% 78%);
+  --chart-5: hsl(199 90% 72%);
 
-  --sidebar: hsl(240 10% 8%);
-  --sidebar-foreground: hsl(30 6% 82%);
-  --sidebar-primary: hsl(239 84% 70%);
-  --sidebar-primary-foreground: hsl(244 60% 12%);
-  --sidebar-accent: hsl(243 35% 22%);
-  --sidebar-accent-foreground: hsl(240 90% 92%);
-  --sidebar-border: hsl(240 6% 18%);
-  --sidebar-ring: hsl(239 84% 70%);
+  --sidebar: hsl(215 12% 5.5%);
+  --sidebar-foreground: hsl(215 12% 78%);
+  --sidebar-primary: hsl(228 100% 78%);
+  --sidebar-primary-foreground: hsl(230 45% 12%);
+  --sidebar-accent: hsl(228 32% 18%);
+  --sidebar-accent-foreground: hsl(228 90% 90%);
+  --sidebar-border: hsl(0 0% 100% / 0.06);
+  --sidebar-ring: hsl(228 100% 78%);
 
   /* On dark surfaces a drop shadow is nearly invisible, so elevation is
      carried by a top highlight plus a deeper, larger shadow. */
@@ -217,8 +217,8 @@
   --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.5), inset 0 1px 0 0 hsl(0 0% 100% / 0.03);
   --shadow-md: 0 8px 24px -6px hsl(0 0% 0% / 0.6), inset 0 1px 0 0 hsl(0 0% 100% / 0.04);
 
-  --surface-sunken: hsl(240 8% 7%);
-  --surface-overlay: hsl(240 8% 11%);
+  --surface-sunken: hsl(220 10% 5.5%);
+  --surface-overlay: hsl(220 10% 9.5%);
 }
 
 /* ---------------------------------------------------------------------------
@@ -338,13 +338,27 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
-  /* Headings tighten as they grow — the standard optical correction that
-     keeps a 30px figure from looking loose next to 13px labels. */
+  /* Weight and tracking follow what Linear actually ships: display text
+     sits around 510-560, never 600+, with tracking pulled in as size
+     grows. Bold headings are the single loudest thing in a default
+     shadcn layout and the first thing to go. */
   h1,
   h2,
   h3,
-  [data-slot="card-title"] {
-    letter-spacing: -0.015em;
+  h4,
+  [data-slot="card-title"],
+  [data-slot="dialog-title"],
+  [data-slot="sheet-title"],
+  [data-slot="alert-dialog-title"] {
+    font-weight: 560;
+    letter-spacing: -0.014em;
+  }
+
+  /* Anything genuinely large gets the tighter optical correction. */
+  .text-2xl,
+  .text-3xl,
+  .tabular-nums.text-\[1\.75rem\] {
+    letter-spacing: -0.022em;
   }
 
   code,
