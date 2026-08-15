@@ -91,7 +91,7 @@ export function OverviewPage() {
               return (
                 <div key={p.ID} className="flex items-center justify-between border-t border-border py-2 text-xs first:border-t-0">
                   <span className="flex items-center text-foreground">
-                    <ProviderAvatar name={p.Name} />
+                    <ProviderAvatar name={p.Name} kind={p.Kind} />
                     {p.Name}
                   </span>
                   <StatusPill tone={healthTone[state]}>{healthLabel[state]}</StatusPill>

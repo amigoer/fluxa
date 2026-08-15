@@ -6,6 +6,7 @@ import { Logo } from "@/components/shared/logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { FeishuIcon } from "@/components/shared/brand-icons"
 import { api, ApiError } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
@@ -174,7 +175,11 @@ export function LoginPage() {
         )}
 
         {methods?.feishu && (
-          <Button className="w-full" onClick={() => (window.location.href = "/api/auth/feishu/login")}>
+          <Button
+            className="w-full gap-2"
+            onClick={() => (window.location.href = "/api/auth/feishu/login")}
+          >
+            <FeishuIcon className="size-4" />
             使用飞书登录
           </Button>
         )}

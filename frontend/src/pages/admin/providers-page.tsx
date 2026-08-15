@@ -130,7 +130,7 @@ export function ProvidersPage() {
               <tr key={p.ID} className="border-t border-border">
                 <td className="p-3">
                   <span className="flex items-center text-foreground">
-                    <ProviderAvatar name={p.Name} />
+                    <ProviderAvatar name={p.Name} kind={p.Kind} />
                     {p.Name}
                   </span>
                 </td>

@@ -66,6 +66,9 @@ export interface Model {
   InputPriceCentsPer1M: number
   OutputPriceCentsPer1M: number
   ContextWindow: number
+  // Only populated by GET /api/models/published (see
+  // internal/provider/repo.go ListPublishedModels) -- empty elsewhere.
+  ProviderKind?: string
 }
 
 export interface ProcurementRecord {

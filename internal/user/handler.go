@@ -716,7 +716,10 @@ func (h *Handler) getNotifyChannel(w http.ResponseWriter, r *http.Request) {
 	kind := NotifyChannelKind(chi.URLParam(r, "kind"))
 	channel, err := h.service.GetNotifyChannel(r.Context(), kind)
 	if errors.Is(err, ErrNotFound) {
-		httpx.JSON(w, http.StatusOK, NotifyChannel{Kind: kind})
+		// Same shape as the found case below (channel + sentThisMonth),
+		// just zeroed out -- the frontend always expects the wrapper,
+		// unconfigured or not.
+		httpx.JSON(w, http.StatusOK, map[string]any{"channel": NotifyChannel{Kind: kind}, "sentThisMonth": 0})
 		return
 	}
 	if err != nil {

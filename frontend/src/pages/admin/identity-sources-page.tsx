@@ -15,14 +15,31 @@ import {
 } from "@/components/ui/dialog"
 import { api } from "@/lib/api"
 import type { AuthSettings, IdentityConfig } from "@/lib/types"
+import { FeishuIcon, DingTalkIcon } from "@/components/shared/brand-icons"
+import type { IconProps } from "@/components/shared/brand-icons"
+import type { ComponentType } from "react"
 
-const providers: { key: string; label: string; letter: string }[] = [
-  { key: "feishu", label: "飞书", letter: "飞" },
+// WeCom has no real icon wired up yet -- no clean, redistributable
+// source was found (not in Simple Icons or lobe-icons, no official
+// Linux app package to pull from the way Feishu and DingTalk's were).
+// It stays on the letter avatar until a real asset turns up.
+const providers: { key: string; label: string; letter: string; icon?: ComponentType<IconProps> }[] = [
+  { key: "feishu", label: "飞书", letter: "飞", icon: FeishuIcon },
   { key: "wecom", label: "企业微信", letter: "企" },
-  { key: "dingtalk", label: "钉钉", letter: "钉" },
+  { key: "dingtalk", label: "钉钉", letter: "钉", icon: DingTalkIcon },
 ]
 
-function IdentityCard({ providerKey, label, letter }: { providerKey: string; label: string; letter: string }) {
+function IdentityCard({
+  providerKey,
+  label,
+  letter,
+  icon: Icon,
+}: {
+  providerKey: string
+  label: string
+  letter: string
+  icon?: ComponentType<IconProps>
+}) {
   const [config, setConfig] = useState<IdentityConfig | null>(null)
   const [open, setOpen] = useState(false)
   const [appId, setAppId] = useState("")
@@ -54,9 +71,15 @@ function IdentityCard({ providerKey, label, letter }: { providerKey: string; lab
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-[12.5px] font-bold text-accent-foreground">
-            {letter}
-          </span>
+          {Icon ? (
+            <span className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-card ring-1 ring-inset ring-border">
+              <Icon className="size-5" />
+            </span>
+          ) : (
+            <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-[12.5px] font-bold text-accent-foreground">
+              {letter}
+            </span>
+          )}
           <span className="text-[13px] font-semibold text-foreground">{label}</span>
         </span>
         <StatusPill tone={config?.Enabled ? "ok" : "warn"}>{config?.Enabled ? "已启用" : "未配置"}</StatusPill>
@@ -159,7 +182,7 @@ export function IdentitySourcesPage() {
       <PageHeader title="身份源" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {providers.map((p) => (
-          <IdentityCard key={p.key} providerKey={p.key} label={p.label} letter={p.letter} />
+          <IdentityCard key={p.key} providerKey={p.key} label={p.label} letter={p.letter} icon={p.icon} />
         ))}
         <LocalAccountCard />
       </div>

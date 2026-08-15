@@ -30,6 +30,7 @@ export function ProcurementPage() {
   const { data: records, refetch } = useApiQuery<ProcurementRecord[]>("/api/procurement")
   const { data: providers } = useApiQuery<Provider[]>("/api/providers")
   const providerName = (id: string) => (providers ?? []).find((p) => p.ID === id)?.Name ?? id
+  const providerKind = (id: string) => (providers ?? []).find((p) => p.ID === id)?.Kind
 
   const [open, setOpen] = useState(false)
   const [providerId, setProviderId] = useState("")
@@ -126,7 +127,7 @@ export function ProcurementPage() {
               <tr key={r.ID} className="border-t border-border">
                 <td className="p-3">
                   <span className="flex items-center text-foreground">
-                    <ProviderAvatar name={providerName(r.ProviderID)} />
+                    <ProviderAvatar name={providerName(r.ProviderID)} kind={providerKind(r.ProviderID)} />
                     {providerName(r.ProviderID)}
                   </span>
                 </td>

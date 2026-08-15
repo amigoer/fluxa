@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react"
+import { Mail } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/shared/page-header"
 import { StatusPill } from "@/components/shared/status-pill"
+import { AlibabaCloudIcon } from "@/components/shared/brand-icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -52,7 +54,9 @@ function SmsCard() {
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-[12.5px] font-bold text-accent-foreground">短</span>
+          <span className="flex size-8 items-center justify-center rounded-lg bg-card ring-1 ring-inset ring-border">
+            <AlibabaCloudIcon className="size-5" />
+          </span>
           <span className="text-[13px] font-semibold text-foreground">短信</span>
         </span>
         <StatusPill tone={data?.channel.Enabled ? "ok" : "warn"}>{data?.channel.Enabled ? "已启用" : "未配置"}</StatusPill>
@@ -133,7 +137,9 @@ function EmailCard() {
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-[12.5px] font-bold text-accent-foreground">邮</span>
+          <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+            <Mail className="size-4" strokeWidth={2} />
+          </span>
           <span className="text-[13px] font-semibold text-foreground">邮件（SMTP）</span>
         </span>
         <StatusPill tone={data?.channel.Enabled ? "ok" : "warn"}>{data?.channel.Enabled ? "已启用" : "未配置"}</StatusPill>

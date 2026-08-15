@@ -33,6 +33,7 @@ export function ModelsRoutingPage() {
   const { data: rules, refetch: refetchRules } = useApiQuery<RoutingRule[]>("/api/routing/global")
 
   const providerName = (id: string) => (providers ?? []).find((p) => p.ID === id)?.Name ?? id
+  const providerKind = (id: string) => (providers ?? []).find((p) => p.ID === id)?.Kind
   const modelName = (id: string | null) => (models ?? []).find((m) => m.ID === id)?.Name ?? "—"
 
   const [modelOpen, setModelOpen] = useState(false)
@@ -164,7 +165,7 @@ export function ModelsRoutingPage() {
                   <tr key={m.ID} className="border-t border-border">
                     <td className="p-3">
                       <span className="flex items-center text-foreground">
-                        <ProviderAvatar name={m.Name} />
+                        <ProviderAvatar name={m.Name} kind={providerKind(m.ProviderID)} />
                         {m.Name}
                       </span>
                     </td>

@@ -33,7 +33,7 @@ export function PricingPage() {
               <tr key={m.ID} className="border-t border-border">
                 <td className="p-3">
                   <span className="flex items-center text-foreground">
-                    <ProviderAvatar name={m.Name} />
+                    <ProviderAvatar name={m.Name} kind={m.ProviderKind} />
                     {m.Name}
                   </span>
                 </td>

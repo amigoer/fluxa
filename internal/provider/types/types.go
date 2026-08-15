@@ -52,8 +52,13 @@ type Model struct {
 	InputPriceCentsPer1M  int64
 	OutputPriceCentsPer1M int64
 	ContextWindow         int
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	// ProviderKind is only populated by queries that join providers in
+	// (ListPublishedModels), for the frontend to pick a brand icon
+	// without a separate /api/providers call an employee isn't
+	// permitted to make. Zero value elsewhere.
+	ProviderKind ProviderKind
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type ProcurementRecord struct {
