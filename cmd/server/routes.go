@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/amigoer/fluxa/internal/platform/config"
+	"github.com/amigoer/fluxa/internal/provider"
 	"github.com/amigoer/fluxa/internal/user"
 )
 
@@ -19,4 +20,12 @@ func wireRoutes(r chi.Router, cfg config.Config, pool *pgxpool.Pool, log *slog.L
 	sessions := user.NewSessionManager(userRepo, userService, cfg.SessionCookieName, cfg.SessionCookieSecure)
 	userHandler := user.NewHandler(userService, userRepo, sessions, cfg.BaseURL)
 	userHandler.RegisterRoutes(r)
+
+	providerRepo := provider.NewRepo(pool)
+	providerService := provider.NewService(providerRepo)
+	providerHandler := provider.NewHandler(providerService, providerRepo)
+	r.Group(func(r chi.Router) {
+		r.Use(sessions.Middleware)
+		providerHandler.RegisterRoutes(r)
+	})
 }
