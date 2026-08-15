@@ -27,6 +27,12 @@ export function LoginPage() {
   const [name, setName] = useState("")
   const [codeSent, setCodeSent] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Which login paths are actually configured: an admin hasn't set up
+  // Feishu or a notify channel on a brand new deployment, so the
+  // corresponding button must not be offered as if it worked -- see
+  // internal/user/handler.go authMethods. null while still loading, so
+  // nothing renders (and nothing is clickable) until we actually know.
+  const [methods, setMethods] = useState<{ feishu: boolean; local: boolean } | null>(null)
 
   useEffect(() => {
     api
@@ -36,6 +42,13 @@ export function LoginPage() {
       })
       .catch(() => {})
   }, [navigate])
+
+  useEffect(() => {
+    api
+      .get<{ feishu: boolean; local: boolean }>("/api/auth/methods")
+      .then(setMethods)
+      .catch(() => setMethods({ feishu: false, local: false }))
+  }, [])
 
   const requestCode = async () => {
     setBusy(true)
@@ -141,6 +154,8 @@ export function LoginPage() {
     )
   }
 
+  const noMethodsConfigured = methods && !methods.feishu && !methods.local
+
   return (
     <LoginLayout>
       <div className="flex flex-col items-center gap-4">
@@ -149,15 +164,32 @@ export function LoginPage() {
           <p className="text-[19px] font-bold text-foreground">登录 Fluxa</p>
           <p className="mt-1 text-[12.5px] text-muted-foreground">企业内部 AI 资源分发管理系统</p>
         </div>
-        <Button className="w-full" onClick={() => (window.location.href = "/api/auth/feishu/login")}>
-          使用飞书登录
-        </Button>
-        <div className="flex w-full items-center gap-2.5 text-[11px] text-muted-foreground">
-          <span className="h-px flex-1 bg-border" />或<span className="h-px flex-1 bg-border" />
-        </div>
-        <Button variant="outline" className="w-full" onClick={() => setView("login")}>
-          手机号 / 邮箱登录
-        </Button>
+
+        {!methods && <p className="text-xs text-muted-foreground">加载中…</p>}
+
+        {noMethodsConfigured && (
+          <p className="text-center text-[12.5px] text-muted-foreground">
+            管理员还没有配置登录方式（飞书或短信/邮箱），请联系管理员完成配置后再试
+          </p>
+        )}
+
+        {methods?.feishu && (
+          <Button className="w-full" onClick={() => (window.location.href = "/api/auth/feishu/login")}>
+            使用飞书登录
+          </Button>
+        )}
+
+        {methods?.feishu && methods?.local && (
+          <div className="flex w-full items-center gap-2.5 text-[11px] text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />或<span className="h-px flex-1 bg-border" />
+          </div>
+        )}
+
+        {methods?.local && (
+          <Button variant="outline" className="w-full" onClick={() => setView("login")}>
+            手机号 / 邮箱登录
+          </Button>
+        )}
       </div>
     </LoginLayout>
   )

@@ -11,7 +11,7 @@ import { adminHasAnyPermission } from "@/layouts/nav-config"
 import { api } from "@/lib/api"
 
 export function TopBar({ title, sideAction }: { title: string; sideAction?: React.ReactNode }) {
-  const { member, permissions, refresh } = useAuth()
+  const { permissions, roleName, departmentName, refresh } = useAuth()
   const canSeeAdmin = adminHasAnyPermission(permissions)
 
   const logout = async () => {
@@ -30,7 +30,8 @@ export function TopBar({ title, sideAction }: { title: string; sideAction?: Reac
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-1 pl-3 pr-1.5 text-[11.5px] text-foreground shadow-[var(--shadow-card)]">
-              {member?.Status === "active" ? "在职" : member?.Status}
+              {roleName}
+              {departmentName && <span className="text-muted-foreground"> · {departmentName}</span>}
               <ChevronDown className="size-2.5 text-muted-foreground" strokeWidth={1.8} />
             </button>
           </DropdownMenuTrigger>

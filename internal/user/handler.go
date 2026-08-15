@@ -51,6 +51,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/setup/status", h.setupStatus)
 	r.Post("/api/setup", h.setup)
 
+	r.Get("/api/auth/methods", h.authMethods)
 	r.Get("/api/auth/feishu/login", h.feishuLogin)
 	r.Get("/api/auth/feishu/callback", h.feishuCallback)
 	r.Post("/api/auth/local/register/request-otp", h.requestRegisterOTP)
@@ -93,6 +94,31 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 func (h *Handler) setupStatus(w http.ResponseWriter, r *http.Request) {
 	_, err := h.repo.GetOrganization(r.Context())
 	httpx.JSON(w, http.StatusOK, map[string]bool{"needsSetup": errors.Is(err, ErrNotFound)})
+}
+
+// authMethods reports which login paths are actually usable right now,
+// so the login page can hide or grey out a method instead of sending
+// the caller into a dead end (e.g. a full-page redirect to Feishu OAuth
+// that isn't configured yet just 404s). Public: a caller who isn't
+// logged in yet is exactly who needs to know this before picking a
+// button.
+func (h *Handler) authMethods(w http.ResponseWriter, r *http.Request) {
+	feishu, err := h.service.GetIdentityConfig(r.Context(), IdentityProviderFeishu)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		httpx.InternalError(w, err)
+		return
+	}
+
+	settings, err := h.service.GetAuthSettings(r.Context())
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, map[string]bool{
+		"feishu": feishu.Enabled,
+		"local":  settings.LocalAccountEnabled,
+	})
 }
 
 type setupRequest struct {
@@ -446,9 +472,25 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		httpx.InternalError(w, err)
 		return
 	}
+
+	role, err := h.repo.GetRoleByID(r.Context(), member.RoleID)
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+
+	departmentName := ""
+	if member.DepartmentID != nil {
+		if dept, err := h.repo.GetDepartment(r.Context(), *member.DepartmentID); err == nil {
+			departmentName = dept.Name
+		}
+	}
+
 	httpx.JSON(w, http.StatusOK, map[string]any{
-		"member":      member,
-		"permissions": principal.Permissions,
+		"member":         member,
+		"permissions":    principal.Permissions,
+		"roleName":       role.Name,
+		"departmentName": departmentName,
 	})
 }
 

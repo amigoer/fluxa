@@ -5,7 +5,7 @@ import { Logo } from "@/components/shared/logo"
 import type { NavGroup } from "@/layouts/nav-config"
 
 export function SidebarNav({ groups, narrow }: { groups: NavGroup[]; narrow?: boolean }) {
-  const { member, permissions } = useAuth()
+  const { member, permissions, roleName } = useAuth()
 
   return (
     <div
@@ -59,7 +59,7 @@ export function SidebarNav({ groups, narrow }: { groups: NavGroup[]; narrow?: bo
           </span>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-foreground">{member.Name}</p>
-            <p className="truncate text-[10.5px] text-muted-foreground">{member.Status}</p>
+            <p className="truncate text-[10.5px] text-muted-foreground">{roleName || "—"}</p>
           </div>
         </div>
       )}

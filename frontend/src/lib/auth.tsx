@@ -15,11 +15,18 @@ export interface Member {
 interface MeResponse {
   member: Member
   permissions: Record<string, unknown>
+  roleName: string
+  departmentName: string
 }
 
 interface AuthState {
   member: Member | null
   permissions: Set<string>
+  // Display-only identity info the mockup shows next to a member (the
+  // role pill, the sidebar footer) -- not itself a source of access
+  // control, that's what `permissions` is for.
+  roleName: string
+  departmentName: string
   loading: boolean
   refresh: () => Promise<void>
 }
@@ -33,6 +40,8 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [member, setMember] = useState<Member | null>(null)
   const [permissions, setPermissions] = useState<Set<string>>(new Set())
+  const [roleName, setRoleName] = useState("")
+  const [departmentName, setDepartmentName] = useState("")
   const [loading, setLoading] = useState(true)
 
   const refresh = async () => {
@@ -41,10 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.get<MeResponse>("/api/me")
       setMember(res.member)
       setPermissions(new Set(Object.keys(res.permissions ?? {})))
+      setRoleName(res.roleName)
+      setDepartmentName(res.departmentName)
     } catch (err) {
       if (err instanceof ApiError) {
         setMember(null)
         setPermissions(new Set())
+        setRoleName("")
+        setDepartmentName("")
       }
     } finally {
       setLoading(false)
@@ -57,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ member, permissions, loading, refresh }}>
+    <AuthContext.Provider value={{ member, permissions, roleName, departmentName, loading, refresh }}>
       {children}
     </AuthContext.Provider>
   )

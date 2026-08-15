@@ -53,6 +53,17 @@ func (r *Repo) CreateRole(ctx context.Context, orgID, name string, isBuiltin boo
 	return role, err
 }
 
+func (r *Repo) GetRoleByID(ctx context.Context, id string) (Role, error) {
+	var role Role
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, org_id, name, is_builtin, created_at FROM roles WHERE id = $1`, id,
+	).Scan(&role.ID, &role.OrgID, &role.Name, &role.IsBuiltin, &role.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Role{}, ErrNotFound
+	}
+	return role, err
+}
+
 func (r *Repo) GetRoleByName(ctx context.Context, orgID, name string) (Role, error) {
 	var role Role
 	err := r.pool.QueryRow(ctx,
