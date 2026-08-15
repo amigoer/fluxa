@@ -6,6 +6,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/amigoer/fluxa/internal/audit"
+	"github.com/amigoer/fluxa/internal/gateway"
 	"github.com/amigoer/fluxa/internal/platform/config"
 	"github.com/amigoer/fluxa/internal/provider"
 	"github.com/amigoer/fluxa/internal/security"
@@ -25,13 +27,27 @@ func wireRoutes(r chi.Router, cfg config.Config, pool *pgxpool.Pool, log *slog.L
 	providerRepo := provider.NewRepo(pool)
 	providerService := provider.NewService(providerRepo)
 	providerHandler := provider.NewHandler(providerService, providerRepo)
+
 	securityRepo := security.NewRepo(pool)
 	securityService := security.NewService(securityRepo)
 	securityHandler := security.NewHandler(securityService)
 
+	auditRepo := audit.NewRepo(pool)
+	auditService := audit.NewService(auditRepo)
+	auditHandler := audit.NewHandler(auditService)
+
+	// Session-authenticated management API: everything an admin or
+	// employee reaches through the web UI.
 	r.Group(func(r chi.Router) {
 		r.Use(sessions.Middleware)
 		providerHandler.RegisterRoutes(r)
 		securityHandler.RegisterRoutes(r)
+		auditHandler.RegisterRoutes(r)
 	})
+
+	// The actual gateway: virtual-key (bearer token) authenticated, not
+	// session-cookie authenticated -- this is what an integration calls
+	// programmatically, not a browser.
+	pipeline := gateway.NewPipeline(providerService, securityService, auditService)
+	pipeline.RegisterRoutes(r)
 }

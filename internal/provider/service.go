@@ -51,6 +51,22 @@ func (s *Service) ListProviders(ctx context.Context, orgID string) ([]types.Prov
 	return s.repo.ListProviders(ctx, orgID)
 }
 
+func (s *Service) GetProvider(ctx context.Context, id string) (types.Provider, error) {
+	return s.repo.GetProvider(ctx, id)
+}
+
+func (s *Service) GetModel(ctx context.Context, id string) (types.Model, error) {
+	return s.repo.GetModel(ctx, id)
+}
+
+// SpendFromVirtualKey is the gateway's entry point for deducting a
+// completed call's cost from the virtual key that authenticated it; see
+// Repo.SpendFromVirtualKey for the atomicity and monthly-rollover
+// behavior.
+func (s *Service) SpendFromVirtualKey(ctx context.Context, keyID string, amountCents int64) (bool, error) {
+	return s.repo.SpendFromVirtualKey(ctx, keyID, amountCents)
+}
+
 func (s *Service) CreateModel(ctx context.Context, m types.Model) (types.Model, error) {
 	return s.repo.CreateModel(ctx, m)
 }
