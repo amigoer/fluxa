@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS notify_log;
 DROP TABLE IF EXISTS notify_channels;
 DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS local_otp_codes;
 DROP TABLE IF EXISTS local_accounts;
 DROP TABLE IF EXISTS auth_settings;
 DROP TABLE IF EXISTS identity_configs;

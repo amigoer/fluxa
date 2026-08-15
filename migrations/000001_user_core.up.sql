@@ -97,15 +97,32 @@ CREATE TABLE auth_settings (
 );
 INSERT INTO auth_settings (id) VALUES (true);
 
+-- Local accounts authenticate with a one-time code sent to phone/email
+-- (see local_otp_codes below), not a password: matching the login
+-- screen design, there is no password field anywhere in the product.
 CREATE TABLE local_accounts (
-    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    member_id     uuid NOT NULL UNIQUE REFERENCES members (id) ON DELETE CASCADE,
-    phone         text UNIQUE,
-    email         text UNIQUE,
-    password_hash text NOT NULL,
-    created_at    timestamptz NOT NULL DEFAULT now(),
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    member_id  uuid NOT NULL UNIQUE REFERENCES members (id) ON DELETE CASCADE,
+    phone      text UNIQUE,
+    email      text UNIQUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
     CHECK (phone IS NOT NULL OR email IS NOT NULL)
 );
+
+-- One-time codes for both registration (proving you own the phone/email
+-- before a pending member is created) and login. code_hash is
+-- sha256(code): short-lived and single-use, so slow hashing buys
+-- nothing a tight expiry doesn't already cover.
+CREATE TABLE local_otp_codes (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    identifier  text NOT NULL,
+    purpose     text NOT NULL CHECK (purpose IN ('register', 'login')),
+    code_hash   text NOT NULL,
+    expires_at  timestamptz NOT NULL,
+    consumed_at timestamptz,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX local_otp_codes_identifier_idx ON local_otp_codes (identifier, purpose);
 
 -- Server-side session (DESIGN.md 7.1 "会话机制"): the client only ever
 -- holds an opaque token, and we store a hash of it here, never the raw

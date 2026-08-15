@@ -29,6 +29,10 @@ type Config struct {
 	// cookie. It should be true in any real deployment (HTTPS) and can
 	// be turned off for local HTTP development.
 	SessionCookieSecure bool
+
+	// BaseURL is this deployment's own externally-reachable origin, used
+	// to build OAuth redirect URIs (e.g. the Feishu callback).
+	BaseURL string
 }
 
 // Load reads configuration from environment variables, applying sane
@@ -39,6 +43,7 @@ func Load() (Config, error) {
 		DatabaseURL:         getEnv("FLUXA_DATABASE_URL", ""),
 		SessionCookieName:   getEnv("FLUXA_SESSION_COOKIE", "fluxa_session"),
 		SessionCookieSecure: getEnv("FLUXA_SESSION_COOKIE_SECURE", "true") == "true",
+		BaseURL:             getEnv("FLUXA_BASE_URL", "http://localhost:8080"),
 	}
 
 	if cfg.DatabaseURL == "" {
