@@ -20,6 +20,7 @@ import (
 	"github.com/amigoer/fluxa/internal/platform/config"
 	"github.com/amigoer/fluxa/internal/platform/db"
 	"github.com/amigoer/fluxa/internal/platform/logger"
+	"github.com/amigoer/fluxa/web"
 )
 
 func main() {
@@ -50,7 +51,10 @@ func run(log *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	router := newRouter(cfg, pool, log)
+	router, err := newRouter(cfg, pool, log)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -82,8 +86,11 @@ func run(log *slog.Logger) error {
 }
 
 // newRouter builds the full route tree. Route registration is added
-// module by module as each one is implemented; see wireRoutes.
-func newRouter(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler {
+// module by module as each one is implemented; see wireRoutes. The
+// embedded frontend is mounted last, as the catch-all for anything that
+// isn't an /api or /v1 route, so client-side routes like
+// /admin/overview fall through to index.html instead of 404ing.
+func newRouter(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.Handler, error) {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
@@ -97,5 +104,11 @@ func newRouter(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Han
 
 	wireRoutes(r, cfg, pool, log)
 
-	return r
+	frontend, err := web.Handler()
+	if err != nil {
+		return nil, err
+	}
+	r.NotFound(frontend.ServeHTTP)
+
+	return r, nil
 }

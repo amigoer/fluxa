@@ -3,7 +3,7 @@ plan/
 # Build artifacts
 /fluxa
 /bin/
-/dist/
+/web/dist/
 
 # Runtime data. State lives in Postgres now; the *.db patterns only keep
 # leftover SQLite files from older checkouts out of commits.
@@ -12,6 +12,10 @@ plan/
 *.db-wal
 *.db-shm
 /data/
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
 
 # Editor / local tooling
 .vscode/
@@ -23,4 +27,3 @@ plan/
 .gocache/
 .gomodcache/
 .gopath/
-web/dist/.gitkeep

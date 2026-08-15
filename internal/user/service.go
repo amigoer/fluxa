@@ -209,6 +209,21 @@ func (s *Service) ListRoles(ctx context.Context, orgID string) ([]Role, error) {
 	return s.repo.ListRoles(ctx, orgID)
 }
 
+// RolePermissions returns the permission codes granted to roleID, for
+// the role-permissions admin page to render as a checkbox grid.
+func (s *Service) RolePermissions(ctx context.Context, roleID string) ([]string, error) {
+	return s.repo.RolePermissionCodes(ctx, roleID)
+}
+
+// SetRolePermissions replaces roleID's permission grants outright. Used
+// both for custom roles and for editing a built-in role's grants -- the
+// route is gated by org.manage_roles either way, which only a super
+// admin holds (see builtinRolePermissions), so this can't be used to
+// grant oneself something one didn't already have.
+func (s *Service) SetRolePermissions(ctx context.Context, roleID string, codes []string) error {
+	return s.repo.GrantPermissions(ctx, roleID, codes)
+}
+
 // CreateCustomRole adds an org-specific role beyond the four built-ins
 // (DESIGN.md 7.1: e.g. carving out a "finance" or "security" role).
 func (s *Service) CreateCustomRole(ctx context.Context, orgID, name string, perms []rbac.Permission) (Role, error) {

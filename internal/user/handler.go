@@ -75,6 +75,8 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 
 		r.Get("/api/roles", h.listRoles)
 		r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Post("/api/roles", h.createRole)
+		r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Get("/api/roles/{id}/permissions", h.getRolePermissions)
+		r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Put("/api/roles/{id}/permissions", h.putRolePermissions)
 
 		r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Get("/api/identity-configs/{provider}", h.getIdentityConfig)
 		r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Put("/api/identity-configs/{provider}", h.putIdentityConfig)
@@ -585,6 +587,33 @@ func (h *Handler) createRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusCreated, role)
+}
+
+func (h *Handler) getRolePermissions(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	codes, err := h.service.RolePermissions(r.Context(), id)
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, codes)
+}
+
+type setRolePermissionsRequest struct {
+	Permissions []string `json:"permissions"`
+}
+
+func (h *Handler) putRolePermissions(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req setRolePermissionsRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if err := h.service.SetRolePermissions(r.Context(), id, req.Permissions); err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, nil)
 }
 
 // -- Identity configs & auth settings -------------------------------------
