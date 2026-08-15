@@ -8,6 +8,7 @@ import (
 
 	"github.com/amigoer/fluxa/internal/platform/config"
 	"github.com/amigoer/fluxa/internal/provider"
+	"github.com/amigoer/fluxa/internal/security"
 	"github.com/amigoer/fluxa/internal/user"
 )
 
@@ -24,8 +25,13 @@ func wireRoutes(r chi.Router, cfg config.Config, pool *pgxpool.Pool, log *slog.L
 	providerRepo := provider.NewRepo(pool)
 	providerService := provider.NewService(providerRepo)
 	providerHandler := provider.NewHandler(providerService, providerRepo)
+	securityRepo := security.NewRepo(pool)
+	securityService := security.NewService(securityRepo)
+	securityHandler := security.NewHandler(securityService)
+
 	r.Group(func(r chi.Router) {
 		r.Use(sessions.Middleware)
 		providerHandler.RegisterRoutes(r)
+		securityHandler.RegisterRoutes(r)
 	})
 }
