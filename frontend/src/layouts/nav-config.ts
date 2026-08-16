@@ -70,10 +70,23 @@ export const adminNav: NavGroup[] = [
 export const employeeNav: NavGroup[] = [
   {
     items: [
-      { to: "/app/usage", label: "我的用量", icon: "activity" },
+      { to: "/app/usage", label: "我的用量", icon: "activity", permission: Permission.OrgViewOwnUsage },
+      // 资费一览 stays un-gated on purpose: /api/models/published is open to
+      // every authenticated caller, so there is no permission to check.
       { to: "/app/pricing", label: "资费一览", icon: "wallet" },
-      { to: "/app/routing", label: "我的路由配置", icon: "waypoints" },
-      { to: "/app/quota-requests", label: "配额申请", icon: "clock", badge: "quota" },
+      {
+        to: "/app/routing",
+        label: "我的路由配置",
+        icon: "waypoints",
+        permission: Permission.OrgManagePersonalRouting,
+      },
+      {
+        to: "/app/quota-requests",
+        label: "配额申请",
+        icon: "clock",
+        badge: "quota",
+        permission: Permission.OrgRequestQuota,
+      },
     ],
   },
 ]
@@ -92,8 +105,16 @@ export function filterNav(nav: NavGroup[], permissions: Set<string>): NavGroup[]
     .filter((group) => group.items.length > 0)
 }
 
+// Does this person belong in the admin console at all?
+//
+// Only a permission they actually hold counts. The un-gated items
+// (概览, 快速接入) must not: they are un-gated so that anyone who is
+// *already* in the admin console can see them, not as evidence of being
+// an admin. Treating them as evidence made this return true for
+// everyone, which sent plain employees to /admin/overview on login and
+// showed them the persona switcher.
 export function adminHasAnyPermission(permissions: Set<string>): boolean {
   return adminNav.some((group) =>
-    group.items.some((item) => !item.permission || permissions.has(item.permission)),
+    group.items.some((item) => !!item.permission && permissions.has(item.permission)),
   )
 }

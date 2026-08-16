@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { Toaster } from "sonner"
 import { AuthProvider, useAuth } from "@/lib/auth"
-import { RequireAuth } from "@/components/shared/require-auth"
+import { RequireAdmin, RequireEmployee } from "@/components/shared/require-auth"
 import { ConsoleLayout } from "@/layouts/console-layout"
 import { adminHasAnyPermission } from "@/layouts/nav-config"
 
@@ -47,9 +47,9 @@ function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <ConsoleLayout persona="admin" />
-          </RequireAuth>
+          </RequireAdmin>
         }
       >
         <Route path="overview" element={<OverviewPage />} />
@@ -72,9 +72,9 @@ function AppRoutes() {
       <Route
         path="/app"
         element={
-          <RequireAuth>
+          <RequireEmployee>
             <ConsoleLayout persona="employee" />
-          </RequireAuth>
+          </RequireEmployee>
         }
       >
         <Route path="usage" element={<UsagePage />} />
