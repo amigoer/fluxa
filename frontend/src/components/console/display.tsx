@@ -43,7 +43,11 @@ export function Tag({ tone, children }: { tone: Tone; children: ReactNode }) {
     <ShadcnBadge
       data-t={tone}
       className={cn(
-        "h-[20px] gap-[5px] rounded-full border-0 px-[8px] py-0 text-[10.5px] font-[620] whitespace-normal",
+        // nowrap, not Badge's overridden `whitespace-normal`: squeezed into
+        // a narrow status column the pill broke its own label one character
+        // per line ("正/常") inside a 20px-tall capsule. It keeps its width
+        // and the table scrolls instead.
+        "h-[20px] gap-[5px] rounded-full border-0 px-[8px] py-0 text-[10.5px] font-[620] whitespace-nowrap",
         TONE_BG[tone],
       )}
     >

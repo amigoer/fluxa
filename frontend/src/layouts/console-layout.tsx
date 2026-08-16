@@ -655,7 +655,7 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
             <Outlet />
           </div>
 
-          <ConsoleFooter orgName={orgName} note="数据延迟 < 1 分钟" />
+          <ConsoleFooter note="数据延迟 < 1 分钟" />
         </div>
 
         <TodoDrawer
@@ -670,17 +670,19 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
   )
 }
 
-export function ConsoleFooter({ orgName, note }: { orgName?: string; note?: ReactNode }) {
+// Version and source, and on a wide screen how fresh the numbers are.
+// The copyright line that used to sit between them is gone: this is a
+// self-hosted internal tool, and it spent a third of the footer
+// repeating the company name the sidebar already carries.
+export function ConsoleFooter({ note }: { note?: ReactNode }) {
   return (
     <div className="cn-foot">
       <span>Fluxa {VERSION}</span>
       <span className="cn-foot-sep">·</span>
-      <span>© {new Date().getFullYear()} {orgName || "Fluxa"}</span>
-      <span className="cn-foot-sep">·</span>
       <a href={REPO_URL} target="_blank" rel="noreferrer">
         项目仓库 <Icon name="external-link" size={11} style={{ verticalAlign: -1, display: "inline" }} />
       </a>
-      {note && <span style={{ marginLeft: "auto" }}>{note}</span>}
+      {note && <span className="cn-foot-note">{note}</span>}
     </div>
   )
 }

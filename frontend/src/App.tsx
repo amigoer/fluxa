@@ -93,7 +93,13 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
-        <Toaster position="bottom-right" />
+        {/* Top-center: bottom-right sat on top of the footer on a phone,
+            and on the primary action of whatever form had just been
+            submitted. Both offsets clear the 56px top bar so a toast never
+            covers the breadcrumb or the sidebar button -- sonner keeps a
+            separate mobile offset, and setting only `offset` left narrow
+            screens on its 16px default. */}
+        <Toaster position="top-center" offset={{ top: "68px" }} mobileOffset={{ top: "68px" }} />
       </AuthProvider>
     </BrowserRouter>
   )
