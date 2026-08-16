@@ -3,7 +3,7 @@
 // provider/health, provider/routing and provider/keyauth can depend on
 // them without creating an import cycle back through the parent
 // provider package (which is what wires those subpackages together in
-// provider/service.go).
+// provider/service).
 package types
 
 import "time"

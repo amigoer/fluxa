@@ -1,7 +1,7 @@
 // Package db wires up the PostgreSQL connection pool and runs schema
 // migrations. All data access in the rest of the codebase goes through
-// pgx directly (hand-written SQL in each module's repo.go); this package
-// only owns the pool lifecycle and migration bootstrap.
+// pgx directly (hand-written SQL in each module's repo package); this
+// package only owns the pool lifecycle and migration bootstrap.
 package db
 
 import (

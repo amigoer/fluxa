@@ -1,5 +1,5 @@
 // Package httpx holds small, shared HTTP helpers used by every module's
-// handler.go: consistent JSON encoding and a single error shape carrying
+// handler package: consistent JSON encoding and a single error shape carrying
 // an i18n.Key instead of hardcoded prose.
 package httpx
 
