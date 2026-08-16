@@ -112,7 +112,7 @@ func (r *Repo) GetModel(ctx context.Context, id string) (types.Model, error) {
 
 func (r *Repo) ListModels(ctx context.Context, orgID string) ([]types.Model, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT m.id, m.provider_id, m.name, m.model_identifier, m.status, m.input_price_cents_per_1m, m.output_price_cents_per_1m, m.context_window, m.created_at, m.updated_at
+		SELECT m.id, m.provider_id, m.name, m.model_identifier, m.status, m.input_price_cents_per_1m, m.output_price_cents_per_1m, m.context_window, m.created_at, m.updated_at, p.kind
 		FROM models m
 		JOIN providers p ON p.id = m.provider_id
 		WHERE p.org_id = $1
@@ -125,7 +125,7 @@ func (r *Repo) ListModels(ctx context.Context, orgID string) ([]types.Model, err
 	var out []types.Model
 	for rows.Next() {
 		var m types.Model
-		if err := rows.Scan(&m.ID, &m.ProviderID, &m.Name, &m.ModelIdentifier, &m.Status, &m.InputPriceCentsPer1M, &m.OutputPriceCentsPer1M, &m.ContextWindow, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ProviderID, &m.Name, &m.ModelIdentifier, &m.Status, &m.InputPriceCentsPer1M, &m.OutputPriceCentsPer1M, &m.ContextWindow, &m.CreatedAt, &m.UpdatedAt, &m.ProviderKind); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

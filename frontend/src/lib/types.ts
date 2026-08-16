@@ -66,8 +66,9 @@ export interface Model {
   InputPriceCentsPer1M: number
   OutputPriceCentsPer1M: number
   ContextWindow: number
-  // Only populated by GET /api/models/published (see
-  // internal/provider/repo.go ListPublishedModels) -- empty elsewhere.
+  // Joined in by both model list endpoints (/api/models and
+  // /api/models/published -- see internal/provider/repo.go), so a model
+  // picker can show its vendor mark without also fetching /api/providers.
   ProviderKind?: string
 }
 
