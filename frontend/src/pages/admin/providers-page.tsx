@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
-import { Card, Field, Filters, Modal, PageHead, Select, TableState, Tag } from "@/components/console/ui"
+import { Card, Field, Filters, Input, Modal, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
@@ -81,8 +82,7 @@ export function ProvidersPage() {
   return (
     <div className="cn-page">
       <PageHead title="供应商" sub="上游账号与凭证，熔断状态实时反映网关探活结果">
-        <button
-          className="cn-btn"
+        <Button
           onClick={() => {
             providers.refetch()
             health.refetch()
@@ -91,12 +91,12 @@ export function ProvidersPage() {
         >
           <Icon name="refresh" size={14} />
           刷新状态
-        </button>
+        </Button>
         {canCreate && (
-          <button className="cn-btn cn-btn-pri" onClick={() => setCreating(true)}>
+          <Button tone="primary" onClick={() => setCreating(true)}>
             <Icon name="plus" size={14} />
             接入供应商
-          </button>
+          </Button>
         )}
       </PageHead>
 
@@ -126,52 +126,52 @@ export function ProvidersPage() {
       </Filters>
 
       <Card>
-        <table className="cn-table">
-          <thead>
-            <tr>
-              <th>供应商</th>
-              <th>类型</th>
-              <th>熔断状态</th>
-              <th className="cn-r">P95 延迟</th>
-              <th className="cn-r">失败率</th>
-              <th className="cn-r">本月调用</th>
-              <th className="cn-r">本月花费</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>供应商</TableHead>
+              <TableHead>类型</TableHead>
+              <TableHead>熔断状态</TableHead>
+              <TableHead className="text-right">P95 延迟</TableHead>
+              <TableHead className="text-right">失败率</TableHead>
+              <TableHead className="text-right">本月调用</TableHead>
+              <TableHead className="text-right">本月花费</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((p) => {
               const s = stats.get(p.ID)
               const st = healthById.get(p.ID)?.State ?? "normal"
               return (
-                <tr key={p.ID}>
-                  <td>
+                <TableRow key={p.ID}>
+                  <TableCell>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
                       <span className="cn-cfg-logo" style={{ width: 26, height: 26, borderRadius: 8 }}>
                         <Brand kind={p.Kind} size={14} />
                       </span>
                       <span style={{ fontWeight: 570 }}>{p.Name}</span>
                     </span>
-                  </td>
-                  <td className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
+                  </TableCell>
+                  <TableCell className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
                     {p.Kind}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <Tag tone={HEALTH_TONE[st]}>{HEALTH_LABEL[st]}</Tag>
-                  </td>
-                  <td className="cn-r cn-mono" style={{ color: (s?.p95 ?? 0) > 2000 ? "var(--bad)" : "var(--ink-2)" }}>
+                  </TableCell>
+                  <TableCell className="text-right cn-mono" style={{ color: (s?.p95 ?? 0) > 2000 ? "var(--bad)" : "var(--ink-2)" }}>
                     {s ? `${s.p95}ms` : "—"}
-                  </td>
-                  <td
-                    className="cn-r cn-mono"
+                  </TableCell>
+                  <TableCell
+                    className="text-right cn-mono"
                     style={{ color: (s?.errRate ?? 0) > 5 ? "var(--bad)" : "var(--ink-2)" }}
                   >
                     {s ? `${s.errRate.toFixed(1)}%` : "—"}
-                  </td>
-                  <td className="cn-r cn-mono">{s ? fmtNum(s.calls) : "—"}</td>
-                  <td className="cn-r cn-mono" style={{ fontWeight: 560 }}>
+                  </TableCell>
+                  <TableCell className="text-right cn-mono">{s ? fmtNum(s.calls) : "—"}</TableCell>
+                  <TableCell className="text-right cn-mono" style={{ fontWeight: 560 }}>
                     {fmt(s?.spend ?? 0)}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )
             })}
             <TableState
@@ -185,8 +185,8 @@ export function ProvidersPage() {
                   : "接入第一个上游账号后，网关才能把请求转发出去。"
               }
             />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
 
       <CreateProviderModal
@@ -250,39 +250,38 @@ function CreateProviderModal({
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             {busy ? "接入中…" : "接入"}
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="名称" optional="必填" hint="团队内部叫法，例如「OpenAI 主账号」。">
-          <input className="cn-input" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="类型" optional="必填">
-          <select className="cn-input" value={kind} onChange={(e) => setKind(e.target.value)}>
-            {KINDS.map((k) => (
-              <option key={k.value} value={k.value}>
-                {k.label}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="类型"
+            value={kind}
+            onValue={setKind}
+            options={KINDS.map((k) => ({
+              ...k,
+              icon: <Brand kind={k.value} size={14} />,
+            }))}
+          />
         </Field>
         <Field label="Base URL" hint="留空则使用该厂商的默认地址；自建或代理时填这里。">
-          <input
-            className="cn-input"
+          <Input
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="https://api.openai.com/v1"
           />
         </Field>
         <Field label="API Key" optional="必填" hint="只写不读：保存后无法再取回明文。">
-          <input
-            className="cn-input"
+          <Input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}

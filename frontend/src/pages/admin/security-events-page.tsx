@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Filters, PageHead, Select, TableState, Tag } from "@/components/console/ui"
+import { Card, Filters, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { Permission, useHasPermission } from "@/lib/auth"
 import { downloadCsv } from "@/lib/csv"
@@ -65,10 +66,10 @@ export function SecurityEventsPage() {
   return (
     <div className="cn-page">
       <PageHead title="安全事件" sub="DLP 规则命中记录">
-        <button className="cn-btn" onClick={exportCsv}>
+        <Button onClick={exportCsv}>
           <Icon name="download" size={14} />
           导出
-        </button>
+        </Button>
       </PageHead>
 
       <div className="cn-kpis">
@@ -158,25 +159,25 @@ export function SecurityEventsPage() {
       </Filters>
 
       <Card>
-        <table className="cn-table">
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th>成员</th>
-              <th>命中规则</th>
-              <th>使用的 Key</th>
-              <th>说明</th>
-              <th className="cn-r">动作</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>时间</TableHead>
+              <TableHead>成员</TableHead>
+              <TableHead>命中规则</TableHead>
+              <TableHead>使用的 Key</TableHead>
+              <TableHead>说明</TableHead>
+              <TableHead className="text-right">动作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((e) => (
-              <tr key={e.ID}>
-                <td className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
+              <TableRow key={e.ID}>
+                <TableCell className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
                   {formatDateTime(e.OccurredAt)}
-                </td>
-                <td style={{ fontWeight: 560 }}>{memberById.get(e.MemberID ?? "")?.Name ?? "—"}</td>
-                <td>
+                </TableCell>
+                <TableCell style={{ fontWeight: 560 }}>{memberById.get(e.MemberID ?? "")?.Name ?? "—"}</TableCell>
+                <TableCell>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
                     <span
                       className="cn-todo-ico"
@@ -187,21 +188,21 @@ export function SecurityEventsPage() {
                     </span>
                     {ruleById.get(e.RuleID ?? "")?.Name ?? "已删除的规则"}
                   </span>
-                </td>
-                <td style={{ color: "var(--ink-2)" }}>
+                </TableCell>
+                <TableCell style={{ color: "var(--ink-2)" }}>
                   <span className="cn-trunc" style={{ maxWidth: 150 }}>
                     {keyById.get(e.VirtualKeyID ?? "")?.Name ?? "—"}
                   </span>
-                </td>
-                <td style={{ color: "var(--ink-3)" }}>
+                </TableCell>
+                <TableCell style={{ color: "var(--ink-3)" }}>
                   <span className="cn-trunc">{e.Description}</span>
-                </td>
-                <td className="cn-r">
+                </TableCell>
+                <TableCell className="text-right">
                   <Tag tone={e.ActionTaken === "block" ? "bad" : "warn"}>
                     {e.ActionTaken === "block" ? "拦截" : "脱敏"}
                   </Tag>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
             <TableState
               colSpan={6}
@@ -210,8 +211,8 @@ export function SecurityEventsPage() {
               title="没有安全事件"
               desc="这段时间里没有请求命中任何 DLP 规则。"
             />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
     </div>
   )

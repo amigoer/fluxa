@@ -1,8 +1,9 @@
 import { useId, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
-import { Card, Empty, Gauge, PageHead, Spark, Tag } from "@/components/console/ui"
+import { Card, Empty, Gauge, PageHead, Spark, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tag } from "@/components/console/ui"
 import { ProcurementModal } from "@/components/console/procurement-modal"
 import { useConsole } from "@/layouts/console-layout"
 import { useApiQuery } from "@/hooks/use-api-query"
@@ -212,14 +213,14 @@ export function OverviewPage() {
             </button>
           ))}
         </div>
-        <button className="cn-btn" onClick={exportReport}>
+        <Button onClick={exportReport}>
           <Icon name="download" size={14} />
           导出报表
-        </button>
-        <button className="cn-btn cn-btn-pri" onClick={() => setRecording(true)}>
+        </Button>
+        <Button tone="primary" onClick={() => setRecording(true)}>
           <Icon name="package-plus" size={14} />
           登记入库
-        </button>
+        </Button>
       </PageHead>
 
       <div className="cn-kpis">
@@ -382,24 +383,24 @@ export function OverviewPage() {
           link="成员与部门"
           onLink={() => navigate("/admin/members")}
         >
-          <table className="cn-table">
-            <thead>
-              <tr>
-                <th>部门</th>
-                <th className="cn-col-optional">人数</th>
-                <th>额度使用率</th>
-                <th className="cn-r">环比</th>
-                <th className="cn-r">花费</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>部门</TableHead>
+                <TableHead className="cn-col-optional">人数</TableHead>
+                <TableHead>额度使用率</TableHead>
+                <TableHead className="text-right">环比</TableHead>
+                <TableHead className="text-right">花费</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {deptRows.map((d) => (
-                <tr key={d.id}>
-                  <td style={{ fontWeight: 560 }}>{d.name}</td>
-                  <td className="cn-mono cn-col-optional" style={{ color: "var(--ink-2)" }}>
+                <TableRow key={d.id}>
+                  <TableCell style={{ fontWeight: 560 }}>{d.name}</TableCell>
+                  <TableCell className="cn-mono cn-col-optional" style={{ color: "var(--ink-2)" }}>
                     {d.members}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     {d.rate === null ? (
                       <span style={{ color: "var(--ink-3)" }}>未设额度</span>
                     ) : (
@@ -412,24 +413,24 @@ export function OverviewPage() {
                         </span>
                       </div>
                     )}
-                  </td>
-                  <td className="cn-r">
+                  </TableCell>
+                  <TableCell className="text-right">
                     <Delta value={d.delta} invert />
-                  </td>
-                  <td className="cn-r cn-mono" style={{ fontSize: 12.5, fontWeight: 560 }}>
+                  </TableCell>
+                  <TableCell className="text-right cn-mono" style={{ fontSize: 12.5, fontWeight: 560 }}>
                     {fmt(d.spend)}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
               {deptRows.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ padding: 0 }}>
+                <TableRow>
+                  <TableCell colSpan={5} style={{ padding: 0 }}>
                     <Empty icon="users" title="还没有部门" desc="在「成员与部门」里建好部门后，这里按部门汇总花费。" />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </Card>
 
         <Card
@@ -439,53 +440,53 @@ export function OverviewPage() {
           link="调用日志"
           onLink={() => navigate("/admin/call-logs")}
         >
-          <table className="cn-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>模型</th>
-                <th className="cn-col-optional">成员</th>
-                <th className="cn-r">耗时</th>
-                <th className="cn-r">费用</th>
-                <th className="cn-r">状态</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>时间</TableHead>
+                <TableHead>模型</TableHead>
+                <TableHead className="cn-col-optional">成员</TableHead>
+                <TableHead className="text-right">耗时</TableHead>
+                <TableHead className="text-right">费用</TableHead>
+                <TableHead className="text-right">状态</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {recentCalls.map((c) => {
                 const model = modelById.get(c.ModelID)
                 return (
-                  <tr key={c.ID}>
-                    <td className="cn-mono" style={{ color: "var(--ink-3)" }}>
+                  <TableRow key={c.ID}>
+                    <TableCell className="cn-mono" style={{ color: "var(--ink-3)" }}>
                       {formatTime(c.OccurredAt)}
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
                         <Brand kind={providerById.get(c.ProviderID)?.Kind} size={13} />
                         <span style={{ fontWeight: 540 }}>{model?.Name ?? model?.ModelIdentifier ?? "—"}</span>
                       </span>
-                    </td>
-                    <td className="cn-col-optional" style={{ color: "var(--ink-2)" }}>
+                    </TableCell>
+                    <TableCell className="cn-col-optional" style={{ color: "var(--ink-2)" }}>
                       {memberById.get(c.MemberID)?.Name ?? "—"}
-                    </td>
-                    <td className="cn-r cn-mono" style={{ color: c.LatencyMS > 3000 ? "var(--bad)" : "var(--ink-2)" }}>
+                    </TableCell>
+                    <TableCell className="text-right cn-mono" style={{ color: c.LatencyMS > 3000 ? "var(--bad)" : "var(--ink-2)" }}>
                       {c.LatencyMS}ms
-                    </td>
-                    <td className="cn-r cn-mono">{c.CostCents ? fmt(c.CostCents) : "—"}</td>
-                    <td className="cn-r">
+                    </TableCell>
+                    <TableCell className="text-right cn-mono">{c.CostCents ? fmt(c.CostCents) : "—"}</TableCell>
+                    <TableCell className="text-right">
                       <Tag tone={c.Status === "success" ? "ok" : "bad"}>{c.Status === "success" ? "成功" : "失败"}</Tag>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )
               })}
               {recentCalls.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ padding: 0 }}>
+                <TableRow>
+                  <TableCell colSpan={6} style={{ padding: 0 }}>
                     <Empty icon="activity" title="还没有调用" desc="员工用虚拟 Key 发起第一次请求后，这里会实时滚动。" />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </Card>
       </div>
 

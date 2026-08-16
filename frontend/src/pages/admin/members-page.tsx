@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Field, Filters, Modal, PageHead, Select, TableState, Tag } from "@/components/console/ui"
+import { Card, Field, Filters, Input, Modal, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
@@ -86,8 +87,7 @@ export function MembersPage() {
   return (
     <div className="cn-page">
       <PageHead title="成员与部门" sub="部门与成员由身份源同步，本地注册的账号需管理员审核后启用">
-        <button
-          className="cn-btn"
+        <Button
           onClick={() => {
             members.refetch()
             departments.refetch()
@@ -96,12 +96,12 @@ export function MembersPage() {
         >
           <Icon name="refresh" size={14} />
           刷新
-        </button>
+        </Button>
         {canManageDepts && (
-          <button className="cn-btn cn-btn-pri" onClick={() => setCreatingDept(true)}>
+          <Button tone="primary" onClick={() => setCreatingDept(true)}>
             <Icon name="plus" size={14} />
             新建部门
-          </button>
+          </Button>
         )}
       </PageHead>
 
@@ -156,10 +156,10 @@ export function MembersPage() {
                   </div>
                 </div>
                 {canManageDepts && (
-                  <button className="cn-btn" onClick={() => setAdjusting(true)}>
+                  <Button onClick={() => setAdjusting(true)}>
                     <Icon name="wallet" size={14} />
                     调整额度池
-                  </button>
+                  </Button>
                 )}
               </div>
             </Card>
@@ -194,24 +194,24 @@ export function MembersPage() {
           </Filters>
 
           <Card>
-            <table className="cn-table">
-              <thead>
-                <tr>
-                  <th>成员</th>
-                  <th>角色</th>
-                  <th>状态</th>
-                  <th className="cn-r">本月花费</th>
-                  <th className="cn-r">最近活跃</th>
-                  <th className="cn-r">操作</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>成员</TableHead>
+                  <TableHead>角色</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead className="text-right">本月花费</TableHead>
+                  <TableHead className="text-right">最近活跃</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {list.map((m) => {
                   const a = activity.get(m.ID)
                   const st = STATUS[m.Status] ?? STATUS.active
                   return (
-                    <tr key={m.ID}>
-                      <td>
+                    <TableRow key={m.ID}>
+                      <TableCell>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                           <span className="cn-av" style={{ width: 26, height: 26, fontSize: 11 }}>
                             {m.Name.slice(0, 1)}
@@ -223,28 +223,28 @@ export function MembersPage() {
                             </div>
                           </div>
                         </div>
-                      </td>
-                      <td style={{ color: "var(--ink-2)" }}>{roleById.get(m.RoleID)?.Name ?? "—"}</td>
-                      <td>
+                      </TableCell>
+                      <TableCell style={{ color: "var(--ink-2)" }}>{roleById.get(m.RoleID)?.Name ?? "—"}</TableCell>
+                      <TableCell>
                         <Tag tone={st.tone}>{st.label}</Tag>
-                      </td>
-                      <td className="cn-r cn-mono">{a?.spend ? fmt(a.spend) : "—"}</td>
-                      <td className="cn-r cn-mono" style={{ color: "var(--ink-3)" }}>
+                      </TableCell>
+                      <TableCell className="text-right cn-mono">{a?.spend ? fmt(a.spend) : "—"}</TableCell>
+                      <TableCell className="text-right cn-mono" style={{ color: "var(--ink-3)" }}>
                         {a?.last ? formatAgo(a.last) : "—"}
-                      </td>
-                      <td>
+                      </TableCell>
+                      <TableCell>
                         <div className="cn-row-acts">
                           {m.Status === "pending_review" && (
-                            <button className="cn-mini-btn cn-mini-pri" onClick={() => void approve(m.ID)}>
+                            <Button tone="miniPri" onClick={() => void approve(m.ID)}>
                               通过
-                            </button>
+                            </Button>
                           )}
-                          <button className="cn-icon-act" title="编辑" onClick={() => setEditing(m)}>
+                          <Button tone="icon" title="编辑" onClick={() => setEditing(m)}>
                             <Icon name="edit" size={14} />
-                          </button>
+                          </Button>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
                 <TableState
@@ -254,8 +254,8 @@ export function MembersPage() {
                   title="没有匹配的成员"
                   desc="成员来自身份源同步或本地注册，不在这里手动创建。"
                 />
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </Card>
         </div>
       </div>
@@ -315,18 +315,16 @@ function NewDepartmentModal({ open, onClose, onDone }: { open: boolean; onClose:
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             创建
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="部门名称" optional="必填">
-          <input className="cn-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="研发中心" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="研发中心" />
         </Field>
       </div>
     </Modal>
@@ -390,34 +388,34 @@ function EditMemberModal({
       }}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             保存
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="部门">
-          <select className="cn-input" value={deptValue} onChange={(e) => setDept(e.target.value)}>
-            <option value="">未分配</option>
-            {departments.map((d) => (
-              <option key={d.ID} value={d.ID}>
-                {d.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="部门"
+            value={deptValue}
+            onValue={setDept}
+            options={[
+              { value: "", label: "未分配" },
+              ...departments.map((d) => ({ value: d.ID, label: d.Name })),
+            ]}
+          />
         </Field>
         <Field label="角色">
-          <select className="cn-input" value={roleValue} onChange={(e) => setRole(e.target.value)}>
-            {roles.map((r) => (
-              <option key={r.ID} value={r.ID}>
-                {r.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="角色"
+            value={roleValue}
+            onValue={setRole}
+            options={roles.map((r) => ({ value: r.ID, label: r.Name }))}
+          />
         </Field>
       </div>
     </Modal>
@@ -469,12 +467,10 @@ function AdjustPoolModal({
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             保存
-          </button>
+          </Button>
         </>
       }
     >
@@ -488,8 +484,7 @@ function AdjustPoolModal({
               : "单位为元。"
           }
         >
-          <input
-            className="cn-input"
+          <Input
             inputMode="decimal"
             value={total}
             onChange={(e) => setTotal(e.target.value)}

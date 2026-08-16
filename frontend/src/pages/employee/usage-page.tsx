@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
 import { Card, Empty, PageHead, Spark } from "@/components/console/ui"
@@ -195,15 +196,14 @@ export function UsagePage() {
                 <div className="cn-kv">
                   <span className="cn-kv-k">前缀</span>
                   <span className="cn-kv-v">{k.SecretPrefix}••••••••</span>
-                  <button
-                    className="cn-icon-act"
+                  <Button tone="icon"
                     title="复制前缀"
                     onClick={() =>
                       void navigator.clipboard.writeText(k.SecretPrefix).then(() => toast.success("已复制前缀"))
                     }
                   >
                     <Icon name="copy" size={13} />
-                  </button>
+                  </Button>
                 </div>
                 <div className="cn-kv">
                   <span className="cn-kv-k">模型范围</span>

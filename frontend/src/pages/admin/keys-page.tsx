@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Field, Filters, Modal, PageHead, Select, TableState, Tag } from "@/components/console/ui"
+import { Card, Field, Filters, Input, Modal, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
@@ -56,10 +57,10 @@ export function KeysPage() {
     <div className="cn-page">
       <PageHead title="Key 管理" sub="虚拟 Key 决定可用模型范围和预算上限，不暴露供应商的真实凭证">
         {canManage && (
-          <button className="cn-btn cn-btn-pri" onClick={() => setCreating(true)}>
+          <Button tone="primary" onClick={() => setCreating(true)}>
             <Icon name="plus" size={14} />
             签发 Key
-          </button>
+          </Button>
         )}
       </PageHead>
 
@@ -96,36 +97,36 @@ export function KeysPage() {
       </Filters>
 
       <Card>
-        <table className="cn-table">
-          <thead>
-            <tr>
-              <th>Key</th>
-              <th>归属</th>
-              <th>模型范围</th>
-              <th>预算使用</th>
-              <th>状态</th>
-              <th className="cn-r">签发日期</th>
-              <th className="cn-r">操作</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Key</TableHead>
+              <TableHead>归属</TableHead>
+              <TableHead>模型范围</TableHead>
+              <TableHead>预算使用</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead className="text-right">签发日期</TableHead>
+              <TableHead className="text-right">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((k) => {
               const rate = k.BudgetCents > 0 ? (k.SpentCents / k.BudgetCents) * 100 : 0
               return (
-                <tr key={k.ID} style={k.Status === "revoked" ? { opacity: 0.6 } : undefined}>
-                  <td>
+                <TableRow key={k.ID} style={k.Status === "revoked" ? { opacity: 0.6 } : undefined}>
+                  <TableCell>
                     <div style={{ fontWeight: 570 }}>{k.Name}</div>
                     <div className="cn-mono-cell" style={{ color: "var(--ink-3)", marginTop: 2 }}>
                       {k.SecretPrefix}••••••••
                     </div>
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--ink-2)" }}>
                       <Icon name={k.OwnerType === "department" ? "users" : "key"} size={13} />
                       {ownerName(k)}
                     </span>
-                  </td>
-                  <td style={{ color: "var(--ink-2)" }}>
+                  </TableCell>
+                  <TableCell style={{ color: "var(--ink-2)" }}>
                     {k.ModelScope && k.ModelScope.length > 0 ? (
                       <span className="cn-trunc" style={{ maxWidth: 190 }}>
                         {k.ModelScope.map((id) => modelById.get(id)?.Name ?? id.slice(0, 8)).join(" · ")}
@@ -133,8 +134,8 @@ export function KeysPage() {
                     ) : (
                       <span style={{ color: "var(--ink-3)" }}>不限</span>
                     )}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <div className="cn-usage">
                       <span className="cn-usage-track">
                         <i data-over={rate > 90} style={{ width: `${Math.min(100, rate)}%` }} />
@@ -146,39 +147,37 @@ export function KeysPage() {
                     <div className="cn-mono-cell" style={{ color: "var(--ink-3)", marginTop: 3 }}>
                       {fmt(k.SpentCents)} / {fmt(k.BudgetCents)}
                     </div>
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <Tag tone={k.Status === "active" ? "ok" : "bad"}>
                       {k.Status === "active" ? "生效中" : "已吊销"}
                     </Tag>
-                  </td>
-                  <td className="cn-r cn-mono" style={{ color: "var(--ink-3)" }}>
+                  </TableCell>
+                  <TableCell className="text-right cn-mono" style={{ color: "var(--ink-3)" }}>
                     {formatDay(k.CreatedAt)}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <div className="cn-row-acts">
-                      <button
-                        className="cn-icon-act"
+                      <Button tone="icon"
                         title="复制前缀"
                         onClick={() =>
                           void navigator.clipboard.writeText(k.SecretPrefix).then(() => toast.success("已复制前缀"))
                         }
                       >
                         <Icon name="copy" size={14} />
-                      </button>
+                      </Button>
                       {k.Status === "active" && (
-                        <button
-                          className="cn-icon-act"
+                        <Button tone="icon"
                           data-danger="true"
                           title="吊销"
                           onClick={() => void revoke(k)}
                         >
                           <Icon name="trash" size={14} />
-                        </button>
+                        </Button>
                       )}
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )
             })}
             <TableState
@@ -188,8 +187,8 @@ export function KeysPage() {
               title="还没有签发 Key"
               desc="没有 Key，员工就无法通过网关发起任何调用。"
             />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
 
       <IssueKeyModal
@@ -210,17 +209,16 @@ export function KeysPage() {
         sub="明文只显示这一次，关掉后无法再取回"
         onClose={() => setIssued(null)}
         footer={
-          <button className="cn-btn cn-btn-pri" onClick={() => setIssued(null)}>
+          <Button tone="primary" onClick={() => setIssued(null)}>
             我已保存
-          </button>
+          </Button>
         }
       >
         <div className="cn-form">
           <Field label={issued?.name ?? "Key"} hint="把它交给使用者，或直接填进他们的 SDK 配置里。">
             <div className="cn-static" style={{ fontFamily: "var(--mono)", wordBreak: "break-all" }}>
               {issued?.secret}
-              <button
-                className="cn-icon-act"
+              <Button tone="icon"
                 style={{ marginLeft: "auto" }}
                 title="复制"
                 onClick={() =>
@@ -228,7 +226,7 @@ export function KeysPage() {
                 }
               >
                 <Icon name="copy" size={14} />
-              </button>
+              </Button>
             </div>
           </Field>
         </div>
@@ -300,44 +298,47 @@ function IssueKeyModal({
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             {busy ? "签发中…" : "签发"}
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="名称" optional="必填" hint="写清用途和使用者，吊销时才知道动的是哪一把。">
-          <input className="cn-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="林见夏 · 评测" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="林见夏 · 评测" />
         </Field>
         <Field label="归属" optional="必填" hint="部门 Key 从部门额度池划扣，成员 Key 只算这个人的账。">
-          <select
-            className="cn-input"
+          <Select
+            variant="input"
+            label="归属"
             value={ownerType}
-            onChange={(e) => {
-              setOwnerType(e.target.value as "member" | "department")
+            onValue={(v) => {
+              setOwnerType(v as "member" | "department")
               setOwnerId("")
             }}
-          >
-            <option value="member">成员</option>
-            <option value="department">部门</option>
-          </select>
+            options={[
+              { value: "member", label: "成员" },
+              { value: "department", label: "部门" },
+            ]}
+          />
         </Field>
         <Field label={ownerType === "member" ? "成员" : "部门"} optional="必填">
-          <select className="cn-input" value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
-            <option value="">请选择</option>
-            {(ownerType === "member" ? members : departments).map((o) => (
-              <option key={o.ID} value={o.ID}>
-                {o.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label={ownerType === "member" ? "成员" : "部门"}
+            value={ownerId}
+            onValue={setOwnerId}
+            placeholder="请选择"
+            options={(ownerType === "member" ? members : departments).map((o) => ({
+              value: o.ID,
+              label: o.Name,
+            }))}
+          />
         </Field>
         <Field label="预算" optional="必填" hint="单位为元。用满后这把 Key 的调用会被直接拒绝。">
-          <input className="cn-input" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="2000" />
+          <Input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="2000" />
         </Field>
         <Field label="模型范围" hint="不勾选表示不限，可用所有已发布模型。">
           <div className="cn-rows" style={{ gap: 2 }}>

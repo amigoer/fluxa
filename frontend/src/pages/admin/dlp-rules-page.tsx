@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Field, Filters, Modal, PageHead, Select, Switch, TableState, Tag } from "@/components/console/ui"
+import { Card, Field, Filters, Input, Modal, PageHead, Select, Switch, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import type { DLPRule, SecurityEvent } from "@/lib/types"
@@ -63,10 +64,10 @@ export function DlpRulesPage() {
   return (
     <div className="cn-page">
       <PageHead title="DLP 规则" sub="按优先级自上而下匹配请求体；「拦截」直接终止请求，「脱敏」替换后放行">
-        <button className="cn-btn cn-btn-pri" onClick={() => setCreating(true)}>
+        <Button tone="primary" onClick={() => setCreating(true)}>
           <Icon name="plus" size={14} />
           新增规则
-        </button>
+        </Button>
       </PageHead>
 
       <Filters
@@ -102,54 +103,54 @@ export function DlpRulesPage() {
       </Filters>
 
       <Card>
-        <table className="cn-table">
-          <thead>
-            <tr>
-              <th className="cn-r" style={{ width: 60 }}>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-right" style={{ width: 60 }}>
                 优先级
-              </th>
-              <th>规则名</th>
-              <th>匹配方式</th>
-              <th>模式</th>
-              <th>动作</th>
-              <th className="cn-r">今日命中</th>
-              <th className="cn-r">启用</th>
-              <th className="cn-r">操作</th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+              <TableHead>规则名</TableHead>
+              <TableHead>匹配方式</TableHead>
+              <TableHead>模式</TableHead>
+              <TableHead>动作</TableHead>
+              <TableHead className="text-right">今日命中</TableHead>
+              <TableHead className="text-right">启用</TableHead>
+              <TableHead className="text-right">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((r) => (
-              <tr key={r.ID} style={r.Enabled ? undefined : { opacity: 0.55 }}>
-                <td className="cn-r cn-mono" style={{ color: "var(--ink-3)" }}>
+              <TableRow key={r.ID} style={r.Enabled ? undefined : { opacity: 0.55 }}>
+                <TableCell className="text-right cn-mono" style={{ color: "var(--ink-3)" }}>
                   {r.Priority}
-                </td>
-                <td style={{ fontWeight: 570 }}>{r.Name}</td>
-                <td style={{ color: "var(--ink-2)" }}>{r.MatchType === "keyword" ? "关键词" : "正则 + 校验位"}</td>
-                <td>
+                </TableCell>
+                <TableCell style={{ fontWeight: 570 }}>{r.Name}</TableCell>
+                <TableCell style={{ color: "var(--ink-2)" }}>{r.MatchType === "keyword" ? "关键词" : "正则 + 校验位"}</TableCell>
+                <TableCell>
                   <span className="cn-mono-cell cn-trunc">{r.Pattern}</span>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <Tag tone={r.Action === "block" ? "bad" : "warn"}>{r.Action === "block" ? "拦截" : "脱敏"}</Tag>
-                </td>
-                <td className="cn-r cn-mono" style={{ fontWeight: (hitsToday.get(r.ID) ?? 0) > 20 ? 600 : 400 }}>
+                </TableCell>
+                <TableCell className="text-right cn-mono" style={{ fontWeight: (hitsToday.get(r.ID) ?? 0) > 20 ? 600 : 400 }}>
                   {hitsToday.get(r.ID) || "—"}
-                </td>
-                <td className="cn-r">
+                </TableCell>
+                <TableCell className="text-right">
                   <Switch
                     on={r.Enabled}
                     label={`启用 ${r.Name}`}
                     onToggle={() => void toggle(r)}
                     style={{ display: "inline-block", verticalAlign: "middle" }}
                   />
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <div className="cn-row-acts">
-                    <button className="cn-icon-act" data-danger="true" title="删除" onClick={() => void remove(r)}>
+                    <Button tone="icon" data-danger="true" title="删除" onClick={() => void remove(r)}>
                       <Icon name="trash" size={14} />
-                    </button>
+                    </Button>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
             <TableState
               colSpan={8}
@@ -158,8 +159,8 @@ export function DlpRulesPage() {
               title="还没有 DLP 规则"
               desc="没有规则时，请求体原样转发给上游供应商。"
             />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
 
       <NewRuleModal
@@ -225,46 +226,50 @@ function NewRuleModal({
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             {busy ? "保存中…" : "保存并启用"}
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="规则名" optional="必填">
-          <input className="cn-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="手机号" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="手机号" />
         </Field>
         <Field label="匹配方式" optional="必填" hint="正则 + 校验位适合身份证、银行卡这类有校验规则的号码。">
-          <select
-            className="cn-input"
+          <Select
+            variant="input"
+            label="匹配方式"
             value={matchType}
-            onChange={(e) => setMatchType(e.target.value as "regex_checksum" | "keyword")}
-          >
-            <option value="keyword">关键词</option>
-            <option value="regex_checksum">正则 + 校验位</option>
-          </select>
+            onValue={(v) => setMatchType(v as "regex_checksum" | "keyword")}
+            options={[
+              { value: "keyword", label: "关键词" },
+              { value: "regex_checksum", label: "正则 + 校验位" },
+            ]}
+          />
         </Field>
         <Field label="模式" optional="必填">
-          <input
-            className="cn-input"
+          <Input
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
             placeholder={matchType === "keyword" ? "内部仓库地址" : "1[3-9]\\d{9}"}
           />
         </Field>
         <Field label="动作" optional="必填" hint="拦截会直接终止请求并记录事件；脱敏替换后继续转发。">
-          <select className="cn-input" value={action} onChange={(e) => setAction(e.target.value as "mask" | "block")}>
-            <option value="mask">脱敏</option>
-            <option value="block">拦截</option>
-          </select>
+          <Select
+            variant="input"
+            label="动作"
+            value={action}
+            onValue={(v) => setAction(v as "mask" | "block")}
+            options={[
+              { value: "mask", label: "脱敏" },
+              { value: "block", label: "拦截" },
+            ]}
+          />
         </Field>
         <Field label="优先级" hint="数字越小越先匹配。">
-          <input
-            className="cn-input"
+          <Input
             inputMode="numeric"
             value={priority}
             onChange={(e) => setPriority(e.target.value)}

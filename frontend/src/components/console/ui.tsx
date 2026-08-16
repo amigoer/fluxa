@@ -1,12 +1,11 @@
-import { useEffect, useId, type CSSProperties, type ReactNode } from "react"
+import { useId, type ReactNode } from "react"
 import { Icon, type IconName } from "@/components/console/icon"
+import { TableCell, TableRow } from "@/components/console/display"
 import { areaPath, linePath } from "@/lib/chart"
 
 // The page-level building blocks, one for one with the hi-fi design's
 // shell.jsx helpers. Seven page types share this set across the whole
 // console -- no page gets its own bespoke chrome (DESIGN.md 6.3).
-
-export type Tone = "ok" | "warn" | "bad" | "brand"
 
 export function PageHead({ title, sub, children }: { title: string; sub?: ReactNode; children?: ReactNode }) {
   return (
@@ -17,54 +16,6 @@ export function PageHead({ title, sub, children }: { title: string; sub?: ReactN
       </div>
       {children && <div className="cn-page-acts">{children}</div>}
     </div>
-  )
-}
-
-export function Card({
-  title,
-  note,
-  link,
-  onLink,
-  children,
-  flush = true,
-  className = "",
-  style,
-  head,
-}: {
-  title?: ReactNode
-  note?: ReactNode
-  link?: ReactNode
-  onLink?: () => void
-  children?: ReactNode
-  flush?: boolean
-  className?: string
-  style?: CSSProperties
-  head?: ReactNode
-}) {
-  return (
-    <div className={`cn-card ${className}`} style={style}>
-      {head ?? ((title || link) && (
-        <div className="cn-card-head">
-          {title && <span className="cn-card-title">{title}</span>}
-          {note && <span className="cn-card-note">{note}</span>}
-          {link && (
-            <button className="cn-card-link" onClick={onLink}>
-              {link} <Icon name="chevron-right" size={12} />
-            </button>
-          )}
-        </div>
-      ))}
-      <div className={flush ? "cn-card-body cn-flush" : "cn-card-body"}>{children}</div>
-    </div>
-  )
-}
-
-export function Tag({ tone, children }: { tone: Tone; children: ReactNode }) {
-  return (
-    <span className="cn-tag" data-t={tone}>
-      <i />
-      {children}
-    </span>
   )
 }
 
@@ -101,88 +52,14 @@ export function Filters({
   )
 }
 
-export function Select({
-  value,
-  onValue,
-  options,
-  label,
-}: {
-  value: string
-  onValue: (v: string) => void
-  options: { value: string; label: string }[]
-  label?: string
-}) {
-  return (
-    <select
-      className="cn-field cn-field-select"
-      value={value}
-      aria-label={label}
-      onChange={(e) => onValue(e.target.value)}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-export function Switch({
-  on,
-  onToggle,
-  disabled,
-  label,
-  style,
-}: {
-  on: boolean
-  onToggle?: () => void
-  disabled?: boolean
-  label?: string
-  style?: CSSProperties
-}) {
-  return (
-    <button
-      type="button"
-      className="cn-switch"
-      data-on={on}
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      disabled={disabled || !onToggle}
-      style={style}
-      onClick={onToggle}
-    />
-  )
-}
-
-export function Check({
-  on,
-  locked,
-  onToggle,
-  label,
-}: {
-  on: boolean
-  locked?: boolean
-  onToggle?: () => void
-  label?: string
-}) {
-  const Tag = onToggle ? "button" : "span"
-  return (
-    <Tag
-      className="cn-check"
-      data-on={on}
-      data-locked={!!(on && locked)}
-      role="checkbox"
-      aria-checked={on}
-      aria-label={label}
-      onClick={onToggle}
-      {...(onToggle ? { type: "button" as const } : {})}
-    >
-      {on && <Icon name="check" size={11} stroke={2.6} />}
-    </Tag>
-  )
-}
+// Re-exported so the pages keep importing their controls from one place.
+// The control itself is no longer a native <select>: that one handed its
+// popup to the OS, which drew it differently on every desktop and was the
+// last piece of the console the design system could not reach.
+export { Select, type SelectOption } from "@/components/console/select"
+export { Check, Input, Switch, Textarea } from "@/components/console/form"
+export { Card, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tag, type Tone } from "@/components/console/display"
+export { Modal } from "@/components/console/modal"
 
 export function Empty({
   icon = "inbox",
@@ -229,59 +106,11 @@ export function TableState({
 }) {
   if (!loading && !empty) return null
   return (
-    <tr>
-      <td colSpan={colSpan} style={{ padding: 0 }}>
+    <TableRow className="hover:bg-transparent">
+      <TableCell colSpan={colSpan} className="p-0">
         {loading ? <Loading /> : <Empty title={title} desc={desc} />}
-      </td>
-    </tr>
-  )
-}
-
-// ---- dialogs ---------------------------------------------------------
-
-export function Modal({
-  open,
-  title,
-  sub,
-  onClose,
-  children,
-  footer,
-  wide,
-}: {
-  open: boolean
-  title: string
-  sub?: ReactNode
-  onClose: () => void
-  children: ReactNode
-  footer?: ReactNode
-  wide?: boolean
-}) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-  return (
-    <div className="cn-modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={wide ? "cn-modal cn-modal-wide" : "cn-modal"} role="dialog" aria-modal="true" aria-label={title}>
-        <div className="cn-modal-head">
-          <div>
-            <div className="cn-modal-title">{title}</div>
-            {sub && <div className="cn-modal-sub">{sub}</div>}
-          </div>
-          <button className="cn-modal-close" onClick={onClose} aria-label="关闭">
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-        <div className="cn-modal-body">{children}</div>
-        {footer && <div className="cn-modal-foot">{footer}</div>}
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   )
 }
 

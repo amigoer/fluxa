@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import { Field, Modal } from "@/components/console/ui"
+import { Brand } from "@/components/console/brand"
+import { Field, Input, Modal, Select, Textarea } from "@/components/console/ui"
 import { api } from "@/lib/api"
 import type { Provider } from "@/lib/types"
+import { Button } from "@/components/console/button"
 
 // Recording a top-up is reachable from two places (the overview's primary
 // action and the procurement page), so the form lives in one component
@@ -57,29 +59,30 @@ export function ProcurementModal({
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             {busy ? "提交中…" : "确认登记"}
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="供应商" optional="必填">
-          <select className="cn-input" value={providerId} onChange={(e) => setProviderId(e.target.value)}>
-            <option value="">选择供应商</option>
-            {providers.map((p) => (
-              <option key={p.ID} value={p.ID}>
-                {p.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="供应商"
+            value={providerId}
+            onValue={setProviderId}
+            placeholder="选择供应商"
+            options={providers.map((p) => ({
+              value: p.ID,
+              label: p.Name,
+              icon: <Brand kind={p.Kind} size={14} />,
+            }))}
+          />
         </Field>
         <Field label="金额" optional="必填" hint="单位为元，支持两位小数；系统内部按分存储。">
-          <input
-            className="cn-input"
+          <Input
             inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -87,8 +90,7 @@ export function ProcurementModal({
           />
         </Field>
         <Field label="备注" hint="写清采购批次或合同号，对账时能省很多事。">
-          <textarea
-            className="cn-input"
+          <Textarea
             rows={3}
             value={note}
             onChange={(e) => setNote(e.target.value)}

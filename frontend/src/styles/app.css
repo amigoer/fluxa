@@ -4,12 +4,15 @@
    same tokens and shapes as console.css / pages.css so the additions read
    as part of the same system, not as bolted-on app chrome. */
 
-/* ---- native form controls ------------------------------------------- */
+/* ---- form controls --------------------------------------------------- */
 /* The mockup draws filters and selects as divs. Real ones have to be
    focusable and keyboard-operable, so the same look is re-hung on real
-   <input>/<select> elements. */
+   elements. Dropdowns are the exception: a native <select> hands its
+   popup to the OS, which draws it differently on every desktop, so those
+   are shadcn/ui's Select instead (components/console/select.tsx) and are
+   styled there rather than here. */
 
-input.cn-field, select.cn-field, .cn-field input {
+input.cn-field, .cn-field input {
   font-size: 12.5px;
   color: var(--ink);
 }
@@ -19,19 +22,6 @@ input.cn-field, select.cn-field, .cn-field input {
 }
 .cn-field input::placeholder { color: var(--ink-3); }
 
-select.cn-field-select, select.cn-input {
-  appearance: none;
-  padding-right: 28px;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b97ab' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6.5 9.5 5.5 5.5 5.5-5.5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 13px 13px;
-  cursor: pointer;
-}
-select.cn-field-select { font-weight: 520; }
-select.cn-field-select:focus-visible, select.cn-input:focus-visible {
-  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(47,95,234,.14);
-}
 .cn-input::placeholder { color: var(--ink-3); }
 .cn-input:disabled { background: #f5f7fb; color: var(--ink-3); }
 

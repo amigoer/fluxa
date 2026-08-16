@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
-import { Card, Empty, PageHead, Tag } from "@/components/console/ui"
+import { Card, Empty, PageHead, Select, Tag, Textarea } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
@@ -131,23 +132,21 @@ export function PlaygroundPage() {
   return (
     <div className="cn-page" style={{ flex: 1, minHeight: 0 }}>
       <PageHead title="Playground" sub="验证路由和 Provider 是否真的按预期生效，右侧给出这次请求的完整诊断">
-        <select
-          className="cn-field cn-field-select"
+        <Select
+          label="模型"
           value={modelId}
-          aria-label="模型"
-          onChange={(e) => setModelId(e.target.value)}
-        >
-          <option value="">选择模型</option>
-          {(models ?? []).map((m) => (
-            <option key={m.ID} value={m.ID}>
-              {m.Name}
-            </option>
-          ))}
-        </select>
-        <button className="cn-btn" onClick={() => { setMessages([]); setDiag(null) }}>
+          onValue={setModelId}
+          placeholder="选择模型"
+          options={(models ?? []).map((m) => ({
+            value: m.ID,
+            label: m.Name,
+            icon: <Brand kind={m.ProviderKind} size={14} />,
+          }))}
+        />
+        <Button onClick={() => { setMessages([]); setDiag(null) }}>
           <Icon name="refresh" size={14} />
           清空对话
-        </button>
+        </Button>
       </PageHead>
 
       {!secret && (
@@ -161,10 +160,10 @@ export function PlaygroundPage() {
           </div>
           <div className="cn-filters" style={{ marginTop: 12 }}>
             {canMakeKeys && (
-              <button className="cn-btn cn-btn-pri" disabled={creatingKey} onClick={() => void createTestKey()}>
+              <Button tone="primary" disabled={creatingKey} onClick={() => void createTestKey()}>
                 <Icon name="plus" size={14} />
                 {creatingKey ? "创建中…" : "创建测试 Key"}
-              </button>
+              </Button>
             )}
             <label className="cn-field" style={{ width: 280 }}>
               <Icon name="key" size={14} />
@@ -206,8 +205,7 @@ export function PlaygroundPage() {
             )}
           </div>
           <div className="cn-chat-input">
-            <textarea
-              className="cn-input"
+            <Textarea
               rows={2}
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -255,13 +253,12 @@ export function PlaygroundPage() {
               </DiagRow>
               <DiagRow k="Request ID" mono>
                 {diag.requestId.slice(0, 18)}…
-                <button
-                  className="cn-icon-act"
+                <Button tone="icon"
                   title="复制"
                   onClick={() => void navigator.clipboard.writeText(diag.requestId).then(() => toast.success("已复制 Request ID"))}
                 >
                   <Icon name="copy" size={13} />
-                </button>
+                </Button>
               </DiagRow>
             </div>
           )}

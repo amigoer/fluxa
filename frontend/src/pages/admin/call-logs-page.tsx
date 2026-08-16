@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
-import { Card, Filters, PageHead, Select, TableState, Tag } from "@/components/console/ui"
+import { Card, Filters, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { Permission, useHasPermission } from "@/lib/auth"
 import { downloadCsv } from "@/lib/csv"
@@ -79,10 +80,10 @@ export function CallLogsPage() {
   return (
     <div className="cn-page">
       <PageHead title="调用日志" sub="每一次网关请求的完整记录，可按 Request ID 精确定位">
-        <button className="cn-btn" onClick={exportCsv}>
+        <Button onClick={exportCsv}>
           <Icon name="download" size={14} />
           导出 CSV
-        </button>
+        </Button>
       </PageHead>
 
       <Filters
@@ -101,7 +102,11 @@ export function CallLogsPage() {
           onValue={setModelId}
           options={[
             { value: "", label: "全部模型" },
-            ...(models ?? []).map((m) => ({ value: m.ID, label: m.Name })),
+            ...(models ?? []).map((m) => ({
+              value: m.ID,
+              label: m.Name,
+              icon: <Brand kind={m.ProviderKind} size={14} />,
+            })),
           ]}
         />
         <Select
@@ -110,7 +115,11 @@ export function CallLogsPage() {
           onValue={setProviderId}
           options={[
             { value: "", label: "全部供应商" },
-            ...(providers ?? []).map((p) => ({ value: p.ID, label: p.Name })),
+            ...(providers ?? []).map((p) => ({
+              value: p.ID,
+              label: p.Name,
+              icon: <Brand kind={p.Kind} size={14} />,
+            })),
           ]}
         />
         <Select
@@ -137,58 +146,58 @@ export function CallLogsPage() {
       </Filters>
 
       <Card>
-        <table className="cn-table">
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th>Request ID</th>
-              <th>成员</th>
-              <th>模型</th>
-              <th>Key</th>
-              <th className="cn-r">耗时</th>
-              <th className="cn-r">Token</th>
-              <th className="cn-r">费用</th>
-              <th className="cn-r">状态</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>时间</TableHead>
+              <TableHead>Request ID</TableHead>
+              <TableHead>成员</TableHead>
+              <TableHead>模型</TableHead>
+              <TableHead>Key</TableHead>
+              <TableHead className="text-right">耗时</TableHead>
+              <TableHead className="text-right">Token</TableHead>
+              <TableHead className="text-right">费用</TableHead>
+              <TableHead className="text-right">状态</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((c) => {
               const model = modelById.get(c.ModelID)
               return (
-                <tr key={c.ID}>
-                  <td className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
+                <TableRow key={c.ID}>
+                  <TableCell className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
                     {formatDateTime(c.OccurredAt)}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <span className="cn-mono-cell cn-trunc" style={{ color: "var(--brand)", maxWidth: 130 }}>
                       {c.RequestID || "—"}
                     </span>
-                  </td>
-                  <td style={{ fontWeight: 560 }}>{memberById.get(c.MemberID)?.Name ?? "—"}</td>
-                  <td>
+                  </TableCell>
+                  <TableCell style={{ fontWeight: 560 }}>{memberById.get(c.MemberID)?.Name ?? "—"}</TableCell>
+                  <TableCell>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
                       <Brand kind={providerById.get(c.ProviderID)?.Kind} size={13} />
                       {model?.ModelIdentifier ?? "—"}
                     </span>
-                  </td>
-                  <td style={{ color: "var(--ink-2)" }}>
+                  </TableCell>
+                  <TableCell style={{ color: "var(--ink-2)" }}>
                     <span className="cn-trunc" style={{ maxWidth: 130 }}>
                       {keyById.get(c.VirtualKeyID)?.Name ?? "—"}
                     </span>
-                  </td>
-                  <td className="cn-r cn-mono" style={{ color: c.LatencyMS > 3000 ? "var(--bad)" : "var(--ink-2)" }}>
+                  </TableCell>
+                  <TableCell className="text-right cn-mono" style={{ color: c.LatencyMS > 3000 ? "var(--bad)" : "var(--ink-2)" }}>
                     {c.LatencyMS}ms
-                  </td>
-                  <td className="cn-r cn-mono" style={{ color: "var(--ink-2)" }}>
+                  </TableCell>
+                  <TableCell className="text-right cn-mono" style={{ color: "var(--ink-2)" }}>
                     {c.Status === "failed" ? "—" : `${fmtNum(c.InputTokens)} / ${fmtNum(c.OutputTokens)}`}
-                  </td>
-                  <td className="cn-r cn-mono" style={{ fontWeight: 560 }}>
+                  </TableCell>
+                  <TableCell className="text-right cn-mono" style={{ fontWeight: 560 }}>
                     {c.CostCents ? fmt(c.CostCents) : "—"}
-                  </td>
-                  <td className="cn-r">
+                  </TableCell>
+                  <TableCell className="text-right">
                     <Tag tone={c.Status === "success" ? "ok" : "bad"}>{c.Status === "success" ? "成功" : "失败"}</Tag>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )
             })}
             <TableState
@@ -198,8 +207,8 @@ export function CallLogsPage() {
               title={q ? `没有匹配 “${q}” 的请求` : "这段时间没有调用"}
               desc={q ? "换个关键词，或把时间范围放宽到全部。" : undefined}
             />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
     </div>
   )

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
-import { Card, Field, Modal, PageHead, Switch, Tag } from "@/components/console/ui"
+import { Card, Field, Input, Modal, PageHead, Switch, Tag } from "@/components/console/ui"
 import { api } from "@/lib/api"
 import type { AuthSettings, IdentityConfig } from "@/lib/types"
 
@@ -113,10 +114,10 @@ function IdentityCard({
           </div>
         </div>
         <div className="cn-cfg-acts">
-          <button className="cn-btn" disabled={!implemented} onClick={() => setEditing(true)}>
+          <Button disabled={!implemented} onClick={() => setEditing(true)}>
             <Icon name="edit" size={14} />
             配置
-          </button>
+          </Button>
           <Switch
             on={!!config?.Enabled}
             label={`启用${name}登录`}
@@ -133,22 +134,21 @@ function IdentityCard({
         onClose={() => setEditing(false)}
         footer={
           <>
-            <button className="cn-btn" disabled={busy} onClick={() => void save(false)}>
+            <Button disabled={busy} onClick={() => void save(false)}>
               保存但不启用
-            </button>
-            <button className="cn-btn cn-btn-pri" disabled={busy || !appId || !appSecret} onClick={() => void save(true)}>
+            </Button>
+            <Button tone="primary" disabled={busy || !appId || !appSecret} onClick={() => void save(true)}>
               保存并启用
-            </button>
+            </Button>
           </>
         }
       >
         <div className="cn-form">
           <Field label="App ID" optional="必填">
-            <input className="cn-input" value={appId} onChange={(e) => setAppId(e.target.value)} />
+            <Input value={appId} onChange={(e) => setAppId(e.target.value)} />
           </Field>
           <Field label="App Secret" optional="必填" hint="只写不读：保存后无法再取回明文。">
-            <input
-              className="cn-input"
+            <Input
               type="password"
               value={appSecret}
               onChange={(e) => setAppSecret(e.target.value)}
@@ -156,7 +156,7 @@ function IdentityCard({
             />
           </Field>
           <Field label="回调路径" hint={`需要在${name}开放平台后台登记同样的地址。`}>
-            <input className="cn-input" value={callback} onChange={(e) => setCallback(e.target.value)} />
+            <Input value={callback} onChange={(e) => setCallback(e.target.value)} />
           </Field>
         </div>
       </Modal>

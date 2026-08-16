@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
-import { Card, Filters, PageHead, Select, TableState } from "@/components/console/ui"
+import { Card, Filters, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { fmt } from "@/lib/format"
 import type { Model } from "@/lib/types"
@@ -40,36 +40,36 @@ export function PricingPage() {
       </Filters>
 
       <Card>
-        <table className="cn-table">
-          <thead>
-            <tr>
-              <th>模型</th>
-              <th>模型标识</th>
-              <th className="cn-r">输入 / 1M token</th>
-              <th className="cn-r">输出 / 1M token</th>
-              <th className="cn-r">上下文</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>模型</TableHead>
+              <TableHead>模型标识</TableHead>
+              <TableHead className="text-right">输入 / 1M token</TableHead>
+              <TableHead className="text-right">输出 / 1M token</TableHead>
+              <TableHead className="text-right">上下文</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((m) => (
-              <tr key={m.ID}>
-                <td>
+              <TableRow key={m.ID}>
+                <TableCell>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 570 }}>
                     <Brand kind={m.ProviderKind} size={14} />
                     {m.Name}
                   </span>
-                </td>
-                <td className="cn-mono-cell">{m.ModelIdentifier}</td>
-                <td className="cn-r cn-mono" style={{ fontWeight: 560 }}>
+                </TableCell>
+                <TableCell className="cn-mono-cell">{m.ModelIdentifier}</TableCell>
+                <TableCell className="text-right cn-mono" style={{ fontWeight: 560 }}>
                   {fmt(m.InputPriceCentsPer1M)}
-                </td>
-                <td className="cn-r cn-mono" style={{ fontWeight: 560 }}>
+                </TableCell>
+                <TableCell className="text-right cn-mono" style={{ fontWeight: 560 }}>
                   {fmt(m.OutputPriceCentsPer1M)}
-                </td>
-                <td className="cn-r cn-mono" style={{ color: "var(--ink-2)" }}>
+                </TableCell>
+                <TableCell className="text-right cn-mono" style={{ color: "var(--ink-2)" }}>
                   {(m.ContextWindow / 1000).toFixed(0)}K
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
             <TableState
               colSpan={5}
@@ -78,8 +78,8 @@ export function PricingPage() {
               title="还没有可用模型"
               desc="管理员发布模型后，这里会列出它们的单价。"
             />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
 
       <Card flush={false}>

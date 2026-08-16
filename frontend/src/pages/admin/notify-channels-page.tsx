@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Field, Modal, PageHead, Switch, Tag } from "@/components/console/ui"
+import { Card, Field, Input, Modal, PageHead, Switch, Tag } from "@/components/console/ui"
 import { api } from "@/lib/api"
 import type { NotifyChannel } from "@/lib/types"
 
@@ -114,10 +115,10 @@ function ChannelCard({ spec }: { spec: ChannelSpec }) {
         <span className="cn-card-title">{spec.name}</span>
         <Tag tone={channel?.Enabled ? "ok" : "warn"}>{channel?.Enabled ? "已启用" : "未启用"}</Tag>
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-          <button className="cn-btn" onClick={() => setEditing(true)}>
+          <Button onClick={() => setEditing(true)}>
             <Icon name="edit" size={14} />
             配置
-          </button>
+          </Button>
           <Switch
             on={!!channel?.Enabled}
             label={`启用${spec.name}`}
@@ -154,20 +155,19 @@ function ChannelCard({ spec }: { spec: ChannelSpec }) {
         onClose={() => setEditing(false)}
         footer={
           <>
-            <button className="cn-btn" disabled={busy} onClick={() => void save(false)}>
+            <Button disabled={busy} onClick={() => void save(false)}>
               保存但不启用
-            </button>
-            <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void save(true)}>
+            </Button>
+            <Button tone="primary" disabled={busy} onClick={() => void save(true)}>
               保存并启用
-            </button>
+            </Button>
           </>
         }
       >
         <div className="cn-form">
           {spec.fields.map((f) => (
             <Field key={f.key} label={f.label}>
-              <input
-                className="cn-input"
+              <Input
                 type={f.secret ? "password" : "text"}
                 value={values[f.key] ?? ""}
                 onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}

@@ -6,6 +6,7 @@ import { Icon } from "@/components/console/icon"
 import { Brand, FluxaLogo } from "@/components/console/brand"
 import { api, ApiError } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { Input } from "@/components/console/ui"
 
 type View = "entry" | "login" | "register" | "pending"
 
@@ -149,9 +150,8 @@ export function LoginPage() {
             {isRegister && (
               <div className="cn-form-row">
                 <label className="cn-form-label" htmlFor="login-name">姓名</label>
-                <input
+                <Input
                   id="login-name"
-                  className="cn-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="你的姓名"
@@ -161,9 +161,8 @@ export function LoginPage() {
 
             <div className="cn-form-row">
               <label className="cn-form-label" htmlFor="login-id">{channel === "phone" ? "手机号" : "邮箱"}</label>
-              <input
+              <Input
                 id="login-id"
-                className="cn-input"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder={channel === "phone" ? "138 0000 0000" : "name@example.com"}
@@ -173,9 +172,8 @@ export function LoginPage() {
             <div className="cn-form-row">
               <label className="cn-form-label" htmlFor="login-code">验证码</label>
               <div className="cn-code-input">
-                <input
+                <Input
                   id="login-code"
-                  className="cn-input"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="6 位数字"

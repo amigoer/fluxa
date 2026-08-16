@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
 import { Card, PageHead } from "@/components/console/ui"
@@ -42,14 +43,18 @@ export function QuickstartPage() {
   return (
     <div className="cn-page">
       <PageHead title="快速接入" sub="兼容 OpenAI 协议：把 base_url 换成 Fluxa，其余代码不用改">
-        <a className="cn-btn" href={REPO_URL} target="_blank" rel="noreferrer">
-          <Icon name="book" size={14} />
-          完整 API 文档
-        </a>
-        <button className="cn-btn cn-btn-pri" onClick={() => navigate("/admin/keys")}>
+        {/* asChild keeps this a real link -- it opens a new tab, so it has
+            to stay an <a>, not a button that navigates. */}
+        <Button asChild>
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            <Icon name="book" size={14} />
+            完整 API 文档
+          </a>
+        </Button>
+        <Button tone="primary" onClick={() => navigate("/admin/keys")}>
           <Icon name="key" size={14} />
           创建我的第一个 Key
-        </button>
+        </Button>
       </PageHead>
 
       <div className="cn-docs">

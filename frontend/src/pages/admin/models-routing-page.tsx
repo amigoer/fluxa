@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
-import { Card, Empty, Field, Filters, Modal, PageHead, Select, TableState, Tag } from "@/components/console/ui"
+import { Card, Empty, Field, Filters, Input, Modal, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
@@ -40,16 +41,16 @@ export function ModelsRoutingPage() {
     <div className="cn-page">
       <PageHead title="模型与路由" sub="已发布的模型才会出现在员工的资费表和 Key 的可选范围里">
         {canManageRouting && (
-          <button className="cn-btn" onClick={() => setAddingRule(true)}>
+          <Button onClick={() => setAddingRule(true)}>
             <Icon name="waypoints" size={14} />
             新增路由规则
-          </button>
+          </Button>
         )}
         {canManageModels && (
-          <button className="cn-btn cn-btn-pri" onClick={() => setAddingModel(true)}>
+          <Button tone="primary" onClick={() => setAddingModel(true)}>
             <Icon name="plus" size={14} />
             添加模型
-          </button>
+          </Button>
         )}
       </PageHead>
 
@@ -69,7 +70,11 @@ export function ModelsRoutingPage() {
           onValue={setProviderId}
           options={[
             { value: "", label: "全部供应商" },
-            ...(providers ?? []).map((p) => ({ value: p.ID, label: p.Name })),
+            ...(providers ?? []).map((p) => ({
+              value: p.ID,
+              label: p.Name,
+              icon: <Brand kind={p.Kind} size={14} />,
+            })),
           ]}
         />
         <Select
@@ -85,42 +90,42 @@ export function ModelsRoutingPage() {
       </Filters>
 
       <Card>
-        <table className="cn-table">
-          <thead>
-            <tr>
-              <th>模型</th>
-              <th>模型标识</th>
-              <th>供应商</th>
-              <th>状态</th>
-              <th className="cn-r">输入 / 1M</th>
-              <th className="cn-r">输出 / 1M</th>
-              <th className="cn-r">上下文</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>模型</TableHead>
+              <TableHead>模型标识</TableHead>
+              <TableHead>供应商</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead className="text-right">输入 / 1M</TableHead>
+              <TableHead className="text-right">输出 / 1M</TableHead>
+              <TableHead className="text-right">上下文</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((m) => {
               const p = providerById.get(m.ProviderID)
               return (
-                <tr key={m.ID}>
-                  <td style={{ fontWeight: 570 }}>{m.Name}</td>
-                  <td className="cn-mono-cell">{m.ModelIdentifier}</td>
-                  <td>
+                <TableRow key={m.ID}>
+                  <TableCell style={{ fontWeight: 570 }}>{m.Name}</TableCell>
+                  <TableCell className="cn-mono-cell">{m.ModelIdentifier}</TableCell>
+                  <TableCell>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--ink-2)" }}>
                       <Brand kind={p?.Kind} size={13} />
                       {p?.Name ?? "—"}
                     </span>
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <Tag tone={m.Status === "published" ? "ok" : "warn"}>
                       {m.Status === "published" ? "已发布" : "草稿"}
                     </Tag>
-                  </td>
-                  <td className="cn-r cn-mono">{fmt(m.InputPriceCentsPer1M)}</td>
-                  <td className="cn-r cn-mono">{fmt(m.OutputPriceCentsPer1M)}</td>
-                  <td className="cn-r cn-mono" style={{ color: "var(--ink-2)" }}>
+                  </TableCell>
+                  <TableCell className="text-right cn-mono">{fmt(m.InputPriceCentsPer1M)}</TableCell>
+                  <TableCell className="text-right cn-mono">{fmt(m.OutputPriceCentsPer1M)}</TableCell>
+                  <TableCell className="text-right cn-mono" style={{ color: "var(--ink-2)" }}>
                     {(m.ContextWindow / 1000).toFixed(0)}K
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )
             })}
             <TableState
@@ -130,8 +135,8 @@ export function ModelsRoutingPage() {
               title={q || providerId || status ? "没有匹配的模型" : "还没有添加模型"}
               desc="模型定价按 100 万 token 计，是员工资费表的唯一来源。"
             />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
 
       {canManageRouting && (
@@ -258,51 +263,58 @@ function AddModelModal({
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             {busy ? "添加中…" : "添加"}
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="供应商" optional="必填">
-          <select className="cn-input" value={providerId} onChange={(e) => setProviderId(e.target.value)}>
-            <option value="">选择供应商</option>
-            {providers.map((p) => (
-              <option key={p.ID} value={p.ID}>
-                {p.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="供应商"
+            value={providerId}
+            onValue={setProviderId}
+            placeholder="选择供应商"
+            options={providers.map((p) => ({
+              value: p.ID,
+              label: p.Name,
+              icon: <Brand kind={p.Kind} size={14} />,
+            }))}
+          />
         </Field>
         <Field label="展示名称" optional="必填" hint="员工在资费表里看到的名字。">
-          <input className="cn-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="GPT-4o" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="GPT-4o" />
         </Field>
         <Field label="模型标识" optional="必填" hint="转发给上游时使用的 model 值。">
-          <input
-            className="cn-input"
+          <Input
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             placeholder="gpt-4o"
           />
         </Field>
         <Field label="输入价格 / 1M token">
-          <input className="cn-input" inputMode="decimal" value={input} onChange={(e) => setInput(e.target.value)} placeholder="18.00" />
+          <Input inputMode="decimal" value={input} onChange={(e) => setInput(e.target.value)} placeholder="18.00" />
         </Field>
         <Field label="输出价格 / 1M token">
-          <input className="cn-input" inputMode="decimal" value={output} onChange={(e) => setOutput(e.target.value)} placeholder="72.00" />
+          <Input inputMode="decimal" value={output} onChange={(e) => setOutput(e.target.value)} placeholder="72.00" />
         </Field>
         <Field label="上下文窗口" hint="单位 token。">
-          <input className="cn-input" inputMode="numeric" value={ctx} onChange={(e) => setCtx(e.target.value)} />
+          <Input inputMode="numeric" value={ctx} onChange={(e) => setCtx(e.target.value)} />
         </Field>
         <Field label="状态" hint="草稿不会出现在员工资费表和 Key 的可选范围里。">
-          <select className="cn-input" value={publish ? "published" : "draft"} onChange={(e) => setPublish(e.target.value === "published")}>
-            <option value="published">已发布</option>
-            <option value="draft">草稿</option>
-          </select>
+          <Select
+            variant="input"
+            label="状态"
+            value={publish ? "published" : "draft"}
+            onValue={(v) => setPublish(v === "published")}
+            options={[
+              { value: "published", label: "已发布" },
+              { value: "draft", label: "草稿" },
+            ]}
+          />
         </Field>
       </div>
     </Modal>
@@ -359,41 +371,49 @@ function AddRuleModal({
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             {busy ? "保存中…" : "保存"}
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="条件" optional="必填" hint="写成一句人话，例如「请求 gpt-4 系列」。">
-          <input className="cn-input" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} />
         </Field>
         <Field label="目标模型" optional="必填">
-          <select className="cn-input" value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">选择模型</option>
-            {models.map((m) => (
-              <option key={m.ID} value={m.ID}>
-                {m.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="目标模型"
+            value={target}
+            onValue={setTarget}
+            placeholder="选择模型"
+            options={models.map((m) => ({
+              value: m.ID,
+              label: m.Name,
+              icon: <Brand kind={m.ProviderKind} size={14} />,
+            }))}
+          />
         </Field>
         <Field label="备用模型" hint="留空则目标不可用时直接返回错误。">
-          <select className="cn-input" value={fallback} onChange={(e) => setFallback(e.target.value)}>
-            <option value="">无</option>
-            {models.map((m) => (
-              <option key={m.ID} value={m.ID}>
-                {m.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="备用模型"
+            value={fallback}
+            onValue={setFallback}
+            options={[
+              { value: "", label: "无" },
+              ...models.map((m) => ({
+                value: m.ID,
+                label: m.Name,
+                icon: <Brand kind={m.ProviderKind} size={14} />,
+              })),
+            ]}
+          />
         </Field>
         <Field label="单次费用上限" hint="单位元，留空表示不限。超过上限的请求会走备用模型。">
-          <input className="cn-input" inputMode="decimal" value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
+          <Input inputMode="decimal" value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
         </Field>
       </div>
     </Modal>

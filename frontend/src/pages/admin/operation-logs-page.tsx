@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Filters, PageHead, Select, TableState } from "@/components/console/ui"
+import { Card, Filters, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { Permission, useHasPermission } from "@/lib/auth"
 import { downloadCsv } from "@/lib/csv"
@@ -55,10 +56,10 @@ export function OperationLogsPage() {
   return (
     <div className="cn-page">
       <PageHead title="操作审计" sub="所有管理动作的不可变记录，仅追加，不可删除">
-        <button className="cn-btn" onClick={exportCsv}>
+        <Button onClick={exportCsv}>
           <Icon name="download" size={14} />
           导出 CSV
-        </button>
+        </Button>
       </PageHead>
 
       <Filters
@@ -96,42 +97,42 @@ export function OperationLogsPage() {
       </Filters>
 
       <Card>
-        <table className="cn-table">
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th>操作人</th>
-              <th>动作</th>
-              <th>详情</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>时间</TableHead>
+              <TableHead>操作人</TableHead>
+              <TableHead>动作</TableHead>
+              <TableHead>详情</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((l) => {
               const who = memberById.get(l.ActorMemberID)
               return (
-                <tr key={l.ID}>
-                  <td className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
+                <TableRow key={l.ID}>
+                  <TableCell className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
                     {formatDateTime(l.OccurredAt)}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 560 }}>
                       <span className="cn-av" style={{ width: 22, height: 22, fontSize: 10 }}>
                         {(who?.Name ?? "?").slice(0, 1)}
                       </span>
                       {who?.Name ?? l.ActorMemberID.slice(0, 8)}
                     </span>
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <span className="cn-mono-cell" style={{ color: "var(--ink)" }}>
                       {l.Action}
                     </span>
-                  </td>
-                  <td style={{ color: "var(--ink-3)" }}>
+                  </TableCell>
+                  <TableCell style={{ color: "var(--ink-3)" }}>
                     <span className="cn-trunc" style={{ maxWidth: 420 }}>
                       {l.Detail || "—"}
                     </span>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )
             })}
             <TableState
@@ -141,8 +142,8 @@ export function OperationLogsPage() {
               title="没有操作记录"
               desc="管理动作发生后会自动写入这里，无法修改或删除。"
             />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
     </div>
   )

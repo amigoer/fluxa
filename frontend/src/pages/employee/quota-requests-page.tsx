@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Empty, PageHead, Tag } from "@/components/console/ui"
+import { Card, Empty, Input, PageHead, Tag, Textarea } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -91,9 +92,8 @@ export function QuotaRequestsPage() {
               <label className="cn-form-label" htmlFor="req-amount">
                 申请金额 <span>必填</span>
               </label>
-              <input
+              <Input
                 id="req-amount"
-                className="cn-input"
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -106,9 +106,8 @@ export function QuotaRequestsPage() {
               <label className="cn-form-label" htmlFor="req-reason">
                 申请事由 <span>必填</span>
               </label>
-              <textarea
+              <Textarea
                 id="req-reason"
-                className="cn-input"
                 rows={4}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -127,10 +126,10 @@ export function QuotaRequestsPage() {
             </div>
 
             <div className="cn-form-foot">
-              <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+              <Button tone="primary" disabled={busy} onClick={() => void submit()}>
                 <Icon name="send" size={14} />
                 {busy ? "提交中…" : "提交申请"}
-              </button>
+              </Button>
             </div>
           </div>
         </Card>

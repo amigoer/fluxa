@@ -5,6 +5,7 @@ import { LoginShell } from "@/layouts/login-layout"
 import { FluxaLogo } from "@/components/console/brand"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { Input } from "@/components/console/ui"
 
 // First-run setup: creates the single organization this deployment
 // serves and its first super admin (DESIGN.md 9, one org per
@@ -53,9 +54,8 @@ export function SetupPage() {
             <label className="cn-form-label" htmlFor="setup-org">
               企业名称 <span>必填</span>
             </label>
-            <input
+            <Input
               id="setup-org"
-              className="cn-input"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               required
@@ -66,9 +66,8 @@ export function SetupPage() {
             <label className="cn-form-label" htmlFor="setup-name">
               你的姓名 <span>必填</span>
             </label>
-            <input
+            <Input
               id="setup-name"
-              className="cn-input"
               value={adminName}
               onChange={(e) => setAdminName(e.target.value)}
               required
@@ -79,9 +78,8 @@ export function SetupPage() {
             <label className="cn-form-label" htmlFor="setup-email">
               邮箱 <span>必填</span>
             </label>
-            <input
+            <Input
               id="setup-email"
-              className="cn-input"
               type="email"
               value={adminEmail}
               onChange={(e) => setAdminEmail(e.target.value)}

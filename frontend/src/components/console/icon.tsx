@@ -120,6 +120,7 @@ const ICON_PATHS: Record<string, ReactElement> = {
     </g>
   ),
   "chevron-down": <path d="m6.5 9.5 5.5 5.5 5.5-5.5" />,
+  "chevron-up": <path d="m6.5 14.5 5.5-5.5 5.5 5.5" />,
   "chevron-right": <path d="m9.5 5.5 6 6.5-6 6.5" />,
   "chevron-up-down": <path d="m8 10 4-4 4 4M8 14l4 4 4-4" />,
   search: (
@@ -161,6 +162,9 @@ const ICON_PATHS: Record<string, ReactElement> = {
   ),
   check: <path d="m20 6.5-10.5 11L4 12" />,
   x: <path d="m6 6 12 12M18 6 6 18" />,
+  // Radio indicator for menus -- solid, so it overrides the shared
+  // fill:none/stroke:currentColor the rest of the set is drawn with.
+  dot: <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />,
   filter: <path d="M3.5 5.5h17l-6.5 7.6v5.6l-4 2.3v-7.9z" />,
   download: <path d="M12 3.5v11m0 0 4-4m-4 4-4-4M4 18.5v1a1.5 1.5 0 0 0 1.5 1.5h13a1.5 1.5 0 0 0 1.5-1.5v-1" />,
   clock: (

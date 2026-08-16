@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Empty, Field, Modal, PageHead } from "@/components/console/ui"
+import { Brand } from "@/components/console/brand"
+import { Card, Empty, Field, Input, Modal, PageHead, Select } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
@@ -24,10 +26,10 @@ export function MyRoutingPage() {
   return (
     <div className="cn-page">
       <PageHead title="我的路由配置" sub="个人规则优先于全局规则；没有命中的请求会回落到管理员配置的全局链路">
-        <button className="cn-btn cn-btn-pri" onClick={() => setAdding(true)}>
+        <Button tone="primary" onClick={() => setAdding(true)}>
           <Icon name="plus" size={14} />
           新增规则
-        </button>
+        </Button>
       </PageHead>
 
       <Card title="个人规则" note="自上而下匹配，命中即停">
@@ -173,41 +175,49 @@ function AddRuleModal({
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             保存
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="当我" optional="必填" hint="写成一句人话，例如「请求 gpt-4 系列」。">
-          <input className="cn-input" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} />
         </Field>
         <Field label="就用" optional="必填">
-          <select className="cn-input" value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">选择模型</option>
-            {models.map((m) => (
-              <option key={m.ID} value={m.ID}>
-                {m.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="就用"
+            value={target}
+            onValue={setTarget}
+            placeholder="选择模型"
+            options={models.map((m) => ({
+              value: m.ID,
+              label: m.Name,
+              icon: <Brand kind={m.ProviderKind} size={14} />,
+            }))}
+          />
         </Field>
         <Field label="它不可用时" hint="留空则回落到管理员配置的全局链路。">
-          <select className="cn-input" value={fallback} onChange={(e) => setFallback(e.target.value)}>
-            <option value="">回落全局规则</option>
-            {models.map((m) => (
-              <option key={m.ID} value={m.ID}>
-                {m.Name}
-              </option>
-            ))}
-          </select>
+          <Select
+            variant="input"
+            label="它不可用时"
+            value={fallback}
+            onValue={setFallback}
+            options={[
+              { value: "", label: "回落全局规则" },
+              ...models.map((m) => ({
+                value: m.ID,
+                label: m.Name,
+                icon: <Brand kind={m.ProviderKind} size={14} />,
+              })),
+            ]}
+          />
         </Field>
         <Field label="单次费用上限" hint="单位元，留空表示不限。">
-          <input className="cn-input" inputMode="decimal" value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
+          <Input inputMode="decimal" value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
         </Field>
       </div>
     </Modal>

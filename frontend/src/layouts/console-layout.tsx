@@ -9,6 +9,20 @@ import {
 } from "react"
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Icon } from "@/components/console/icon"
 import { FluxaLogo } from "@/components/console/brand"
 import { useApiQuery } from "@/hooks/use-api-query"
@@ -16,7 +30,7 @@ import { api } from "@/lib/api"
 import { Permission, useAuth } from "@/lib/auth"
 import { fmt, formatAgo } from "@/lib/format"
 import type { Member, Provider, ProviderHealth, QuotaRequest, SecurityEvent, VirtualKey } from "@/lib/types"
-import { adminHasAnyPermission, adminNav, employeeNav, filterNav, routeLabel } from "@/layouts/nav-config"
+import { adminNav, employeeNav, filterNav, routeLabel } from "@/layouts/nav-config"
 
 const VERSION = "v1.0.0"
 const REPO_URL = "https://github.com/amigoer/fluxa"
@@ -194,19 +208,29 @@ function TodoDrawer({
   setFilter: (k: TodoKind | "全部") => void
   onClose: () => void
 }) {
-  if (!open) return null
   const list = filter === "全部" ? todos : todos.filter((t) => t.kind === filter)
   return (
-    <>
-      <div className="cn-scrim" onClick={onClose} />
-      <div className="cn-drawer" role="dialog" aria-label="待处理事项">
-        <div className="cn-drawer-head">
-          <span className="cn-drawer-title">需要你处理</span>
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      {/* .cn-scrim / .cn-drawer, restated as utilities -- those rules sit
+          in the `fluxa` layer and lose to the primitive's own classes. */}
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        overlayClassName="z-[40] bg-[rgba(16,24,40,.30)]"
+        aria-label="待处理事项"
+        className={
+          "z-[41] flex w-[424px] max-w-full flex-col gap-0 border-l border-[var(--line)] " +
+          "bg-[var(--panel)] p-0 shadow-[-14px_0_40px_-18px_rgba(22,35,58,.34)]"
+        }
+      >
+        <SheetHeader className="cn-drawer-head block space-y-0 p-0">
+          <SheetTitle className="cn-drawer-title text-inherit font-inherit">需要你处理</SheetTitle>
+          <SheetDescription className="sr-only">熔断、预算、审批与安全事件的待办队列</SheetDescription>
           <span className="cn-rail-count">{todos.length}</span>
-          <button className="cn-drawer-close" onClick={onClose} aria-label="关闭">
+          <SheetClose className="cn-drawer-close" aria-label="关闭">
             <Icon name="x" size={16} />
-          </button>
-        </div>
+          </SheetClose>
+        </SheetHeader>
 
         <div className="cn-drawer-filters">
           <button className="cn-chip" data-on={filter === "全部"} onClick={() => setFilter("全部")}>
@@ -256,8 +280,8 @@ function TodoDrawer({
             </div>
           )}
         </div>
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   )
 }
 
@@ -373,16 +397,29 @@ function OmniSearch({ pages, logs }: { pages: { to: string; label: string }[]; l
 
 // ---- identity menu ----------------------------------------------------
 
+// .cn-menu / .cn-menu-item, restated as utilities: those rules live in the
+// `fluxa` layer and would lose to the primitive's own classes.
+const MENU =
+  "min-w-[208px] rounded-[10px] border-[var(--line)] bg-[var(--panel)] p-[5px] " +
+  "shadow-[0_1px_2px_rgba(22,35,58,.05),0_18px_40px_-18px_rgba(22,35,58,.34)]"
+const MENU_ITEM =
+  "gap-[9px] rounded-[7px] px-[9px] py-[7px] text-[12.5px] text-[var(--ink-2)] " +
+  "focus:bg-[#f5f7fb] focus:text-[var(--ink)] [&_svg:not([class*='size-'])]:size-auto"
+const MENU_DANGER =
+  MENU_ITEM + " focus:bg-[var(--bad-soft)]! focus:text-[var(--bad)]! data-[variant=destructive]:text-[var(--ink-2)]"
+
+// Account actions only. There is deliberately no persona switch: every
+// employee-side page has a strictly more capable admin equivalent (概览 /
+// 调用日志 for 我的用量, 模型与路由 for 资费, 全局路由规则 for 我的路由,
+// and an admin adjusts any member's quota rather than requesting one), so
+// "switch to employee self-service" moved an admin to a weaker view of
+// their own data -- and, since the employee shell offered no way back,
+// stranded them there.
 function IdentityMenu({ compact }: { compact?: boolean }) {
   const navigate = useNavigate()
-  const { member, permissions, roleName, departmentName, logout } = useAuth()
+  const { member, roleName, departmentName, logout } = useAuth()
   const [open, setOpen] = useState(false)
-  const wrap = useRef<HTMLDivElement>(null)
-  useOnOutsideClick(wrap, () => setOpen(false), open)
 
-  const location = useLocation()
-  const inAdmin = location.pathname.startsWith("/admin")
-  const canAdmin = adminHasAnyPermission(permissions)
   const initial = member?.Name?.slice(0, 1) ?? "?"
 
   const signOut = async () => {
@@ -390,52 +427,47 @@ function IdentityMenu({ compact }: { compact?: boolean }) {
     navigate("/login", { replace: true })
   }
 
+  // .cn-menu on Radix. The outside-click hook and the manual `open` state
+  // for dismissal are gone: the primitive brings keyboard navigation,
+  // focus return and the layer stack the hand-rolled version lacked.
   return (
-    <div className="cn-menu-wrap" ref={wrap}>
-      {compact ? (
-        <button className="cn-side-foot" onClick={() => setOpen((v) => !v)} style={{ width: "100%" }}>
-          <span className="cn-av">{initial}</span>
-          <div className="cn-side-foot-text" style={{ minWidth: 0, textAlign: "left" }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600 }}>{member?.Name}</div>
-            <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{roleName}</div>
-          </div>
-          <Icon name="chevron-up-down" size={14} style={{ marginLeft: "auto", color: "var(--ink-3)" }} />
-        </button>
-      ) : (
-        <button className="cn-idchip" onClick={() => setOpen((v) => !v)}>
-          <span className="cn-av" style={{ width: 24, height: 24, fontSize: 11 }}>
-            {initial}
-          </span>
-          {[roleName, departmentName].filter(Boolean).join(" · ")}
-          <Icon name="chevron-down" size={13} />
-        </button>
-      )}
-
-      {open && (
-        <div className={compact ? "cn-menu cn-menu-up" : "cn-menu"}>
-          <div className="cn-menu-head">
-            <div className="cn-menu-name">{member?.Name}</div>
-            <div className="cn-menu-sub">{[roleName, departmentName].filter(Boolean).join(" · ")}</div>
-          </div>
-          {canAdmin && (
-            <button
-              className="cn-menu-item"
-              onClick={() => {
-                setOpen(false)
-                navigate(inAdmin ? "/app/usage" : "/admin/overview")
-              }}
-            >
-              <Icon name={inAdmin ? "activity" : "layout-grid"} size={14} />
-              {inAdmin ? "切换到员工自助" : "回到管理台"}
-            </button>
-          )}
-          <button className="cn-menu-item" data-danger="true" onClick={() => void signOut()}>
-            <Icon name="log-out" size={14} />
-            退出登录
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        {compact ? (
+          <button className="cn-side-foot" style={{ width: "100%" }}>
+            <span className="cn-av">{initial}</span>
+            <div className="cn-side-foot-text" style={{ minWidth: 0, textAlign: "left" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{member?.Name}</div>
+              <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{roleName}</div>
+            </div>
+            <Icon name="chevron-up-down" size={14} style={{ marginLeft: "auto", color: "var(--ink-3)" }} />
           </button>
+        ) : (
+          <button className="cn-idchip">
+            <span className="cn-av" style={{ width: 24, height: 24, fontSize: 11 }}>
+              {initial}
+            </span>
+            {[roleName, departmentName].filter(Boolean).join(" · ")}
+            <Icon name="chevron-down" size={13} />
+          </button>
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align={compact ? "start" : "end"}
+        side={compact ? "top" : "bottom"}
+        sideOffset={6}
+        className={MENU}
+      >
+        <div className="cn-menu-head">
+          <div className="cn-menu-name">{member?.Name}</div>
+          <div className="cn-menu-sub">{[roleName, departmentName].filter(Boolean).join(" · ")}</div>
         </div>
-      )}
-    </div>
+        <DropdownMenuItem className={MENU_DANGER} onSelect={() => void signOut()}>
+          <Icon name="log-out" size={14} />
+          退出登录
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -466,7 +498,7 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
   }, [drawer])
 
   const nav = useMemo(
-    () => (isAdmin ? filterNav(adminNav, permissions) : employeeNav),
+    () => filterNav(isAdmin ? adminNav : employeeNav, permissions),
     [isAdmin, permissions],
   )
   const pages = useMemo(() => nav.flatMap((g) => g.items.map((i) => ({ to: i.to, label: i.label }))), [nav])
@@ -534,7 +566,7 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
             ))}
           </div>
 
-          <IdentityMenu compact />
+          {!isAdmin && <IdentityMenu compact />}
         </div>
 
         <div className="cn-body">
@@ -557,7 +589,7 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
                   {todos.length > 0 && <span className="cn-bell-badge">{todos.length}</span>}
                 </button>
               )}
-              <IdentityMenu />
+              {isAdmin && <IdentityMenu />}
             </div>
           </div>
 

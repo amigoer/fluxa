@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
-import { Card, Check, Field, Modal, PageHead } from "@/components/console/ui"
+import { Card, Check, Field, Input, Modal, PageHead } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { permissionCatalog } from "@/lib/permission-catalog"
@@ -83,10 +84,10 @@ export function RolesPage() {
   return (
     <div className="cn-page">
       <PageHead title="角色权限" sub="角色 = 权限点集合。内置角色不可编辑，可按需拆出自定义角色">
-        <button className="cn-btn cn-btn-pri" onClick={() => setCreating(true)}>
+        <Button tone="primary" onClick={() => setCreating(true)}>
           <Icon name="plus" size={14} />
           新建角色
-        </button>
+        </Button>
       </PageHead>
 
       <div className="cn-md">
@@ -213,18 +214,16 @@ function NewRoleModal({ open, onClose, onDone }: { open: boolean; onClose: () =>
       onClose={onClose}
       footer={
         <>
-          <button className="cn-btn" onClick={onClose}>
-            取消
-          </button>
-          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+          <Button onClick={onClose}>取消</Button>
+          <Button tone="primary" disabled={busy} onClick={() => void submit()}>
             创建
-          </button>
+          </Button>
         </>
       }
     >
       <div className="cn-form">
         <Field label="角色名称" optional="必填">
-          <input className="cn-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="部门负责人" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="部门负责人" />
         </Field>
       </div>
     </Modal>
