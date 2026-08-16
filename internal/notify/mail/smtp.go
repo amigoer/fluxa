@@ -3,9 +3,19 @@ package mail
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"mime"
+	"net"
 	"net/smtp"
+	"strings"
+	"time"
 )
+
+// dialTimeout bounds both the TCP connect and the TLS handshake. net/smtp
+// has no timeout of its own, so without this a black-holed host hangs the
+// request until the server's own 60s timeout fires.
+const dialTimeout = 15 * time.Second
 
 // SMTPSender sends email through a configured SMTP relay. config is
 // expected to hold: host, port, username, password, from_address, and
@@ -16,7 +26,17 @@ func NewSMTPSender() *SMTPSender {
 	return &SMTPSender{}
 }
 
-func (s *SMTPSender) Send(ctx context.Context, config map[string]any, recipient, message string) error {
+// SendEmail delivers one message. Two things here are what make it work
+// against real providers rather than only a local relay:
+//
+//   - Port 465 is implicit TLS: the connection is wrapped before any SMTP
+//     is spoken. Everything else is dialled plain and upgraded with
+//     STARTTLS when the server offers it. net/smtp's SendMail only does
+//     the second, which is why 465 (what 163/QQ hand out first) failed.
+//   - The body is a real MIME message declaring UTF-8, and the subject and
+//     sender name go through RFC 2047. Without that a Chinese subject
+//     arrives as mojibake, and plenty of relays score the message as spam.
+func (s *SMTPSender) SendEmail(ctx context.Context, config map[string]any, recipient, subject, body string) error {
 	host, _ := config["host"].(string)
 	port, _ := config["port"].(string)
 	username, _ := config["username"].(string)
@@ -24,25 +44,124 @@ func (s *SMTPSender) Send(ctx context.Context, config map[string]any, recipient,
 	fromAddress, _ := config["from_address"].(string)
 	fromName, _ := config["from_name"].(string)
 	if host == "" || port == "" || fromAddress == "" {
-		return fmt.Errorf("mail: smtp channel is missing required config")
+		return fmt.Errorf("mail: smtp channel is missing host, port or from_address")
 	}
 
+	client, err := dial(ctx, host, port)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		if err := client.StartTLS(&tls.Config{ServerName: host}); err != nil {
+			return fmt.Errorf("mail: starttls: %w", err)
+		}
+	}
+
+	if username != "" {
+		// LOGIN is offered by several China-based relays that do not
+		// advertise PLAIN; net/smtp only implements PLAIN and CRAM-MD5.
+		auth := smtp.Auth(smtp.PlainAuth("", username, password, host))
+		if ok, mechs := client.Extension("AUTH"); ok && !strings.Contains(mechs, "PLAIN") &&
+			strings.Contains(mechs, "LOGIN") {
+			auth = &loginAuth{username: username, password: password}
+		}
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("mail: auth: %w", err)
+		}
+	}
+
+	if err := client.Mail(fromAddress); err != nil {
+		return fmt.Errorf("mail: from: %w", err)
+	}
+	if err := client.Rcpt(recipient); err != nil {
+		return fmt.Errorf("mail: to: %w", err)
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("mail: data: %w", err)
+	}
+	if _, err := w.Write([]byte(message(fromAddress, fromName, recipient, subject, body))); err != nil {
+		return fmt.Errorf("mail: write: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("mail: send: %w", err)
+	}
+	return client.Quit()
+}
+
+// dial opens the connection, wrapping it in TLS up front on 465.
+func dial(ctx context.Context, host, port string) (*smtp.Client, error) {
+	addr := net.JoinHostPort(host, port)
+	d := &net.Dialer{Timeout: dialTimeout}
+
+	if port == "465" {
+		conn, err := tls.DialWithDialer(d, "tcp", addr, &tls.Config{ServerName: host})
+		if err != nil {
+			return nil, fmt.Errorf("mail: dial %s over tls: %w", addr, err)
+		}
+		client, err := smtp.NewClient(conn, host)
+		if err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("mail: smtp handshake: %w", err)
+		}
+		return client, nil
+	}
+
+	conn, err := d.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("mail: dial %s: %w", addr, err)
+	}
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("mail: smtp handshake: %w", err)
+	}
+	return client, nil
+}
+
+func message(fromAddress, fromName, recipient, subject, body string) string {
 	from := fromAddress
 	if fromName != "" {
-		from = fmt.Sprintf("%s <%s>", fromName, fromAddress)
+		from = fmt.Sprintf("%s <%s>", mime.QEncoding.Encode("UTF-8", fromName), fromAddress)
 	}
 
-	body := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: Fluxa verification code\r\n\r\n%s\r\n",
-		from, recipient, message)
+	var b strings.Builder
+	b.WriteString("From: " + from + "\r\n")
+	b.WriteString("To: " + recipient + "\r\n")
+	b.WriteString("Subject: " + mime.QEncoding.Encode("UTF-8", subject) + "\r\n")
+	b.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + "\r\n")
+	b.WriteString("MIME-Version: 1.0\r\n")
+	b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	b.WriteString("Content-Transfer-Encoding: 8bit\r\n")
+	b.WriteString("\r\n")
+	// Written raw: the writer from Client.Data is a textproto.DotWriter,
+	// which already escapes a leading "." and terminates the block. Doing
+	// it here too would put the second dot on the wire for real.
+	b.WriteString(body)
+	b.WriteString("\r\n")
+	return b.String()
+}
 
-	addr := host + ":" + port
-	var auth smtp.Auth
-	if username != "" {
-		auth = smtp.PlainAuth("", username, password, host)
+// loginAuth implements the non-standard but widely deployed AUTH LOGIN.
+type loginAuth struct{ username, password string }
+
+func (a *loginAuth) Start(_ *smtp.ServerInfo) (string, []byte, error) {
+	return "LOGIN", nil, nil
+}
+
+func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
 	}
-
-	// net/smtp doesn't take a context; the caller applies its own
-	// timeout to the surrounding request instead.
-	_ = ctx
-	return smtp.SendMail(addr, auth, fromAddress, []string{recipient}, []byte(body))
+	switch strings.ToLower(strings.TrimRight(string(fromServer), ": ")) {
+	case "username":
+		return []byte(a.username), nil
+	case "password":
+		return []byte(a.password), nil
+	default:
+		return nil, fmt.Errorf("mail: unexpected login prompt %q", fromServer)
+	}
 }

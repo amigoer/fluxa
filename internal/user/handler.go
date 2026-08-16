@@ -98,6 +98,7 @@ func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
 
 	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Get("/api/notify-channels/{kind}", h.getNotifyChannel)
 	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Put("/api/notify-channels/{kind}", h.putNotifyChannel)
+	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Post("/api/notify-channels/{kind}/test", h.testNotifyChannel)
 }
 
 // -- Setup ----------------------------------------------------------------
@@ -159,7 +160,10 @@ func (h *Handler) canDeliverOTP(ctx context.Context) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if channel.Enabled {
+		// Enabled is only a promise; rows written before the guard in
+		// putNotifyChannel existed can still be switched on with an empty
+		// config, so the credentials get checked here rather than trusted.
+		if channel.Enabled && notify.Configured(channel.Provider, channel.Config) {
 			return true, nil
 		}
 	}
@@ -322,12 +326,18 @@ func (h *Handler) deliverOTP(ctx context.Context, identifier, code string) error
 	if err != nil {
 		return err
 	}
+	// Same class of failure as no channel at all, and the admin needs the
+	// same fix -- so say so, instead of letting the vendor call fail and
+	// surface as a 500 to somebody trying to log in.
+	if !notify.Configured(channel.Provider, channel.Config) {
+		return fmt.Errorf("%w: %s is enabled but not configured", errNoNotifyChannel, kind)
+	}
 
 	message := fmt.Sprintf("Your Fluxa verification code is %s, valid for 5 minutes.", code)
 	if kind == NotifyChannelSMS {
 		err = notify.SendSMS(ctx, channel.Provider, channel.Config, identifier, code)
 	} else {
-		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, message)
+		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, "Fluxa 验证码", message)
 	}
 	if err != nil {
 		return err
@@ -777,6 +787,55 @@ func (h *Handler) putAuthSettings(w http.ResponseWriter, r *http.Request) {
 
 // -- Notify channels ------------------------------------------------------
 
+// maskedValue is what a stored credential reads back as. It carries no
+// prefix of the real value on purpose -- unlike an OAuth app id, an SMTP
+// password has no half worth showing.
+const maskedValue = "****"
+
+// secretConfigKeys names the credential fields inside each channel kind's
+// config blob. They are write-only: masked on the way out, and an update
+// that leaves one blank (or hands back the mask) keeps what is stored.
+var secretConfigKeys = map[NotifyChannelKind][]string{
+	NotifyChannelSMS:   {"access_key_secret"},
+	NotifyChannelEmail: {"password"},
+}
+
+func maskChannelSecrets(kind NotifyChannelKind, config map[string]any) map[string]any {
+	if config == nil {
+		return nil
+	}
+	out := make(map[string]any, len(config))
+	for k, v := range config {
+		out[k] = v
+	}
+	for _, k := range secretConfigKeys[kind] {
+		if s, _ := out[k].(string); s != "" {
+			out[k] = maskedValue
+		}
+	}
+	return out
+}
+
+// mergeChannelSecrets puts the stored credential back wherever the caller
+// did not supply a new one, so saving an unrelated field (or toggling the
+// channel on) cannot silently blank the password.
+func mergeChannelSecrets(kind NotifyChannelKind, stored, incoming map[string]any) map[string]any {
+	if incoming == nil {
+		incoming = map[string]any{}
+	}
+	for _, k := range secretConfigKeys[kind] {
+		if s, _ := incoming[k].(string); s != "" && s != maskedValue {
+			continue
+		}
+		if kept, ok := stored[k]; ok {
+			incoming[k] = kept
+		} else {
+			delete(incoming, k)
+		}
+	}
+	return incoming
+}
+
 func (h *Handler) getNotifyChannel(w http.ResponseWriter, r *http.Request) {
 	kind := NotifyChannelKind(chi.URLParam(r, "kind"))
 	channel, err := h.service.GetNotifyChannel(r.Context(), kind)
@@ -796,6 +855,7 @@ func (h *Handler) getNotifyChannel(w http.ResponseWriter, r *http.Request) {
 		httpx.InternalError(w, err)
 		return
 	}
+	channel.Config = maskChannelSecrets(kind, channel.Config)
 	httpx.JSON(w, http.StatusOK, map[string]any{"channel": channel, "sentThisMonth": sentThisMonth})
 }
 
@@ -806,7 +866,79 @@ func (h *Handler) putNotifyChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	channel.Kind = kind
+
+	stored, err := h.service.GetNotifyChannel(r.Context(), kind)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		httpx.InternalError(w, err)
+		return
+	}
+	channel.Config = mergeChannelSecrets(kind, stored.Config, channel.Config)
+
+	// Refuse to switch on a channel that cannot send. Every "is a channel
+	// enabled?" check downstream -- including the one that decides whether
+	// the login page offers local accounts -- treats the flag as a promise
+	// that a code will arrive.
+	if channel.Enabled && !notify.Configured(channel.Provider, channel.Config) {
+		httpx.Error(w, http.StatusBadRequest, i18n.KeyValidationFailed,
+			"the channel is missing required credentials and cannot be enabled")
+		return
+	}
+
 	if err := h.service.UpsertNotifyChannel(r.Context(), channel); err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, nil)
+}
+
+type testChannelRequest struct {
+	Recipient string `json:"recipient"`
+}
+
+// testNotifyChannel sends one real message through the stored config, so
+// an admin learns whether the credentials work from this button rather
+// than from a colleague whose verification code never arrived.
+//
+// It deliberately uses what is saved rather than what is on screen: that
+// is the config the OTP path will use, and since secrets are write-only
+// the form does not hold them anyway. It also ignores `enabled` -- the
+// whole point is to check a channel before switching it on.
+func (h *Handler) testNotifyChannel(w http.ResponseWriter, r *http.Request) {
+	kind := NotifyChannelKind(chi.URLParam(r, "kind"))
+	if kind != NotifyChannelEmail {
+		httpx.Error(w, http.StatusNotImplemented, i18n.KeyValidationFailed, "only the email channel can be tested for now")
+		return
+	}
+
+	var req testChannelRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Recipient == "" {
+		httpx.Error(w, http.StatusBadRequest, i18n.KeyValidationFailed, "recipient is required")
+		return
+	}
+
+	channel, err := h.service.GetNotifyChannel(r.Context(), kind)
+	if errors.Is(err, ErrNotFound) {
+		httpx.Error(w, http.StatusBadRequest, i18n.KeyNotifyChannelMissing, "the email channel has no configuration yet")
+		return
+	}
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+
+	body := "这是一封来自 Fluxa 的测试邮件。\r\n\r\n" +
+		"收到它说明发信通道配置正确，本地账号的注册和登录验证码可以正常送达。"
+	if err := notify.SendEmail(r.Context(), channel.Provider, channel.Config, req.Recipient, "Fluxa 测试邮件", body); err != nil {
+		// The upstream message is the entire value of this button:
+		// "authentication failed" and "connection timed out" need
+		// different fixes, and only the relay knows which happened.
+		httpx.Error(w, http.StatusBadGateway, i18n.KeyValidationFailed, err.Error())
+		return
+	}
+	if err := h.repo.LogNotifySent(r.Context(), kind, req.Recipient, "test"); err != nil {
 		httpx.InternalError(w, err)
 		return
 	}

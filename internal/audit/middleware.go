@@ -23,16 +23,17 @@ import (
 // empty.
 var actions = map[string]string{
 	// 组织与权限
-	"POST /api/members/{id}/approve":       "member.approve",
-	"PATCH /api/members/{id}/department":   "member.department.update",
-	"PATCH /api/members/{id}/role":         "member.role.update",
-	"POST /api/departments":                "department.create",
-	"PATCH /api/departments/{id}/lead":     "department.lead.update",
-	"POST /api/roles":                      "role.create",
-	"PUT /api/roles/{id}/permissions":      "role.permissions.update",
-	"PUT /api/identity-configs/{provider}": "identity_config.update",
-	"PUT /api/auth-settings":               "auth_settings.update",
-	"PUT /api/notify-channels/{kind}":      "notify_channel.update",
+	"POST /api/members/{id}/approve":        "member.approve",
+	"PATCH /api/members/{id}/department":    "member.department.update",
+	"PATCH /api/members/{id}/role":          "member.role.update",
+	"POST /api/departments":                 "department.create",
+	"PATCH /api/departments/{id}/lead":      "department.lead.update",
+	"POST /api/roles":                       "role.create",
+	"PUT /api/roles/{id}/permissions":       "role.permissions.update",
+	"PUT /api/identity-configs/{provider}":  "identity_config.update",
+	"PUT /api/auth-settings":                "auth_settings.update",
+	"PUT /api/notify-channels/{kind}":       "notify_channel.update",
+	"POST /api/notify-channels/{kind}/test": "notify_channel.test",
 
 	// 资源管理
 	"POST /api/providers":                            "provider.create",
