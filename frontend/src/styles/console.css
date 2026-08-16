@@ -80,7 +80,7 @@
 }
 .cn[data-side="collapsed"] .cn-item:hover::after { opacity: 1; }
 
-.cn[data-side="collapsed"] .cn-side-foot { justify-content: center; padding: 10px 0 2px; }
+.cn[data-side="collapsed"] .cn-side-foot { justify-content: center; padding: 9px 0; }
 .cn[data-side="collapsed"] .cn-side-foot-text,
 .cn[data-side="collapsed"] .cn-side-foot > svg { display: none; }
 
@@ -102,9 +102,21 @@
 }
 
 .cn-side-foot {
-  margin-top: 8px; padding: 10px 8px 2px; border-top: 1px solid var(--line-2);
+  margin-top: 8px; padding: 9px 8px; border-top: 1px solid var(--line-2);
   display: flex; align-items: center; gap: 9px;
+  width: 100%; text-align: left;
 }
+.cn-side-foot:hover { background: #f4f6fa; }
+.cn-side-foot-text { min-width: 0; }
+.cn-side-foot-name {
+  font-size: 12.5px; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cn-side-foot-role {
+  font-size: 11px; color: var(--ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cn-side-foot-caret { margin-left: auto; flex: none; color: var(--ink-3); }
 .cn-av {
   width: 28px; height: 28px; border-radius: 50%; flex: none;
   background: var(--brand-soft); color: var(--brand);
@@ -137,12 +149,6 @@
   display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2);
 }
 .cn-ghost:hover { background: #f4f6fa; color: var(--ink); }
-.cn-idchip {
-  display: inline-flex; align-items: center; gap: 8px; height: 34px;
-  padding: 0 10px 0 6px; border-radius: 999px; border: 1px solid var(--line);
-  font-size: 12px; color: var(--ink-2);
-}
-.cn-idchip:hover { border-color: #d3dae6; background: #fbfcfe; }
 
 /* ---- content + right rail ------------------------------------------- */
 

@@ -415,7 +415,12 @@ const MENU_DANGER =
 // "switch to employee self-service" moved an admin to a weaker view of
 // their own data -- and, since the employee shell offered no way back,
 // stranded them there.
-function IdentityMenu({ compact }: { compact?: boolean }) {
+//
+// It sits at the foot of the sidebar for both personas. Admins used to
+// get a chip in the top bar instead, which put one control in two places
+// depending on who was looking and spent top-bar room on something that
+// is consulted rarely and acted on almost never.
+function IdentityMenu() {
   const navigate = useNavigate()
   const { member, roleName, departmentName, logout } = useAuth()
   const [open, setOpen] = useState(false)
@@ -433,31 +438,16 @@ function IdentityMenu({ compact }: { compact?: boolean }) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        {compact ? (
-          <button className="cn-side-foot" style={{ width: "100%" }}>
-            <span className="cn-av">{initial}</span>
-            <div className="cn-side-foot-text" style={{ minWidth: 0, textAlign: "left" }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{member?.Name}</div>
-              <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{roleName}</div>
-            </div>
-            <Icon name="chevron-up-down" size={14} style={{ marginLeft: "auto", color: "var(--ink-3)" }} />
-          </button>
-        ) : (
-          <button className="cn-idchip">
-            <span className="cn-av" style={{ width: 24, height: 24, fontSize: 11 }}>
-              {initial}
-            </span>
-            {[roleName, departmentName].filter(Boolean).join(" · ")}
-            <Icon name="chevron-down" size={13} />
-          </button>
-        )}
+        <button className="cn-side-foot" aria-label="账号">
+          <span className="cn-av">{initial}</span>
+          <div className="cn-side-foot-text">
+            <div className="cn-side-foot-name">{member?.Name}</div>
+            <div className="cn-side-foot-role">{[roleName, departmentName].filter(Boolean).join(" · ")}</div>
+          </div>
+          <Icon name="chevron-up-down" size={14} className="cn-side-foot-caret" />
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align={compact ? "start" : "end"}
-        side={compact ? "top" : "bottom"}
-        sideOffset={6}
-        className={MENU}
-      >
+      <DropdownMenuContent align="start" side="top" sideOffset={6} className={MENU}>
         <div className="cn-menu-head">
           <div className="cn-menu-name">{member?.Name}</div>
           <div className="cn-menu-sub">{[roleName, departmentName].filter(Boolean).join(" · ")}</div>
@@ -566,7 +556,7 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
             ))}
           </div>
 
-          {!isAdmin && <IdentityMenu compact />}
+          <IdentityMenu />
         </div>
 
         <div className="cn-body">
@@ -589,7 +579,6 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
                   {todos.length > 0 && <span className="cn-bell-badge">{todos.length}</span>}
                 </button>
               )}
-              {isAdmin && <IdentityMenu />}
             </div>
           </div>
 
