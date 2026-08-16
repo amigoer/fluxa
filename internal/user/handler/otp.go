@@ -2,7 +2,7 @@
 // that keep those endpoints from being used to send mail and billable SMS
 // to arbitrary addresses.
 
-package user
+package handler
 
 import (
 	"context"
@@ -11,6 +11,9 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/amigoer/fluxa/internal/user/repo"
+	"github.com/amigoer/fluxa/internal/user/types"
 
 	"github.com/amigoer/fluxa/internal/notify"
 	"github.com/amigoer/fluxa/internal/platform/httpx"
@@ -98,7 +101,7 @@ func (h *Handler) checkOTPQuota(ctx context.Context, identifier string) error {
 	return nil
 }
 
-func (h *Handler) sendOTP(ctx context.Context, identifier string, purpose OTPPurpose) error {
+func (h *Handler) sendOTP(ctx context.Context, identifier string, purpose types.OTPPurpose) error {
 	if err := h.checkOTPQuota(ctx, identifier); err != nil {
 		return err
 	}
@@ -116,14 +119,14 @@ func (h *Handler) sendOTP(ctx context.Context, identifier string, purpose OTPPur
 // deliverOTP sends code through whichever channel (SMS or email) is
 // configured for identifier's shape, using the pluggable notify package
 // (DESIGN.md 7.1: not hardcoded to one vendor).
-func (h *Handler) deliverOTP(ctx context.Context, identifier, code string, purpose OTPPurpose) error {
-	kind := NotifyChannelEmail
+func (h *Handler) deliverOTP(ctx context.Context, identifier, code string, purpose types.OTPPurpose) error {
+	kind := types.NotifyChannelEmail
 	if isPhone(identifier) {
-		kind = NotifyChannelSMS
+		kind = types.NotifyChannelSMS
 	}
 
 	channel, err := h.service.GetNotifyChannel(ctx, kind)
-	if errors.Is(err, ErrNotFound) || !channel.Enabled {
+	if errors.Is(err, repo.ErrNotFound) || !channel.Enabled {
 		return fmt.Errorf("%w: %s", errNoNotifyChannel, kind)
 	}
 	if err != nil {
@@ -139,7 +142,7 @@ func (h *Handler) deliverOTP(ctx context.Context, identifier, code string, purpo
 	// SMS carries the bare code because the vendor's template supplies the
 	// wording; email carries the whole sentence, in the console's language.
 	body := fmt.Sprintf("你的 Fluxa 验证码是 %s，5 分钟内有效。\r\n\r\n如果这不是你本人的操作，忽略这封邮件即可。", code)
-	if kind == NotifyChannelSMS {
+	if kind == types.NotifyChannelSMS {
 		err = notify.SendSMS(ctx, channel.Provider, channel.Config, identifier, code)
 	} else {
 		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, "Fluxa 验证码", body)
@@ -182,7 +185,7 @@ func (h *Handler) requestRegisterOTP(w http.ResponseWriter, r *http.Request) {
 		writeOTPError(w, errOTPRateLimited)
 		return
 	}
-	if err := h.sendOTP(r.Context(), req.Identifier, OTPPurposeRegister); err != nil {
+	if err := h.sendOTP(r.Context(), req.Identifier, types.OTPPurposeRegister); err != nil {
 		writeOTPError(w, err)
 		return
 	}
@@ -216,7 +219,7 @@ func (h *Handler) verifyRegisterOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err := h.repo.ConsumeOTP(r.Context(), req.Identifier, OTPPurposeRegister, identity.HashOTP(req.Code))
+	ok, err := h.repo.ConsumeOTP(r.Context(), req.Identifier, types.OTPPurposeRegister, identity.HashOTP(req.Code))
 	if err != nil {
 		httpx.InternalError(w, err)
 		return
@@ -243,12 +246,12 @@ func (h *Handler) verifyRegisterOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status := MemberStatusActive
+	status := types.MemberStatusActive
 	if settings.LocalAccountRequiresApproval {
-		status = MemberStatusPendingReview
+		status = types.MemberStatusPendingReview
 	}
 
-	member := Member{OrgID: org.ID, RoleID: roles[RoleEmployee].ID, Name: req.Name, Status: status}
+	member := types.Member{OrgID: org.ID, RoleID: roles[types.RoleEmployee].ID, Name: req.Name, Status: status}
 	if isPhone(req.Identifier) {
 		member.Phone = &req.Identifier
 	} else {
@@ -260,7 +263,7 @@ func (h *Handler) verifyRegisterOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account := LocalAccount{MemberID: member.ID}
+	account := types.LocalAccount{MemberID: member.ID}
 	if isPhone(req.Identifier) {
 		account.Phone = &req.Identifier
 	} else {
@@ -271,7 +274,7 @@ func (h *Handler) verifyRegisterOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if status == MemberStatusPendingReview {
+	if status == types.MemberStatusPendingReview {
 		httpx.JSON(w, http.StatusAccepted, map[string]string{"status": "pending_review"})
 		return
 	}
@@ -303,7 +306,7 @@ func (h *Handler) requestLoginOTP(w http.ResponseWriter, r *http.Request) {
 		httpx.JSON(w, http.StatusOK, nil)
 		return
 	}
-	if err := h.sendOTP(r.Context(), req.Identifier, OTPPurposeLogin); err != nil {
+	if err := h.sendOTP(r.Context(), req.Identifier, types.OTPPurposeLogin); err != nil {
 		if errors.Is(err, errOTPRateLimited) {
 			// The daily ceiling only ever accumulates for an address that
 			// has an account, so answering 429 here would confirm one
@@ -329,7 +332,7 @@ func (h *Handler) verifyLoginOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err := h.repo.ConsumeOTP(r.Context(), req.Identifier, OTPPurposeLogin, identity.HashOTP(req.Code))
+	ok, err := h.repo.ConsumeOTP(r.Context(), req.Identifier, types.OTPPurposeLogin, identity.HashOTP(req.Code))
 	if err != nil {
 		httpx.InternalError(w, err)
 		return
@@ -349,7 +352,7 @@ func (h *Handler) verifyLoginOTP(w http.ResponseWriter, r *http.Request) {
 		httpx.InternalError(w, err)
 		return
 	}
-	if member.Status == MemberStatusPendingReview {
+	if member.Status == types.MemberStatusPendingReview {
 		httpx.Error(w, http.StatusForbidden, i18n.KeyAccountPendingReview, "")
 		return
 	}

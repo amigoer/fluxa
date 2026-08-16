@@ -17,17 +17,20 @@ import (
 	securityhandler "github.com/amigoer/fluxa/internal/security/handler"
 	securityrepo "github.com/amigoer/fluxa/internal/security/repo"
 	securityservice "github.com/amigoer/fluxa/internal/security/service"
-	"github.com/amigoer/fluxa/internal/user"
+	userhandler "github.com/amigoer/fluxa/internal/user/handler"
+	userrepo "github.com/amigoer/fluxa/internal/user/repo"
+	userservice "github.com/amigoer/fluxa/internal/user/service"
+	usersession "github.com/amigoer/fluxa/internal/user/session"
 )
 
 // wireRoutes mounts every module's HTTP routes onto r. Each module owns
-// its own handler.go; this function is just the assembly point, filled
+// its own handler package; this function is just the assembly point, filled
 // in as each module lands.
 func wireRoutes(r chi.Router, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) {
-	userRepo := user.NewRepo(pool)
-	userService := user.NewService(userRepo)
-	sessions := user.NewSessionManager(userRepo, userService, cfg.SessionCookieName, cfg.SessionCookieSecure)
-	userHandler := user.NewHandler(userService, userRepo, sessions, cfg.BaseURL)
+	userRepo := userrepo.New(pool)
+	userService := userservice.New(userRepo)
+	sessions := usersession.NewManager(userRepo, userService, cfg.SessionCookieName, cfg.SessionCookieSecure)
+	userHandler := userhandler.New(userService, userRepo, sessions, cfg.BaseURL)
 	userHandler.RegisterPublicRoutes(r)
 
 	providerRepo := providerrepo.New(pool)

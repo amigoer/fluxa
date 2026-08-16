@@ -1,10 +1,15 @@
-package user
+package handler
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/amigoer/fluxa/internal/user/repo"
+	"github.com/amigoer/fluxa/internal/user/service"
+	"github.com/amigoer/fluxa/internal/user/session"
+	"github.com/amigoer/fluxa/internal/user/types"
 
 	"github.com/go-chi/chi/v5"
 
@@ -22,9 +27,9 @@ import (
 // endpoints; rbac.Require on each route is what limits what a caller can
 // see or do (DESIGN.md 6.3: "不拆成两个独立的 App").
 type Handler struct {
-	service  *Service
-	repo     *Repo
-	sessions *SessionManager
+	service  service.Service
+	repo     repo.Repo
+	sessions *session.Manager
 	feishu   *identity.FeishuAdapter
 	baseURL  string
 
@@ -36,7 +41,7 @@ type Handler struct {
 	otpPerIP         *ratelimit.Window
 }
 
-func NewHandler(service *Service, repo *Repo, sessions *SessionManager, baseURL string) *Handler {
+func New(service service.Service, repo repo.Repo, sessions *session.Manager, baseURL string) *Handler {
 	return &Handler{
 		service:          service,
 		repo:             repo,
@@ -105,7 +110,7 @@ func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
 
 func (h *Handler) setupStatus(w http.ResponseWriter, r *http.Request) {
 	_, err := h.repo.GetOrganization(r.Context())
-	httpx.JSON(w, http.StatusOK, map[string]bool{"needsSetup": errors.Is(err, ErrNotFound)})
+	httpx.JSON(w, http.StatusOK, map[string]bool{"needsSetup": errors.Is(err, repo.ErrNotFound)})
 }
 
 // authMethods reports which login paths are actually usable right now,
@@ -115,8 +120,8 @@ func (h *Handler) setupStatus(w http.ResponseWriter, r *http.Request) {
 // logged in yet is exactly who needs to know this before picking a
 // button.
 func (h *Handler) authMethods(w http.ResponseWriter, r *http.Request) {
-	feishu, err := h.service.GetIdentityConfig(r.Context(), IdentityProviderFeishu)
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	feishu, err := h.service.GetIdentityConfig(r.Context(), types.IdentityProviderFeishu)
+	if err != nil && !errors.Is(err, repo.ErrNotFound) {
 		httpx.InternalError(w, err)
 		return
 	}
@@ -152,9 +157,9 @@ func (h *Handler) authMethods(w http.ResponseWriter, r *http.Request) {
 // one-time code right now. Either kind will do: the login form lets the
 // caller identify themselves by phone or by email.
 func (h *Handler) canDeliverOTP(ctx context.Context) (bool, error) {
-	for _, kind := range []NotifyChannelKind{NotifyChannelSMS, NotifyChannelEmail} {
+	for _, kind := range []types.NotifyChannelKind{types.NotifyChannelSMS, types.NotifyChannelEmail} {
 		channel, err := h.service.GetNotifyChannel(ctx, kind)
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, repo.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -177,7 +182,7 @@ type setupRequest struct {
 }
 
 func (h *Handler) setup(w http.ResponseWriter, r *http.Request) {
-	if _, err := h.repo.GetOrganization(r.Context()); !errors.Is(err, ErrNotFound) {
+	if _, err := h.repo.GetOrganization(r.Context()); !errors.Is(err, repo.ErrNotFound) {
 		httpx.Error(w, http.StatusConflict, i18n.KeyValidationFailed, "organization already set up")
 		return
 	}

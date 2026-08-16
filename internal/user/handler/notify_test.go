@@ -1,6 +1,10 @@
-package user
+package handler
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/amigoer/fluxa/internal/user/types"
+)
 
 // The mask/merge pair is what makes stored credentials write-only. Both
 // directions fail quietly when wrong: masking that misses a field leaks a
@@ -16,7 +20,7 @@ func TestMaskChannelSecretsHidesCredentials(t *testing.T) {
 		"from_address": "sender@example.com",
 	}
 
-	masked := maskChannelSecrets(NotifyChannelEmail, config)
+	masked := maskChannelSecrets(types.NotifyChannelEmail, config)
 
 	if masked["password"] != maskedValue {
 		t.Errorf("password = %v, want it masked", masked["password"])
@@ -37,11 +41,11 @@ func TestMaskChannelSecretsCoversEveryKind(t *testing.T) {
 	// A kind whose secret is not listed would publish that credential in
 	// clear text, so the mapping is asserted rather than assumed.
 	cases := []struct {
-		kind   NotifyChannelKind
+		kind   types.NotifyChannelKind
 		secret string
 	}{
-		{NotifyChannelEmail, "password"},
-		{NotifyChannelSMS, "access_key_secret"},
+		{types.NotifyChannelEmail, "password"},
+		{types.NotifyChannelSMS, "access_key_secret"},
 	}
 	for _, c := range cases {
 		masked := maskChannelSecrets(c.kind, map[string]any{c.secret: "real"})
@@ -54,7 +58,7 @@ func TestMaskChannelSecretsCoversEveryKind(t *testing.T) {
 func TestMaskChannelSecretsLeavesAnEmptySecretAlone(t *testing.T) {
 	// Masking an unset field would claim a credential exists and make the
 	// form show "已保存，留空表示不修改" over nothing.
-	masked := maskChannelSecrets(NotifyChannelEmail, map[string]any{"password": ""})
+	masked := maskChannelSecrets(types.NotifyChannelEmail, map[string]any{"password": ""})
 	if masked["password"] != "" {
 		t.Errorf("password = %v, want it left empty", masked["password"])
 	}
@@ -69,7 +73,7 @@ func TestMergeChannelSecretsKeepsStoredValue(t *testing.T) {
 		"the field is absent":     {"host": "smtp.example.com"},
 	}
 	for name, incoming := range cases {
-		merged := mergeChannelSecrets(NotifyChannelEmail, stored, incoming)
+		merged := mergeChannelSecrets(types.NotifyChannelEmail, stored, incoming)
 		if merged["password"] != "s3cr3t" {
 			t.Errorf("%s: password = %v, want the stored secret preserved", name, merged["password"])
 		}
@@ -77,7 +81,7 @@ func TestMergeChannelSecretsKeepsStoredValue(t *testing.T) {
 }
 
 func TestMergeChannelSecretsAcceptsANewValue(t *testing.T) {
-	merged := mergeChannelSecrets(NotifyChannelEmail,
+	merged := mergeChannelSecrets(types.NotifyChannelEmail,
 		map[string]any{"password": "old"},
 		map[string]any{"password": "new"})
 
@@ -90,7 +94,7 @@ func TestMergeChannelSecretsDropsTheMaskWithNothingStored(t *testing.T) {
 	// Nothing to fall back on, so the mask must not be saved as if it were
 	// the password -- that would produce a channel that looks configured
 	// and fails to authenticate.
-	merged := mergeChannelSecrets(NotifyChannelEmail, nil, map[string]any{"password": maskedValue})
+	merged := mergeChannelSecrets(types.NotifyChannelEmail, nil, map[string]any{"password": maskedValue})
 
 	if _, ok := merged["password"]; ok {
 		t.Errorf("password = %v, want the mask dropped entirely", merged["password"])

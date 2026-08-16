@@ -2,12 +2,16 @@
 // codes go out on, including the write-only handling that keeps stored
 // secrets from being read back.
 
-package user
+package handler
 
 import (
 	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/amigoer/fluxa/internal/user/repo"
+	"github.com/amigoer/fluxa/internal/user/types"
+
 	// Aliased to keep it distinct from the project's own notify/mail
 	// package, which this file also reaches (through notify.SendEmail).
 	netmail "net/mail"
@@ -30,12 +34,12 @@ const maskedValue = "****"
 // secretConfigKeys names the credential fields inside each channel kind's
 // config blob. They are write-only: masked on the way out, and an update
 // that leaves one blank (or hands back the mask) keeps what is stored.
-var secretConfigKeys = map[NotifyChannelKind][]string{
-	NotifyChannelSMS:   {"access_key_secret"},
-	NotifyChannelEmail: {"password"},
+var secretConfigKeys = map[types.NotifyChannelKind][]string{
+	types.NotifyChannelSMS:   {"access_key_secret"},
+	types.NotifyChannelEmail: {"password"},
 }
 
-func maskChannelSecrets(kind NotifyChannelKind, config map[string]any) map[string]any {
+func maskChannelSecrets(kind types.NotifyChannelKind, config map[string]any) map[string]any {
 	if config == nil {
 		return nil
 	}
@@ -54,7 +58,7 @@ func maskChannelSecrets(kind NotifyChannelKind, config map[string]any) map[strin
 // mergeChannelSecrets puts the stored credential back wherever the caller
 // did not supply a new one, so saving an unrelated field (or toggling the
 // channel on) cannot silently blank the password.
-func mergeChannelSecrets(kind NotifyChannelKind, stored, incoming map[string]any) map[string]any {
+func mergeChannelSecrets(kind types.NotifyChannelKind, stored, incoming map[string]any) map[string]any {
 	if incoming == nil {
 		incoming = map[string]any{}
 	}
@@ -72,13 +76,13 @@ func mergeChannelSecrets(kind NotifyChannelKind, stored, incoming map[string]any
 }
 
 func (h *Handler) getNotifyChannel(w http.ResponseWriter, r *http.Request) {
-	kind := NotifyChannelKind(chi.URLParam(r, "kind"))
+	kind := types.NotifyChannelKind(chi.URLParam(r, "kind"))
 	channel, err := h.service.GetNotifyChannel(r.Context(), kind)
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, repo.ErrNotFound) {
 		// Same shape as the found case below (channel + sentThisMonth),
 		// just zeroed out -- the frontend always expects the wrapper,
 		// unconfigured or not.
-		httpx.JSON(w, http.StatusOK, map[string]any{"channel": NotifyChannel{Kind: kind}, "sentThisMonth": 0})
+		httpx.JSON(w, http.StatusOK, map[string]any{"channel": types.NotifyChannel{Kind: kind}, "sentThisMonth": 0})
 		return
 	}
 	if err != nil {
@@ -95,15 +99,15 @@ func (h *Handler) getNotifyChannel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) putNotifyChannel(w http.ResponseWriter, r *http.Request) {
-	kind := NotifyChannelKind(chi.URLParam(r, "kind"))
-	var channel NotifyChannel
+	kind := types.NotifyChannelKind(chi.URLParam(r, "kind"))
+	var channel types.NotifyChannel
 	if !decodeJSON(w, r, &channel) {
 		return
 	}
 	channel.Kind = kind
 
 	stored, err := h.service.GetNotifyChannel(r.Context(), kind)
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	if err != nil && !errors.Is(err, repo.ErrNotFound) {
 		httpx.InternalError(w, err)
 		return
 	}
@@ -141,8 +145,8 @@ type testChannelRequest struct {
 // the form does not hold them anyway. It also ignores `enabled` -- the
 // whole point is to check a channel before switching it on.
 func (h *Handler) testNotifyChannel(w http.ResponseWriter, r *http.Request) {
-	kind := NotifyChannelKind(chi.URLParam(r, "kind"))
-	if kind != NotifyChannelEmail {
+	kind := types.NotifyChannelKind(chi.URLParam(r, "kind"))
+	if kind != types.NotifyChannelEmail {
 		httpx.Error(w, http.StatusNotImplemented, i18n.KeyValidationFailed, "only the email channel can be tested for now")
 		return
 	}
@@ -162,7 +166,7 @@ func (h *Handler) testNotifyChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	channel, err := h.service.GetNotifyChannel(r.Context(), kind)
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, repo.ErrNotFound) {
 		httpx.Error(w, http.StatusBadRequest, i18n.KeyNotifyChannelMissing, "the email channel has no configuration yet")
 		return
 	}

@@ -1,6 +1,6 @@
 // Member, department and role administration.
 
-package user
+package handler
 
 import (
 	"net/http"

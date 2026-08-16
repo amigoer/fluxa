@@ -1,4 +1,4 @@
-package user
+package session
 
 import (
 	"context"
@@ -10,6 +10,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/amigoer/fluxa/internal/user/repo"
+	"github.com/amigoer/fluxa/internal/user/service"
+
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
 	"github.com/amigoer/fluxa/internal/rbac"
@@ -20,21 +23,21 @@ import (
 // and a week is generous enough for daily internal-tool use.
 const sessionTTL = 7 * 24 * time.Hour
 
-// SessionManager implements the server-side session described in
+// Manager implements the server-side session described in
 // DESIGN.md 7.1: the client only ever holds an opaque random token in a
 // cookie, and the server stores a hash of it in Postgres. Revoking a
 // session (an admin forcing someone out, or a plain logout) takes effect
 // on the very next request, which is the whole reason this was chosen
 // over a stateless JWT.
-type SessionManager struct {
-	repo         *Repo
-	users        *Service
+type Manager struct {
+	repo         repo.Repo
+	users        service.Service
 	cookieName   string
 	cookieSecure bool
 }
 
-func NewSessionManager(repo *Repo, users *Service, cookieName string, cookieSecure bool) *SessionManager {
-	return &SessionManager{repo: repo, users: users, cookieName: cookieName, cookieSecure: cookieSecure}
+func NewManager(repo repo.Repo, users service.Service, cookieName string, cookieSecure bool) *Manager {
+	return &Manager{repo: repo, users: users, cookieName: cookieName, cookieSecure: cookieSecure}
 }
 
 func hashToken(raw string) string {
@@ -52,7 +55,7 @@ func generateToken() (string, error) {
 
 // Login creates a new session for memberID and sets it on the response
 // as an HttpOnly cookie.
-func (sm *SessionManager) Login(ctx context.Context, w http.ResponseWriter, memberID string) error {
+func (sm *Manager) Login(ctx context.Context, w http.ResponseWriter, memberID string) error {
 	token, err := generateToken()
 	if err != nil {
 		return err
@@ -77,7 +80,7 @@ func (sm *SessionManager) Login(ctx context.Context, w http.ResponseWriter, memb
 
 // Logout revokes the session tied to the request's cookie, if any, and
 // clears the cookie.
-func (sm *SessionManager) Logout(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (sm *Manager) Logout(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(sm.cookieName); err == nil {
 		_ = sm.repo.RevokeSession(ctx, hashToken(cookie.Value))
 	}
@@ -96,7 +99,7 @@ func (sm *SessionManager) Logout(ctx context.Context, w http.ResponseWriter, r *
 // the member's rbac.Principal, and stores it on the context for
 // rbac.Require (and handlers) to read. Requests without a valid session
 // are rejected here so downstream handlers never have to check again.
-func (sm *SessionManager) Middleware(next http.Handler) http.Handler {
+func (sm *Manager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(sm.cookieName)
 		if err != nil {
@@ -105,7 +108,7 @@ func (sm *SessionManager) Middleware(next http.Handler) http.Handler {
 		}
 
 		session, err := sm.repo.GetSession(r.Context(), hashToken(cookie.Value))
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, repo.ErrNotFound) {
 			httpx.Error(w, http.StatusUnauthorized, i18n.KeySessionExpired, "")
 			return
 		}

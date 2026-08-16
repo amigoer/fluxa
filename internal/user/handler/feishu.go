@@ -1,13 +1,16 @@
 // Feishu login: the OAuth redirect pair and the join-or-create rule that
 // turns an external identity into a member.
 
-package user
+package handler
 
 import (
 	"context"
 	"errors"
 	"net/http"
 	"net/url"
+
+	"github.com/amigoer/fluxa/internal/user/repo"
+	"github.com/amigoer/fluxa/internal/user/types"
 
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
@@ -17,8 +20,8 @@ import (
 // -- Feishu login -----------------------------------------------------------
 
 func (h *Handler) feishuLogin(w http.ResponseWriter, r *http.Request) {
-	cfg, err := h.service.GetIdentityConfig(r.Context(), IdentityProviderFeishu)
-	if errors.Is(err, ErrNotFound) || !cfg.Enabled {
+	cfg, err := h.service.GetIdentityConfig(r.Context(), types.IdentityProviderFeishu)
+	if errors.Is(err, repo.ErrNotFound) || !cfg.Enabled {
 		httpx.Error(w, http.StatusNotFound, i18n.KeyNotFound, "feishu login is not configured")
 		return
 	}
@@ -43,7 +46,7 @@ func (h *Handler) feishuCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := h.service.GetIdentityConfig(r.Context(), IdentityProviderFeishu)
+	cfg, err := h.service.GetIdentityConfig(r.Context(), types.IdentityProviderFeishu)
 	if err != nil || !cfg.Enabled {
 		httpx.Error(w, http.StatusNotFound, i18n.KeyNotFound, "feishu login is not configured")
 		return
@@ -55,12 +58,12 @@ func (h *Handler) feishuCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	member, err := h.findOrCreateFromExternalIdentity(r.Context(), IdentityProviderFeishu, info)
+	member, err := h.findOrCreateFromExternalIdentity(r.Context(), types.IdentityProviderFeishu, info)
 	if err != nil {
 		httpx.InternalError(w, err)
 		return
 	}
-	if member.Status == MemberStatusPendingReview {
+	if member.Status == types.MemberStatusPendingReview {
 		httpx.Error(w, http.StatusForbidden, i18n.KeyAccountPendingReview, "")
 		return
 	}
@@ -72,37 +75,37 @@ func (h *Handler) feishuCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func (h *Handler) findOrCreateFromExternalIdentity(ctx context.Context, provider IdentityProvider, info identity.UserInfo) (Member, error) {
+func (h *Handler) findOrCreateFromExternalIdentity(ctx context.Context, provider types.IdentityProvider, info identity.UserInfo) (types.Member, error) {
 	member, err := h.repo.FindMemberByExternalIdentity(ctx, provider, info.ExternalUserID)
 	if err == nil {
 		return member, nil
 	}
-	if !errors.Is(err, ErrNotFound) {
-		return Member{}, err
+	if !errors.Is(err, repo.ErrNotFound) {
+		return types.Member{}, err
 	}
 
 	org, err := h.repo.GetOrganization(ctx)
 	if err != nil {
-		return Member{}, err
+		return types.Member{}, err
 	}
 	roles, err := h.service.EnsureBuiltinRoles(ctx, org.ID)
 	if err != nil {
-		return Member{}, err
+		return types.Member{}, err
 	}
 
 	email := info.Email
-	member, err = h.repo.CreateMember(ctx, Member{
+	member, err = h.repo.CreateMember(ctx, types.Member{
 		OrgID:  org.ID,
-		RoleID: roles[RoleEmployee].ID,
+		RoleID: roles[types.RoleEmployee].ID,
 		Name:   info.Name,
 		Email:  &email,
-		Status: MemberStatusActive,
+		Status: types.MemberStatusActive,
 	})
 	if err != nil {
-		return Member{}, err
+		return types.Member{}, err
 	}
 	if err := h.repo.LinkExternalIdentity(ctx, member.ID, provider, info.ExternalUserID); err != nil {
-		return Member{}, err
+		return types.Member{}, err
 	}
 	return member, nil
 }
