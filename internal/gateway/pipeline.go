@@ -9,6 +9,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -59,6 +60,7 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if key.Status != types.VirtualKeyStatusActive {
+		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audit.CallStatusFailed)
 		httpx.Error(w, http.StatusForbidden, i18n.KeyVirtualKeyRevoked, "")
 		return
 	}
@@ -81,6 +83,7 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		for _, hit := range scan.Hits {
 			_ = p.security.LogEvent(ctx, memberIDPtr(key), &key.ID, hit)
 		}
+		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audit.CallStatusFailed)
 		httpx.Error(w, http.StatusForbidden, i18n.KeyValidationFailed, "request blocked by a DLP rule")
 		return
 	}
@@ -100,11 +103,13 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	condition := routingCondition(r, estimatedInputTokens)
 	resolved, err := p.providers.Resolver.Resolve(ctx, memberIDOrEmpty(key), condition, estimatedInputTokens, estimatedOutputTokens)
 	if err != nil {
+		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audit.CallStatusFailed)
 		httpx.Error(w, http.StatusServiceUnavailable, i18n.KeyProviderUnavailable, err.Error())
 		return
 	}
 
 	if !modelInScope(key, resolved.Model.ID) {
+		p.logCall(ctx, key, "", resolved.Model.ID, r, 0, 0, 0, 0, audit.CallStatusFailed)
 		httpx.Error(w, http.StatusForbidden, i18n.KeyModelNotEnabled, "")
 		return
 	}
@@ -151,7 +156,11 @@ func (p *Pipeline) logCall(ctx context.Context, key types.VirtualKey, providerID
 	if key.OwnerMemberID != nil {
 		memberID = *key.OwnerMemberID
 	}
-	_ = p.audit.LogCall(ctx, audit.CallLog{
+	// Deliberately not discarded: swallowing this is what hid department-
+	// owned keys failing to log at all (their member_id was an empty
+	// string against a NOT NULL uuid column). The request itself has
+	// already been answered, so a failure here is reported, not returned.
+	if err := p.audit.LogCall(ctx, audit.CallLog{
 		MemberID:     memberID,
 		VirtualKeyID: key.ID,
 		ProviderID:   providerID,
@@ -162,7 +171,9 @@ func (p *Pipeline) logCall(ctx context.Context, key types.VirtualKey, providerID
 		InputTokens:  inputTokens,
 		OutputTokens: outputTokens,
 		CostCents:    costCents,
-	})
+	}); err != nil {
+		slog.ErrorContext(ctx, "gateway: write call log", "error", err, "virtual_key", key.ID)
+	}
 }
 
 func bearerToken(r *http.Request) string {
