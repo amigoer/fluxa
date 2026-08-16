@@ -11,7 +11,9 @@ import (
 	auditservice "github.com/amigoer/fluxa/internal/audit/service"
 	"github.com/amigoer/fluxa/internal/gateway"
 	"github.com/amigoer/fluxa/internal/platform/config"
-	"github.com/amigoer/fluxa/internal/provider"
+	providerhandler "github.com/amigoer/fluxa/internal/provider/handler"
+	providerrepo "github.com/amigoer/fluxa/internal/provider/repo"
+	providerservice "github.com/amigoer/fluxa/internal/provider/service"
 	securityhandler "github.com/amigoer/fluxa/internal/security/handler"
 	securityrepo "github.com/amigoer/fluxa/internal/security/repo"
 	securityservice "github.com/amigoer/fluxa/internal/security/service"
@@ -28,9 +30,9 @@ func wireRoutes(r chi.Router, cfg config.Config, pool *pgxpool.Pool, log *slog.L
 	userHandler := user.NewHandler(userService, userRepo, sessions, cfg.BaseURL)
 	userHandler.RegisterPublicRoutes(r)
 
-	providerRepo := provider.NewRepo(pool)
-	providerService := provider.NewService(providerRepo)
-	providerHandler := provider.NewHandler(providerService, providerRepo)
+	providerRepo := providerrepo.New(pool)
+	providerService := providerservice.New(providerRepo)
+	providerHandler := providerhandler.New(providerService, providerRepo)
 
 	securityRepo := securityrepo.New(pool)
 	securityService := securityservice.New(securityRepo)

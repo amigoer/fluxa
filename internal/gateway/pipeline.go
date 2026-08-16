@@ -21,7 +21,7 @@ import (
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
 	"github.com/amigoer/fluxa/internal/provider/routing"
-	"github.com/amigoer/fluxa/internal/provider"
+	providerservice "github.com/amigoer/fluxa/internal/provider/service"
 	"github.com/amigoer/fluxa/internal/provider/types"
 	securityservice "github.com/amigoer/fluxa/internal/security/service"
 )
@@ -32,13 +32,13 @@ import (
 const longInputTokenThreshold = 50_000
 
 type Pipeline struct {
-	providers *provider.Service
+	providers providerservice.Service
 	security  securityservice.Service
 	audit     auditservice.Service
 	upstream  *upstreamClient
 }
 
-func NewPipeline(providers *provider.Service, sec securityservice.Service, aud auditservice.Service) *Pipeline {
+func NewPipeline(providers providerservice.Service, sec securityservice.Service, aud auditservice.Service) *Pipeline {
 	return &Pipeline{providers: providers, security: sec, audit: aud, upstream: newUpstreamClient()}
 }
 
@@ -55,7 +55,7 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		httpx.Error(w, http.StatusUnauthorized, i18n.KeyVirtualKeyInvalid, "")
 		return
 	}
-	key, err := p.providers.Keys.Authenticate(ctx, secret)
+	key, err := p.providers.Keys().Authenticate(ctx, secret)
 	if err != nil {
 		httpx.Error(w, http.StatusUnauthorized, i18n.KeyVirtualKeyInvalid, "")
 		return
@@ -102,7 +102,7 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	}
 
 	condition := routingCondition(r, estimatedInputTokens)
-	resolved, err := p.providers.Resolver.Resolve(ctx, memberIDOrEmpty(key), condition, estimatedInputTokens, estimatedOutputTokens)
+	resolved, err := p.providers.Resolver().Resolve(ctx, memberIDOrEmpty(key), condition, estimatedInputTokens, estimatedOutputTokens)
 	if err != nil {
 		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audittypes.CallStatusFailed)
 		httpx.Error(w, http.StatusServiceUnavailable, i18n.KeyProviderUnavailable, err.Error())
@@ -127,12 +127,12 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	latency := time.Since(start)
 
 	if callErr != nil || !result.StatusSuccess {
-		_ = p.providers.Breaker.RecordFailure(ctx, providerRec.ID)
+		_ = p.providers.Breaker().RecordFailure(ctx, providerRec.ID)
 		p.logCall(ctx, key, providerRec.ID, resolved.Model.ID, r, latency, 0, 0, 0, audittypes.CallStatusFailed)
 		return
 	}
 
-	_ = p.providers.Breaker.RecordSuccess(ctx, providerRec.ID)
+	_ = p.providers.Breaker().RecordSuccess(ctx, providerRec.ID)
 
 	inputTokens, outputTokens := estimatedInputTokens, estimatedOutputTokens
 	if result.Usage != nil {

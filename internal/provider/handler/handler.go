@@ -1,4 +1,4 @@
-package provider
+package handler
 
 import (
 	"encoding/json"
@@ -10,6 +10,8 @@ import (
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
 	"github.com/amigoer/fluxa/internal/provider/quota"
+	"github.com/amigoer/fluxa/internal/provider/repo"
+	"github.com/amigoer/fluxa/internal/provider/service"
 	"github.com/amigoer/fluxa/internal/provider/types"
 	"github.com/amigoer/fluxa/internal/rbac"
 )
@@ -21,11 +23,11 @@ import (
 // the handler for things like "my own virtual keys") is what limits what
 // each caller can see or do.
 type Handler struct {
-	service *Service
-	repo    *Repo
+	service service.Service
+	repo    repo.Repo
 }
 
-func NewHandler(service *Service, repo *Repo) *Handler {
+func New(service service.Service, repo repo.Repo) *Handler {
 	return &Handler{service: service, repo: repo}
 }
 
@@ -270,7 +272,7 @@ func (h *Handler) revokeVirtualKey(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getDepartmentQuotaPool(w http.ResponseWriter, r *http.Request) {
 	departmentID := chi.URLParam(r, "departmentId")
 	balance, err := h.service.DepartmentQuotaBalance(r.Context(), departmentID)
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, repo.ErrNotFound) {
 		// A department with no pool yet is an empty pool, not an error --
 		// but it has to serialize like every other balance, so the client
 		// isn't parsing two different shapes off one endpoint.
@@ -367,7 +369,7 @@ func (h *Handler) decideQuotaRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := h.service.DecideQuotaRequest(r.Context(), id, principal.MemberID, body.Approve, principal.Has(rbac.PermissionQuotaApproveAny))
-	if errors.Is(err, ErrCannotApprove) {
+	if errors.Is(err, service.ErrCannotApprove) {
 		httpx.Error(w, http.StatusForbidden, i18n.KeyPermissionDenied, "")
 		return
 	}
