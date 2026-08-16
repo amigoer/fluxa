@@ -6,9 +6,9 @@
 package rbac
 
 // Permission is one independently grantable capability. Keep this list
-// in sync with migrations/000005_seed_permissions.up.sql -- it is the
-// single source of truth for which codes exist, and the seed migration
-// mirrors it for storage.
+// in sync with the permissions seeded in migrations/000001_init.up.sql
+// -- it is the single source of truth for which codes exist, and the
+// seed mirrors it for storage.
 type Permission string
 
 const (

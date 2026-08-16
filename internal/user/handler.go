@@ -20,6 +20,12 @@ import (
 
 const otpTTL = 5 * time.Minute
 
+// errNoNotifyChannel marks the one OTP failure that is a deployment
+// misconfiguration rather than a fault: local accounts are switched on
+// but no SMS or email channel exists to carry the code. Callers turn it
+// into a 503 the caller can act on instead of an opaque 500.
+var errNoNotifyChannel = errors.New("user: no enabled notify channel configured")
+
 // Handler wires the User module's HTTP surface: setup, login (Feishu +
 // local OTP), session-authenticated member/department/role/identity
 // config management. Admin and employee views share these same
@@ -43,11 +49,9 @@ func NewHandler(service *Service, repo *Repo, sessions *SessionManager, baseURL 
 	}
 }
 
-// RegisterRoutes mounts every User module endpoint on r. auth is
-// rbac.Require pre-bound to this handler's session middleware by the
-// caller (see cmd/server/routes.go), so this function only has to say
-// which permission each route needs.
-func (h *Handler) RegisterRoutes(r chi.Router) {
+// RegisterPublicRoutes mounts the endpoints that have to work before any
+// session exists: first-run setup, and every login path.
+func (h *Handler) RegisterPublicRoutes(r chi.Router) {
 	r.Get("/api/setup/status", h.setupStatus)
 	r.Post("/api/setup", h.setup)
 
@@ -58,35 +62,42 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/api/auth/local/register/verify", h.verifyRegisterOTP)
 	r.Post("/api/auth/local/login/request-otp", h.requestLoginOTP)
 	r.Post("/api/auth/local/login/verify", h.verifyLoginOTP)
+}
 
-	r.Group(func(r chi.Router) {
-		r.Use(h.sessions.Middleware)
+// RegisterProtectedRoutes mounts everything that needs a session. The
+// caller passes the group that already carries the session middleware
+// (see cmd/server/routes.go) instead of this handler making its own, so
+// the User module's endpoints sit behind exactly the same stack as every
+// other module's -- including the operation-audit recorder, which is the
+// reason the group is shared rather than per-module.
+//
+// rbac.Require on each route is what limits what a caller can see or do
+// (DESIGN.md 6.3: "不拆成两个独立的 App").
+func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
+	r.Post("/api/auth/logout", h.logout)
+	r.Get("/api/me", h.me)
 
-		r.Post("/api/auth/logout", h.logout)
-		r.Get("/api/me", h.me)
+	r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Get("/api/members", h.listMembers)
+	r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Post("/api/members/{id}/approve", h.approveMember)
+	r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Patch("/api/members/{id}/department", h.updateMemberDepartment)
+	r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Patch("/api/members/{id}/role", h.updateMemberRole)
 
-		r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Get("/api/members", h.listMembers)
-		r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Post("/api/members/{id}/approve", h.approveMember)
-		r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Patch("/api/members/{id}/department", h.updateMemberDepartment)
-		r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Patch("/api/members/{id}/role", h.updateMemberRole)
+	r.With(rbac.Require(rbac.PermissionOrgManageDepartments)).Get("/api/departments", h.listDepartments)
+	r.With(rbac.Require(rbac.PermissionOrgManageDepartments)).Post("/api/departments", h.createDepartment)
+	r.With(rbac.Require(rbac.PermissionOrgManageDepartments)).Patch("/api/departments/{id}/lead", h.setDepartmentLead)
 
-		r.With(rbac.Require(rbac.PermissionOrgManageDepartments)).Get("/api/departments", h.listDepartments)
-		r.With(rbac.Require(rbac.PermissionOrgManageDepartments)).Post("/api/departments", h.createDepartment)
-		r.With(rbac.Require(rbac.PermissionOrgManageDepartments)).Patch("/api/departments/{id}/lead", h.setDepartmentLead)
+	r.Get("/api/roles", h.listRoles)
+	r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Post("/api/roles", h.createRole)
+	r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Get("/api/roles/{id}/permissions", h.getRolePermissions)
+	r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Put("/api/roles/{id}/permissions", h.putRolePermissions)
 
-		r.Get("/api/roles", h.listRoles)
-		r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Post("/api/roles", h.createRole)
-		r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Get("/api/roles/{id}/permissions", h.getRolePermissions)
-		r.With(rbac.Require(rbac.PermissionOrgManageRoles)).Put("/api/roles/{id}/permissions", h.putRolePermissions)
+	r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Get("/api/identity-configs/{provider}", h.getIdentityConfig)
+	r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Put("/api/identity-configs/{provider}", h.putIdentityConfig)
+	r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Get("/api/auth-settings", h.getAuthSettings)
+	r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Put("/api/auth-settings", h.putAuthSettings)
 
-		r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Get("/api/identity-configs/{provider}", h.getIdentityConfig)
-		r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Put("/api/identity-configs/{provider}", h.putIdentityConfig)
-		r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Get("/api/auth-settings", h.getAuthSettings)
-		r.With(rbac.Require(rbac.PermissionOrgManageIdentitySources)).Put("/api/auth-settings", h.putAuthSettings)
-
-		r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Get("/api/notify-channels/{kind}", h.getNotifyChannel)
-		r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Put("/api/notify-channels/{kind}", h.putNotifyChannel)
-	})
+	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Get("/api/notify-channels/{kind}", h.getNotifyChannel)
+	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Put("/api/notify-channels/{kind}", h.putNotifyChannel)
 }
 
 // -- Setup ----------------------------------------------------------------
@@ -115,10 +126,44 @@ func (h *Handler) authMethods(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Being switched on is not the same as being usable: local accounts
+	// authenticate purely by OTP, so with no notify channel to carry the
+	// code there is nothing behind the button. Reporting the toggle alone
+	// re-created exactly the dead end this endpoint exists to prevent --
+	// the login page offered 手机号 / 邮箱登录 and 获取验证码 then failed.
+	local := settings.LocalAccountEnabled
+	if local {
+		deliverable, err := h.canDeliverOTP(r.Context())
+		if err != nil {
+			httpx.InternalError(w, err)
+			return
+		}
+		local = deliverable
+	}
+
 	httpx.JSON(w, http.StatusOK, map[string]bool{
 		"feishu": feishu.Enabled,
-		"local":  settings.LocalAccountEnabled,
+		"local":  local,
 	})
+}
+
+// canDeliverOTP reports whether any channel is configured to carry a
+// one-time code right now. Either kind will do: the login form lets the
+// caller identify themselves by phone or by email.
+func (h *Handler) canDeliverOTP(ctx context.Context) (bool, error) {
+	for _, kind := range []NotifyChannelKind{NotifyChannelSMS, NotifyChannelEmail} {
+		channel, err := h.service.GetNotifyChannel(ctx, kind)
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		if channel.Enabled {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 type setupRequest struct {
@@ -272,7 +317,7 @@ func (h *Handler) deliverOTP(ctx context.Context, identifier, code string) error
 
 	channel, err := h.service.GetNotifyChannel(ctx, kind)
 	if errors.Is(err, ErrNotFound) || !channel.Enabled {
-		return fmt.Errorf("user: no enabled %s channel configured", kind)
+		return fmt.Errorf("%w: %s", errNoNotifyChannel, kind)
 	}
 	if err != nil {
 		return err
@@ -315,10 +360,21 @@ func (h *Handler) requestRegisterOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.sendOTP(r.Context(), req.Identifier, OTPPurposeRegister); err != nil {
-		httpx.InternalError(w, err)
+		writeOTPError(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, nil)
+}
+
+// writeOTPError separates "this deployment is misconfigured" from a
+// genuine fault. A missing notify channel is the admin's to fix and the
+// caller can be told so plainly; anything else is a 500.
+func writeOTPError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errNoNotifyChannel) {
+		httpx.Error(w, http.StatusServiceUnavailable, i18n.KeyNotifyChannelMissing, err.Error())
+		return
+	}
+	httpx.InternalError(w, err)
 }
 
 type verifyRegisterRequest struct {
@@ -411,7 +467,7 @@ func (h *Handler) requestLoginOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.sendOTP(r.Context(), req.Identifier, OTPPurposeLogin); err != nil {
-		httpx.InternalError(w, err)
+		writeOTPError(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, nil)

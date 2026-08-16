@@ -22,7 +22,7 @@ func wireRoutes(r chi.Router, cfg config.Config, pool *pgxpool.Pool, log *slog.L
 	userService := user.NewService(userRepo)
 	sessions := user.NewSessionManager(userRepo, userService, cfg.SessionCookieName, cfg.SessionCookieSecure)
 	userHandler := user.NewHandler(userService, userRepo, sessions, cfg.BaseURL)
-	userHandler.RegisterRoutes(r)
+	userHandler.RegisterPublicRoutes(r)
 
 	providerRepo := provider.NewRepo(pool)
 	providerService := provider.NewService(providerRepo)
@@ -37,9 +37,16 @@ func wireRoutes(r chi.Router, cfg config.Config, pool *pgxpool.Pool, log *slog.L
 	auditHandler := audit.NewHandler(auditService)
 
 	// Session-authenticated management API: everything an admin or
-	// employee reaches through the web UI.
+	// employee reaches through the web UI. Every module's protected
+	// routes share this one group so they share its middleware -- in
+	// particular RecordMutations, which writes the operation audit trail
+	// for whatever is mounted here and therefore cannot be forgotten by a
+	// handler that lands later.
 	r.Group(func(r chi.Router) {
 		r.Use(sessions.Middleware)
+		r.Use(auditService.RecordMutations)
+
+		userHandler.RegisterProtectedRoutes(r)
 		providerHandler.RegisterRoutes(r)
 		securityHandler.RegisterRoutes(r)
 		auditHandler.RegisterRoutes(r)

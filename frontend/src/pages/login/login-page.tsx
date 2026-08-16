@@ -64,10 +64,13 @@ export function LoginPage() {
       setCodeSent(true)
       toast.success("验证码已发送")
     } catch (err) {
+      const key = err instanceof ApiError ? err.key : ""
       toast.error(
-        err instanceof ApiError && err.key === "common.validation_failed"
-          ? "本地账号登录未启用"
-          : "发送失败，请检查手机号 / 邮箱",
+        key === "auth.notify_channel_missing"
+          ? "管理员还没有配置短信 / 邮件通道，验证码发不出来"
+          : key === "common.validation_failed"
+            ? "本地账号登录未启用"
+            : "发送失败，请检查手机号 / 邮箱",
       )
     } finally {
       setBusy(false)

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { LoginShell } from "@/layouts/login-layout"
@@ -18,6 +18,25 @@ export function SetupPage() {
   const [adminName, setAdminName] = useState("")
   const [adminEmail, setAdminEmail] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  // The backend rejects a second setup with 409, but nothing stopped an
+  // already-configured deployment from *rendering* this form -- landing
+  // on /setup directly showed a full 初始化 Fluxa form whose only
+  // possible outcome was that error. The status check LoginPage already
+  // makes is simply made in the other direction here, and the form is
+  // held back until the answer is in so it never flashes.
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    api
+      .get<{ needsSetup: boolean }>("/api/setup/status")
+      .then((res) => {
+        setNeedsSetup(res.needsSetup)
+        if (!res.needsSetup) navigate("/login", { replace: true })
+      })
+      // An unreachable backend is not evidence that setup is done; show
+      // the form and let the submit surface the real failure.
+      .catch(() => setNeedsSetup(true))
+  }, [navigate])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -37,6 +56,8 @@ export function SetupPage() {
       setSubmitting(false)
     }
   }
+
+  if (needsSetup !== true) return null
 
   return (
     <LoginShell>

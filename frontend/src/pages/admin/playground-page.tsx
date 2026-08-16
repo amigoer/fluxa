@@ -167,7 +167,7 @@ export function PlaygroundPage() {
             )}
             <label className="cn-field" style={{ width: 280 }}>
               <Icon name="key" size={14} />
-              <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="粘贴已有 Key（sk-flx-…）" />
+              <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="粘贴已有 Key（vk-…）" />
             </label>
           </div>
         </Card>

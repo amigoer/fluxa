@@ -28,12 +28,20 @@ export type SelectOption = {
   disabled?: boolean
 }
 
-// Radix reserves "" to mean "nothing selected", so no item may carry it.
-// The console uses "" everywhere for the 全部 / 无 / 未分配 rows, so it is
-// swapped for a sentinel going in and swapped back coming out. That keeps
-// every existing call site working untouched.
+// Radix reserves "" to mean "nothing selected" -- it is precisely what
+// makes Select.Value fall back to its placeholder. The console also uses
+// "" for the 全部 / 无 / 未分配 rows, which are real selectable items, so
+// those are swapped for a sentinel going in and swapped back coming out.
+//
+// That swap is conditional on such a row actually existing (see
+// `emptyIsAnOption` below). Sending the sentinel unconditionally broke
+// every select that has no ""-valued option -- a form field with nothing
+// chosen yet matched no item at all, so Radix rendered neither the
+// selected label nor the placeholder, and set no `data-placeholder` for
+// the trigger to style. The result was a blank box where a required
+// field should be (Playground 模型, 登记入库 供应商, 签发 Key 成员,
+// 新增个人路由规则 就用).
 const EMPTY = "__fluxa_empty__"
-const toRadix = (v: string) => (v === "" ? EMPTY : v)
 const fromRadix = (v: string) => (v === EMPTY ? "" : v)
 
 const TRIGGER_BASE =
@@ -95,6 +103,11 @@ export function Select({
   className?: string
   style?: CSSProperties
 }) {
+  // Only a list that really offers a ""-valued row needs the sentinel;
+  // everywhere else "" has to reach Radix intact so the placeholder shows.
+  const emptyIsAnOption = options.some((o) => o.value === "")
+  const toRadix = (v: string) => (v === "" && emptyIsAnOption ? EMPTY : v)
+
   return (
     <SelectRoot value={toRadix(value)} onValueChange={(v) => onValue(fromRadix(v))} disabled={disabled}>
       <SelectTrigger

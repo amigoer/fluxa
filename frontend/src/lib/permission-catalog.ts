@@ -1,9 +1,8 @@
 import { Permission } from "@/lib/auth"
 
 // Human labels for every permission point, grouped the same way the
-// role-permissions admin page groups them. Mirrors
-// migrations/000005_seed_dlp_rules... no -- mirrors
-// migrations/000005_seed_permissions.up.sql's descriptions, translated.
+// role-permissions admin page groups them. Translations of the
+// descriptions seeded in migrations/000001_init.up.sql.
 export const permissionCatalog: { group: string; items: { code: string; label: string }[] }[] = [
   {
     group: "资源管理",

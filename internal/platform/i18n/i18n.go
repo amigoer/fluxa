@@ -18,6 +18,7 @@ const (
 	KeyInvalidCredentials    Key = "auth.invalid_credentials"
 	KeyAccountPendingReview  Key = "auth.account_pending_review"
 	KeySessionExpired        Key = "auth.session_expired"
+	KeyNotifyChannelMissing  Key = "auth.notify_channel_missing"
 	KeyPermissionDenied      Key = "rbac.permission_denied"
 	KeyQuotaExceeded         Key = "quota.exceeded"
 	KeyQuotaRequestNotFound  Key = "quota.request_not_found"
