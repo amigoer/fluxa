@@ -35,6 +35,25 @@ import { adminNav, employeeNav, filterNav, routeLabel } from "@/layouts/nav-conf
 const VERSION = "v1.0.0"
 const REPO_URL = "https://github.com/amigoer/fluxa"
 
+// Below this the sidebar stops being a rail beside the content and
+// becomes an overlay drawer over it. Kept in sync with the same query in
+// console.css -- the CSS positions the drawer, this decides the
+// behaviour that CSS cannot express (which button does what, whether the
+// stored collapse preference applies at all).
+const NARROW = "(max-width: 900px)"
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const sync = () => setMatches(mq.matches)
+    sync()
+    mq.addEventListener("change", sync)
+    return () => mq.removeEventListener("change", sync)
+  }, [query])
+  return matches
+}
+
 // The shell both personas share: sidebar, top bar, fixed footer and the
 // to-do drawer (DESIGN.md 6.3 -- admin and employee are one app, RBAC is
 // what differs). Everything here is the hi-fi design's markup; what the
@@ -469,6 +488,8 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("fluxa-side") === "collapsed")
   const [drawer, setDrawer] = useState(false)
   const [filter, setFilter] = useState<TodoKind | "全部">("全部")
+  const narrow = useMediaQuery(NARROW)
+  const [navOpen, setNavOpen] = useState(false)
 
   const isAdmin = persona === "admin"
   const { todos, reload, securityBadge } = useTodos(isAdmin)
@@ -486,6 +507,19 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [drawer])
+
+  // Tapping a nav item on a phone should navigate *and* get the drawer
+  // out of the way; it covers the content it just navigated to.
+  useEffect(() => setNavOpen(false), [location.pathname])
+
+  useEffect(() => {
+    if (!navOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [navOpen])
 
   const nav = useMemo(
     () => filterNav(isAdmin ? adminNav : employeeNav, permissions),
@@ -512,7 +546,15 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
 
   return (
     <ConsoleContext.Provider value={ctx}>
-      <div className="screen cn" data-side={collapsed ? "collapsed" : "expanded"}>
+      <div
+        className="screen cn"
+        // The collapsed rail is a desktop affordance only: on a phone the
+        // sidebar is an overlay that is either open or absent, and a 60px
+        // icon rail overlaying the content would be the worst of both.
+        // The preference is kept, just not applied while narrow.
+        data-side={!narrow && collapsed ? "collapsed" : "expanded"}
+        data-nav={navOpen ? "open" : "closed"}
+      >
         <div className="cn-side">
           <div className="cn-brand">
             <FluxaLogo size={30} radius={8} bg="var(--brand)" />
@@ -522,11 +564,11 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
             </div>
             <button
               className="cn-side-toggle"
-              onClick={() => setCollapsed((v) => !v)}
-              title={collapsed ? "展开侧边栏" : "收起侧边栏"}
-              aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
+              onClick={() => (narrow ? setNavOpen(false) : setCollapsed((v) => !v))}
+              title={narrow ? "关闭导航" : collapsed ? "展开侧边栏" : "收起侧边栏"}
+              aria-label={narrow ? "关闭导航" : collapsed ? "展开侧边栏" : "收起侧边栏"}
             >
-              <Icon name={collapsed ? "sidebar-expand" : "sidebar-collapse"} size={17} />
+              <Icon name={narrow ? "x" : collapsed ? "sidebar-expand" : "sidebar-collapse"} size={17} />
             </button>
           </div>
 
@@ -559,8 +601,20 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
           <IdentityMenu />
         </div>
 
+        {narrow && navOpen && (
+          <button className="cn-nav-scrim" aria-label="关闭导航" onClick={() => setNavOpen(false)} />
+        )}
+
         <div className="cn-body">
           <div className="cn-top">
+            <button
+              className="cn-nav-toggle"
+              onClick={() => setNavOpen(true)}
+              aria-label="打开导航"
+              aria-expanded={navOpen}
+            >
+              <Icon name="menu" size={18} />
+            </button>
             <div className="cn-crumb">
               {root} <Icon name="chevron-right" size={12} /> <b>{current}</b>
             </div>

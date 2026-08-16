@@ -784,3 +784,75 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
   background: var(--warn-soft); font-size: 12px; line-height: 1.7; color: #7a4a1c;
 }
 .cn-notice svg { flex: none; margin-top: 2px; }
+
+/* ---- 窄屏 / 手机 ------------------------------------------------------ */
+/* 桌面是「侧栏 + 内容」两列。窄屏下侧栏改成覆盖内容的抽屉，内容永远占满
+   整幅宽度；断点 900px 与 console-layout.tsx 里的 NARROW 保持一致，两边
+   改一处就要改另一处。 */
+
+.cn-matrix-wrap { overflow-x: auto; }
+.cn-nav-toggle { display: none; }
+
+/* 4 栏在 1180 以下每栏不足 260px，KPI 的 25px 数字和图表都开始挤。 */
+@media (max-width: 1180px) {
+  .cn-kpis, .cn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .cn-nav-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: none; width: 34px; height: 34px; margin-left: -6px;
+    border-radius: 8px; color: var(--ink-2);
+  }
+  .cn-nav-toggle:hover { background: #f4f6fa; color: var(--ink); }
+
+  /* 宽度和内边距在这里重写，是为了压过收起态那条同权重规则。布局层已经
+     保证窄屏不会带 data-side="collapsed"，但样式不该依赖那个保证。 */
+  .cn .cn-side,
+  .cn[data-side="collapsed"] .cn-side {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 62;
+    width: 268px; padding: 14px 10px 10px;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 0 0 44px -12px rgba(22,35,58,.34);
+  }
+  .cn[data-nav="open"] .cn-side { transform: translateX(0); }
+
+  .cn-nav-scrim { position: fixed; inset: 0; z-index: 61; background: rgba(16,24,40,.34); }
+
+  /* 232px 的列表列和 296px 的诊断列在手机上都放不下，一律堆叠。 */
+  .cn-md, .cn-play, .cn-docs { grid-template-columns: minmax(0, 1fr); }
+  /* 堆叠后两块再抢同一份高度只会把对话区压扁，改成让页面正常滚动。 */
+  .cn-play { flex: none; }
+  .cn-chat { min-height: 60vh; }
+
+  .cn-top { padding: 0 12px; gap: 8px; }
+  .cn-search { width: auto; flex: 1; min-width: 0; margin-left: 0; }
+}
+
+@media (max-width: 680px) {
+  .cn-kpis, .cn-grid { grid-template-columns: minmax(0, 1fr); }
+  .cn-span-2 { grid-column: auto; }
+
+  .cn-page { padding: 14px; gap: 12px; }
+  .cn-page-head { flex-wrap: wrap; align-items: flex-start; }
+  .cn-page-acts { margin-left: 0; width: 100%; flex-wrap: wrap; }
+
+  /* 顶栏放不下搜索和面包屑两样。导航已经收进抽屉，面包屑是「我在哪」的
+     唯一线索，所以让搜索退场——它在页面内还有各自的筛选框可用。 */
+  .cn-search { display: none; }
+
+  .cn-filters-right { margin-left: 0; }
+  .cn-field-search { width: 100%; }
+
+  /* 三段页脚加右侧说明在 375 下会撑出横向滚动。 */
+  .cn-foot { height: auto; padding: 9px 14px; flex-wrap: wrap; gap: 6px 10px; }
+
+  .cn-login { padding: 16px; }
+  .cn-login-card { width: 100%; max-width: 392px; padding: 24px 20px 20px; }
+
+  .cn-cfg-card { flex-wrap: wrap; }
+  .cn-cfg-acts { width: 100%; justify-content: flex-end; }
+
+  .cn-msg { max-width: 94%; }
+}

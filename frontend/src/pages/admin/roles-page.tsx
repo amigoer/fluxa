@@ -135,6 +135,10 @@ export function RolesPage() {
               </div>
             </div>
           )}
+          {/* The matrix grows a column per role and never wraps, so it gets
+              its own scroller rather than pushing the page sideways -- the
+              same shape shadcn's Table brings with it. */}
+          <div className="cn-matrix-wrap">
           <table className="cn-matrix">
             <thead>
               <tr>
@@ -178,6 +182,7 @@ export function RolesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
       </div>
 

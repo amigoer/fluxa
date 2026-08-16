@@ -98,7 +98,7 @@ export function PlaygroundPage() {
       const latencyMs = Math.round(performance.now() - started)
       if (!res.ok) {
         setDiag({ requestId, latencyMs, status: "failed" })
-        toast.error("调用失败，看右侧诊断和调用日志定位")
+        toast.error("调用失败，看诊断面板和调用日志定位")
         return
       }
       const body = await res.json()
@@ -131,7 +131,9 @@ export function PlaygroundPage() {
 
   return (
     <div className="cn-page" style={{ flex: 1, minHeight: 0 }}>
-      <PageHead title="Playground" sub="验证路由和 Provider 是否真的按预期生效，右侧给出这次请求的完整诊断">
+      {/* No "右侧" in the copy: the diagnostics panel sits beside the chat
+          on a desktop and below it on a phone. */}
+      <PageHead title="Playground" sub="验证路由和 Provider 是否真的按预期生效，并给出这次请求的完整诊断">
         <Select
           label="模型"
           value={modelId}
@@ -184,7 +186,7 @@ export function PlaygroundPage() {
               <Empty
                 icon="terminal"
                 title="还没有对话"
-                desc={ready ? "在下面输入一条消息，右侧会给出这次请求的完整诊断。" : "先选好模型、准备好 Key，再开始测试。"}
+                desc={ready ? "在下面输入一条消息，随后会给出这次请求的完整诊断。" : "先选好模型、准备好 Key，再开始测试。"}
               />
             )}
             {messages.map((m, i) => (

@@ -2,14 +2,16 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-// Local edit: upstream wraps the table in a `relative w-full overflow-x-auto`
-// container. Every table in this console already sits inside `.cn-card`,
-// which clips to its own 11px radius, so the extra scroll container both
-// changed horizontal-overflow behaviour and put a block-level div where
-// the markup expected a table. Pass `container` to opt back in.
+// Upstream's `relative w-full overflow-x-auto` container, kept on. It was
+// switched off here on the reasoning that every table sits inside a card
+// that clips to its own radius anyway -- which held only as long as every
+// table fit. On a phone none of them do, and the card's overflow:hidden
+// clips the columns off with no way to reach them. The container gives the
+// table its own horizontal scroller inside the card instead. Pass
+// `container={false}` where a table must be a bare element.
 function Table({
   className,
-  container = false,
+  container = true,
   ...props
 }: React.ComponentProps<"table"> & { container?: boolean }) {
   const table = (

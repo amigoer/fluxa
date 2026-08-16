@@ -136,7 +136,7 @@ export function QuotaRequestsPage() {
 
         <Card title="我的申请记录" note={`${(requests.data ?? []).length} 条`}>
           {(requests.data ?? []).length === 0 ? (
-            <Empty icon="inbox" title="还没有申请记录" desc="额度不够时在左边提一单，通过后立即生效。" />
+            <Empty icon="inbox" title="还没有申请记录" desc="额度不够时提一单，通过后立即生效。" />
           ) : (
             <div className="cn-todo">
               {(requests.data ?? []).map((r) => {

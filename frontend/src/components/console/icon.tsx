@@ -162,6 +162,7 @@ const ICON_PATHS: Record<string, ReactElement> = {
   ),
   check: <path d="m20 6.5-10.5 11L4 12" />,
   x: <path d="m6 6 12 12M18 6 6 18" />,
+  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   // Radio indicator for menus -- solid, so it overrides the shared
   // fill:none/stroke:currentColor the rest of the set is drawn with.
   dot: <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />,

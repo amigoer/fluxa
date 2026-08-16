@@ -120,7 +120,7 @@ export function QuickstartPage() {
                 n={3}
                 done={hasCalls}
                 title="替换 base_url 并发起调用"
-                desc="用左侧示例验证，随后在 Playground 里确认路由是否按预期命中。"
+                desc="用示例代码验证，随后在 Playground 里确认路由是否按预期命中。"
               />
             </div>
           </Card>
