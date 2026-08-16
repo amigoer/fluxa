@@ -1,4 +1,4 @@
-import { useId } from "react"
+import { useId, type CSSProperties } from "react"
 import feishuUrl from "@/assets/brand-icons/feishu.svg"
 import dingtalkUrl from "@/assets/brand-icons/dingtalk.png"
 
@@ -22,41 +22,41 @@ import dingtalkUrl from "@/assets/brand-icons/dingtalk.png"
 //   no official Linux app package to pull from). Still on the letter
 //   avatar until a real asset turns up.
 
-export type IconProps = { className?: string }
+export type IconProps = { className?: string; style?: CSSProperties }
 
-export function FeishuIcon({ className }: IconProps) {
-  return <img src={feishuUrl} alt="飞书" className={className} />
+export function FeishuIcon({ className, style }: IconProps) {
+  return <img src={feishuUrl} alt="飞书" className={className} style={style} />
 }
 
-export function DingTalkIcon({ className }: IconProps) {
-  return <img src={dingtalkUrl} alt="钉钉" className={className} />
+export function DingTalkIcon({ className, style }: IconProps) {
+  return <img src={dingtalkUrl} alt="钉钉" className={className} style={style} />
 }
 
-export function OpenAIIcon({ className }: IconProps) {
+export function OpenAIIcon({ className, style }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} style={style} xmlns="http://www.w3.org/2000/svg">
       <title>OpenAI</title>
       <path d="M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z" />
     </svg>
   )
 }
 
-export function AnthropicIcon({ className }: IconProps) {
+export function AnthropicIcon({ className, style }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} style={style} xmlns="http://www.w3.org/2000/svg">
       <title>Anthropic</title>
       <path d="M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z" />
     </svg>
   )
 }
 
-export function AzureIcon({ className }: IconProps) {
+export function AzureIcon({ className, style }: IconProps) {
   const uid = useId()
   const g0 = `azure-0-${uid}`
   const g1 = `azure-1-${uid}`
   const g2 = `azure-2-${uid}`
   return (
-    <svg viewBox="0 0 24 24" className={className} xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 24 24" className={className} style={style} xmlns="http://www.w3.org/2000/svg">
       <title>Azure</title>
       <path d="M7.242 1.613A1.11 1.11 0 018.295.857h6.977L8.03 22.316a1.11 1.11 0 01-1.052.755h-5.43a1.11 1.11 0 01-1.053-1.466L7.242 1.613z" fill={`url(#${g0})`} />
       <path d="M18.397 15.296H7.4a.51.51 0 00-.347.882l7.066 6.595c.206.192.477.298.758.298h6.226l-2.706-7.775z" fill="#0078D4" />
@@ -83,7 +83,7 @@ export function AzureIcon({ className }: IconProps) {
   )
 }
 
-export function GeminiIcon({ className }: IconProps) {
+export function GeminiIcon({ className, style }: IconProps) {
   const uid = useId()
   const g0 = `gemini-0-${uid}`
   const g1 = `gemini-1-${uid}`
@@ -91,7 +91,7 @@ export function GeminiIcon({ className }: IconProps) {
   const star =
     "M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z"
   return (
-    <svg viewBox="0 0 24 24" className={className} xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 24 24" className={className} style={style} xmlns="http://www.w3.org/2000/svg">
       <title>Gemini</title>
       <path d={star} fill="#3186FF" />
       <path d={star} fill={`url(#${g0})`} />
@@ -115,11 +115,11 @@ export function GeminiIcon({ className }: IconProps) {
   )
 }
 
-export function BedrockIcon({ className }: IconProps) {
+export function BedrockIcon({ className, style }: IconProps) {
   const uid = useId()
   const g0 = `bedrock-${uid}`
   return (
-    <svg viewBox="0 0 24 24" className={className} xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 24 24" className={className} style={style} xmlns="http://www.w3.org/2000/svg">
       <title>Bedrock</title>
       <defs>
         <linearGradient id={g0} x1="80%" x2="20%" y1="20%" y2="80%">
@@ -137,9 +137,9 @@ export function BedrockIcon({ className }: IconProps) {
   )
 }
 
-export function AlibabaCloudIcon({ className }: IconProps) {
+export function AlibabaCloudIcon({ className, style }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="#FF6A00" className={className} xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 24 24" fill="#FF6A00" className={className} style={style} xmlns="http://www.w3.org/2000/svg">
       <title>Alibaba Cloud</title>
       <path d="M14.752 4.64h5.274C22.242 4.64 24 6.475 24 8.691V15.8a3.947 3.947 0 01-3.974 3.975h-5.274l1.299-1.835 3.822-1.222c.688-.23 1.146-.918 1.146-1.605v-5.81c0-.687-.458-1.375-1.146-1.605L16.05 6.475l-1.3-1.835zM2.98 15.111c0 .688.46 1.376 1.147 1.606l3.822 1.146 1.3 1.835H3.974A3.947 3.947 0 010 15.723V8.69c0-2.216 1.758-4.05 3.975-4.05h5.273L7.95 6.474 4.127 7.697c-.688.23-1.146.918-1.146 1.606v5.808z" />
       <path d="M16.051 11.213H8.025v1.835h8.026v-1.835z" />

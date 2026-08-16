@@ -1,14 +1,17 @@
 import type { ReactNode } from "react"
+import { ConsoleFooter } from "@/layouts/console-layout"
 
-// Independent of the main frame (DESIGN.md 6.3): no sidebar, no top bar,
-// just a centered card. Naturally responsive without any special-casing
-// since it's a single column at any width.
-export function LoginLayout({ children }: { children: ReactNode }) {
+// The login screens sit outside the main frame: no sidebar, no top bar,
+// a centred card on the same cold-grey ground the console uses, with the
+// same fixed footer underneath (DESIGN.md 6.3).
+export function LoginShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-side-bg px-4">
-      <div className="w-full max-w-[360px] rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-app)]">
+    <div className="screen cn" style={{ flexDirection: "column" }}>
+      <div className="cn-login">
+        <div className="cn-login-bg" />
         {children}
       </div>
+      <ConsoleFooter />
     </div>
   )
 }

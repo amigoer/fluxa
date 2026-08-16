@@ -9,6 +9,7 @@ import (
 
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
+	"github.com/amigoer/fluxa/internal/provider/quota"
 	"github.com/amigoer/fluxa/internal/provider/types"
 	"github.com/amigoer/fluxa/internal/rbac"
 )
@@ -270,7 +271,10 @@ func (h *Handler) getDepartmentQuotaPool(w http.ResponseWriter, r *http.Request)
 	departmentID := chi.URLParam(r, "departmentId")
 	balance, err := h.service.DepartmentQuotaBalance(r.Context(), departmentID)
 	if errors.Is(err, ErrNotFound) {
-		httpx.JSON(w, http.StatusOK, map[string]int64{"total": 0, "spoken": 0, "remaining": 0})
+		// A department with no pool yet is an empty pool, not an error --
+		// but it has to serialize like every other balance, so the client
+		// isn't parsing two different shapes off one endpoint.
+		httpx.JSON(w, http.StatusOK, quota.Balance{})
 		return
 	}
 	if err != nil {

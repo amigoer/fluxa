@@ -1,152 +1,295 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { PageHeader } from "@/components/shared/page-header"
-import { StatusPill } from "@/components/shared/status-pill"
-import { ProviderAvatar } from "@/components/shared/provider-avatar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Icon } from "@/components/console/icon"
+import { Brand } from "@/components/console/brand"
+import { Card, Field, Filters, Modal, PageHead, Select, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
-import type { Model, Provider } from "@/lib/types"
+import { Permission, useHasPermission } from "@/lib/auth"
+import { fmt, fmtNum } from "@/lib/format"
+import type { CallLog, Provider, ProviderHealth } from "@/lib/types"
 
-const kindLabel: Record<string, string> = {
-  openai_compatible: "OpenAI 兼容",
-  anthropic: "Anthropic",
-  azure_openai: "Azure OpenAI",
-  gemini: "Gemini",
-  bedrock: "Bedrock",
-}
+// 供应商 -- the list page type. Circuit state comes from the gateway's own
+// health table; latency, failure rate, volume and spend are rolled up from
+// the call log, which is the only place those numbers exist.
+
+const HEALTH_LABEL = { normal: "正常", half_open: "半开", circuit_open: "熔断" } as const
+const HEALTH_TONE = { normal: "ok", half_open: "warn", circuit_open: "bad" } as const
+
+const KINDS = [
+  { value: "openai_compatible", label: "OpenAI 兼容" },
+  { value: "anthropic", label: "Anthropic" },
+  { value: "azure_openai", label: "Azure OpenAI" },
+  { value: "gemini", label: "Google Gemini" },
+  { value: "bedrock", label: "AWS Bedrock" },
+  { value: "alibaba", label: "阿里云百炼" },
+]
 
 export function ProvidersPage() {
-  const { data: providers, refetch } = useApiQuery<Provider[]>("/api/providers")
-  const { data: models } = useApiQuery<Model[]>("/api/models")
-  const [open, setOpen] = useState(false)
+  const providers = useApiQuery<Provider[]>("/api/providers")
+  const health = useApiQuery<ProviderHealth[]>("/api/provider-health")
+  const { data: calls } = useApiQuery<CallLog[]>("/api/call-logs")
+  const canCreate = useHasPermission(Permission.ProviderManageCredentials)
+
+  const [q, setQ] = useState("")
+  const [kind, setKind] = useState("")
+  const [state, setState] = useState("")
+  const [creating, setCreating] = useState(false)
+
+  const healthById = useMemo(
+    () => new Map((health.data ?? []).map((h) => [h.ProviderID, h])),
+    [health.data],
+  )
+
+  // One pass over the log per provider: month spend, month calls, p95 and
+  // failure rate. Doing it here rather than per-cell keeps the table from
+  // re-scanning the same array six times.
+  const stats = useMemo(() => {
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+    const acc = new Map<string, { spend: number; calls: number; failed: number; lat: number[] }>()
+    for (const c of calls ?? []) {
+      if (new Date(c.OccurredAt) < monthStart) continue
+      const cur = acc.get(c.ProviderID) ?? { spend: 0, calls: 0, failed: 0, lat: [] }
+      cur.spend += c.CostCents
+      cur.calls += 1
+      if (c.Status === "failed") cur.failed += 1
+      cur.lat.push(c.LatencyMS)
+      acc.set(c.ProviderID, cur)
+    }
+    const out = new Map<string, { spend: number; calls: number; errRate: number; p95: number }>()
+    for (const [id, v] of acc) {
+      const sorted = v.lat.sort((a, b) => a - b)
+      out.set(id, {
+        spend: v.spend,
+        calls: v.calls,
+        errRate: v.calls ? (v.failed / v.calls) * 100 : 0,
+        p95: sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0,
+      })
+    }
+    return out
+  }, [calls])
+
+  const rows = (providers.data ?? []).filter((p) => {
+    if (q && !p.Name.toLowerCase().includes(q.toLowerCase())) return false
+    if (kind && p.Kind !== kind) return false
+    if (state && (healthById.get(p.ID)?.State ?? "normal") !== state) return false
+    return true
+  })
+
+  return (
+    <div className="cn-page">
+      <PageHead title="供应商" sub="上游账号与凭证，熔断状态实时反映网关探活结果">
+        <button
+          className="cn-btn"
+          onClick={() => {
+            providers.refetch()
+            health.refetch()
+            toast.success("已刷新熔断状态")
+          }}
+        >
+          <Icon name="refresh" size={14} />
+          刷新状态
+        </button>
+        {canCreate && (
+          <button className="cn-btn cn-btn-pri" onClick={() => setCreating(true)}>
+            <Icon name="plus" size={14} />
+            接入供应商
+          </button>
+        )}
+      </PageHead>
+
+      <Filters
+        placeholder="搜索供应商名称…"
+        value={q}
+        onValue={setQ}
+        right={<span className="cn-count">{rows.length} 个供应商</span>}
+      >
+        <Select
+          label="类型"
+          value={kind}
+          onValue={setKind}
+          options={[{ value: "", label: "全部类型" }, ...KINDS]}
+        />
+        <Select
+          label="熔断状态"
+          value={state}
+          onValue={setState}
+          options={[
+            { value: "", label: "全部状态" },
+            { value: "normal", label: "正常" },
+            { value: "half_open", label: "半开" },
+            { value: "circuit_open", label: "熔断" },
+          ]}
+        />
+      </Filters>
+
+      <Card>
+        <table className="cn-table">
+          <thead>
+            <tr>
+              <th>供应商</th>
+              <th>类型</th>
+              <th>熔断状态</th>
+              <th className="cn-r">P95 延迟</th>
+              <th className="cn-r">失败率</th>
+              <th className="cn-r">本月调用</th>
+              <th className="cn-r">本月花费</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => {
+              const s = stats.get(p.ID)
+              const st = healthById.get(p.ID)?.State ?? "normal"
+              return (
+                <tr key={p.ID}>
+                  <td>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+                      <span className="cn-cfg-logo" style={{ width: 26, height: 26, borderRadius: 8 }}>
+                        <Brand kind={p.Kind} size={14} />
+                      </span>
+                      <span style={{ fontWeight: 570 }}>{p.Name}</span>
+                    </span>
+                  </td>
+                  <td className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
+                    {p.Kind}
+                  </td>
+                  <td>
+                    <Tag tone={HEALTH_TONE[st]}>{HEALTH_LABEL[st]}</Tag>
+                  </td>
+                  <td className="cn-r cn-mono" style={{ color: (s?.p95 ?? 0) > 2000 ? "var(--bad)" : "var(--ink-2)" }}>
+                    {s ? `${s.p95}ms` : "—"}
+                  </td>
+                  <td
+                    className="cn-r cn-mono"
+                    style={{ color: (s?.errRate ?? 0) > 5 ? "var(--bad)" : "var(--ink-2)" }}
+                  >
+                    {s ? `${s.errRate.toFixed(1)}%` : "—"}
+                  </td>
+                  <td className="cn-r cn-mono">{s ? fmtNum(s.calls) : "—"}</td>
+                  <td className="cn-r cn-mono" style={{ fontWeight: 560 }}>
+                    {fmt(s?.spend ?? 0)}
+                  </td>
+                </tr>
+              )
+            })}
+            <TableState
+              colSpan={7}
+              loading={providers.loading}
+              empty={rows.length === 0}
+              title={q || kind || state ? "没有匹配的供应商" : "还没有接入供应商"}
+              desc={
+                q || kind || state
+                  ? "换个关键词或清掉筛选条件再看看。"
+                  : "接入第一个上游账号后，网关才能把请求转发出去。"
+              }
+            />
+          </tbody>
+        </table>
+      </Card>
+
+      <CreateProviderModal
+        open={creating}
+        onClose={() => setCreating(false)}
+        onDone={() => {
+          providers.refetch()
+          health.refetch()
+        }}
+      />
+    </div>
+  )
+}
+
+function CreateProviderModal({
+  open,
+  onClose,
+  onDone,
+}: {
+  open: boolean
+  onClose: () => void
+  onDone: () => void
+}) {
   const [name, setName] = useState("")
-  const [kind, setKind] = useState("openai_compatible")
+  const [kind, setKind] = useState(KINDS[0].value)
   const [baseUrl, setBaseUrl] = useState("")
   const [apiKey, setApiKey] = useState("")
-  const [submitting, setSubmitting] = useState(false)
+  const [busy, setBusy] = useState(false)
 
-  const modelCount = (providerId: string) => (models ?? []).filter((m) => m.ProviderID === providerId).length
-
-  const create = async () => {
-    setSubmitting(true)
+  const submit = async () => {
+    if (!name || !apiKey) {
+      toast.error("请填写名称和 API Key")
+      return
+    }
+    setBusy(true)
     try {
-      await api.post("/api/providers", { Name: name, Kind: kind, Config: { base_url: baseUrl, api_key: apiKey } })
-      setOpen(false)
+      await api.post("/api/providers", {
+        Name: name,
+        Kind: kind,
+        Config: { base_url: baseUrl, api_key: apiKey },
+        Status: "active",
+      })
+      toast.success("已接入供应商")
       setName("")
       setBaseUrl("")
       setApiKey("")
-      refetch()
-      toast.success("供应商已创建")
+      onDone()
+      onClose()
     } catch {
-      toast.error("创建失败")
+      toast.error("接入失败，请检查凭证")
     } finally {
-      setSubmitting(false)
+      setBusy(false)
     }
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="供应商" />
-
-      <div className="flex items-center gap-2">
-        <Input placeholder="搜索供应商…" className="max-w-[260px]" />
-        <div className="flex-1" />
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>新建供应商</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>新建供应商</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-3.5">
-              <div>
-                <Label className="mb-1.5 text-xs">名称</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：OpenAI Production" />
-              </div>
-              <div>
-                <Label className="mb-1.5 text-xs">类型</Label>
-                <Select value={kind} onValueChange={setKind}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(kindLabel).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 text-xs">Base URL</Label>
-                <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" />
-              </div>
-              <div>
-                <Label className="mb-1.5 text-xs">API Key</Label>
-                <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button disabled={submitting || !name} onClick={() => void create()}>
-                创建
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-[var(--shadow-card)]">
-        <table className="w-full text-[11.5px]">
-          <thead>
-            <tr className="text-left text-[10.5px] font-semibold text-muted-foreground">
-              <th className="p-3 font-semibold">名称</th>
-              <th className="p-3 font-semibold">类型</th>
-              <th className="p-3 font-semibold">状态</th>
-              <th className="p-3 font-semibold">模型数</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(providers ?? []).map((p) => (
-              <tr key={p.ID} className="border-t border-border">
-                <td className="p-3">
-                  <span className="flex items-center text-foreground">
-                    <ProviderAvatar name={p.Name} kind={p.Kind} />
-                    {p.Name}
-                  </span>
-                </td>
-                <td className="p-3 text-muted-foreground">{kindLabel[p.Kind] ?? p.Kind}</td>
-                <td className="p-3">
-                  <StatusPill tone={p.Status === "active" ? "ok" : "bad"}>
-                    {p.Status === "active" ? "正常" : "已停用"}
-                  </StatusPill>
-                </td>
-                <td className="p-3 text-muted-foreground">{modelCount(p.ID)}</td>
-              </tr>
+    <Modal
+      open={open}
+      title="接入供应商"
+      sub="凭证保存后只回显掩码，不再明文返回"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="cn-btn" onClick={onClose}>
+            取消
+          </button>
+          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+            {busy ? "接入中…" : "接入"}
+          </button>
+        </>
+      }
+    >
+      <div className="cn-form">
+        <Field label="名称" optional="必填" hint="团队内部叫法，例如「OpenAI 主账号」。">
+          <input className="cn-input" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="类型" optional="必填">
+          <select className="cn-input" value={kind} onChange={(e) => setKind(e.target.value)}>
+            {KINDS.map((k) => (
+              <option key={k.value} value={k.value}>
+                {k.label}
+              </option>
             ))}
-          </tbody>
-        </table>
-        {(providers ?? []).length === 0 && <p className="p-4 text-xs text-muted-foreground">暂无供应商</p>}
+          </select>
+        </Field>
+        <Field label="Base URL" hint="留空则使用该厂商的默认地址；自建或代理时填这里。">
+          <input
+            className="cn-input"
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder="https://api.openai.com/v1"
+          />
+        </Field>
+        <Field label="API Key" optional="必填" hint="只写不读：保存后无法再取回明文。">
+          <input
+            className="cn-input"
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="sk-…"
+          />
+        </Field>
       </div>
-    </div>
+    </Modal>
   )
 }

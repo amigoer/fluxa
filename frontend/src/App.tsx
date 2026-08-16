@@ -1,10 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
-import { Toaster } from "@/components/ui/sonner"
-import { ThemeProvider } from "@/components/shared/theme-provider"
+import { Toaster } from "sonner"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import { RequireAuth } from "@/components/shared/require-auth"
-import { AdminLayout } from "@/layouts/admin-layout"
-import { EmployeeLayout } from "@/layouts/employee-layout"
+import { ConsoleLayout } from "@/layouts/console-layout"
 import { adminHasAnyPermission } from "@/layouts/nav-config"
 
 import { SetupPage } from "@/pages/login/setup-page"
@@ -50,7 +48,7 @@ function AppRoutes() {
         path="/admin"
         element={
           <RequireAuth>
-            <AdminLayout title="管理台" />
+            <ConsoleLayout persona="admin" />
           </RequireAuth>
         }
       >
@@ -75,7 +73,7 @@ function AppRoutes() {
         path="/app"
         element={
           <RequireAuth>
-            <EmployeeLayout title="我的工作台" />
+            <ConsoleLayout persona="employee" />
           </RequireAuth>
         }
       >
@@ -92,13 +90,11 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-          <Toaster />
-        </AuthProvider>
-      </BrowserRouter>
-    </ThemeProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+        <Toaster position="bottom-right" />
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

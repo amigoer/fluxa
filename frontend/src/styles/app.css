@@ -1,0 +1,173 @@
+/* The few pieces the mockup never had to draw.
+   The 23 hi-fi screens are static, so nothing there opens a dialog, types
+   into a field or waits on a request. Everything below is built out of the
+   same tokens and shapes as console.css / pages.css so the additions read
+   as part of the same system, not as bolted-on app chrome. */
+
+/* ---- native form controls ------------------------------------------- */
+/* The mockup draws filters and selects as divs. Real ones have to be
+   focusable and keyboard-operable, so the same look is re-hung on real
+   <input>/<select> elements. */
+
+input.cn-field, select.cn-field, .cn-field input {
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.cn-field:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(47,95,234,.14); }
+.cn-field input {
+  flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none;
+}
+.cn-field input::placeholder { color: var(--ink-3); }
+
+select.cn-field-select, select.cn-input {
+  appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b97ab' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6.5 9.5 5.5 5.5 5.5-5.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 13px 13px;
+  cursor: pointer;
+}
+select.cn-field-select { font-weight: 520; }
+select.cn-field-select:focus-visible, select.cn-input:focus-visible {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(47,95,234,.14);
+}
+.cn-input::placeholder { color: var(--ink-3); }
+.cn-input:disabled { background: #f5f7fb; color: var(--ink-3); }
+
+/* The switch is a real button in the app, so it needs the focus ring and
+   the disabled state the static <span> never needed. */
+button.cn-switch { padding: 0; border: 0; }
+button.cn-switch:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(47,95,234,.20); }
+button.cn-switch:disabled { opacity: .5; cursor: not-allowed; }
+button.cn-check { padding: 0; cursor: pointer; }
+button.cn-check:disabled { cursor: default; }
+
+.cn-btn:disabled, .cn-mini-btn:disabled, .cn-login-btn:disabled { opacity: .55; }
+.cn-btn:disabled:hover { border-color: var(--line); }
+.cn-btn-pri:disabled:hover { background: var(--brand); border-color: var(--brand); }
+
+/* ---- dialogs --------------------------------------------------------- */
+/* Same scrim + card language as the todo drawer, centred instead of
+   docked. Forms inside reuse .cn-form / .cn-input verbatim. */
+
+.cn-modal-scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(16, 24, 40, .34);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  animation: cnFade .16s ease;
+}
+.cn-modal {
+  width: 460px; max-width: 100%; max-height: 100%;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(22,35,58,.05), 0 26px 60px -26px rgba(22,35,58,.42);
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: cnPop .18s ease;
+}
+.cn-modal-wide { width: 560px; }
+@keyframes cnPop { from { transform: translateY(8px) scale(.99); opacity: 0; } }
+
+.cn-modal-head {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding: 15px 16px 13px; border-bottom: 1px solid var(--line-2);
+}
+.cn-modal-title { font-size: 14.5px; font-weight: 660; letter-spacing: -0.022em; }
+.cn-modal-sub { font-size: 11.5px; color: var(--ink-3); }
+.cn-modal-close {
+  margin-left: auto; width: 28px; height: 28px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--ink-3);
+}
+.cn-modal-close:hover { background: #f2f5fa; color: var(--ink); }
+.cn-modal-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
+.cn-modal-foot {
+  flex: none; display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 16px; border-top: 1px solid var(--line-2); background: #fbfcfe;
+}
+
+/* ---- top-bar search -------------------------------------------------- */
+/* The mockup's search is a static div. Here it wraps a real input and
+   drops a result list underneath; the box itself keeps the same 260x34
+   geometry so the top bar is unchanged. */
+
+.cn-search { position: relative; }
+.cn-search input {
+  flex: 1; min-width: 0; height: 100%;
+  border: 0; background: none; outline: none;
+  font-size: 12.5px; color: var(--ink);
+}
+.cn-search input::placeholder { color: var(--ink-3); }
+.cn-search:focus-within { border-color: var(--brand); background: #fff; }
+
+.cn-omni {
+  position: absolute; top: calc(100% + 6px); left: 0; width: 340px; z-index: 30;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(22,35,58,.05), 0 18px 40px -18px rgba(22,35,58,.34);
+  max-height: 340px; overflow-y: auto; padding: 5px;
+}
+.cn-omni-group {
+  padding: 7px 9px 4px; font-size: 10.5px; font-weight: 620;
+  color: var(--ink-3); letter-spacing: .05em;
+}
+.cn-omni-item {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 7px 9px; border-radius: 7px; font-size: 12.5px; color: var(--ink-2);
+}
+.cn-omni-item:hover { background: #f5f7fb; color: var(--ink); }
+.cn-omni-item b { font-weight: 570; color: var(--ink); }
+.cn-omni-item span { margin-left: auto; font-size: 11px; color: var(--ink-3); }
+.cn-omni-empty { padding: 18px 12px; text-align: center; font-size: 12px; color: var(--ink-3); }
+
+/* ---- identity menu --------------------------------------------------- */
+
+.cn-menu-wrap { position: relative; }
+.cn-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 208px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(22,35,58,.05), 0 18px 40px -18px rgba(22,35,58,.34);
+  padding: 5px;
+}
+.cn-menu-up { top: auto; bottom: calc(100% + 6px); right: auto; left: 0; min-width: 190px; }
+.cn-menu-head { padding: 8px 9px 9px; border-bottom: 1px solid var(--line-2); margin-bottom: 5px; }
+.cn-menu-name { font-size: 12.5px; font-weight: 620; }
+.cn-menu-sub { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.cn-menu-item {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 7px 9px; border-radius: 7px; font-size: 12.5px; color: var(--ink-2);
+}
+.cn-menu-item:hover { background: #f5f7fb; color: var(--ink); }
+.cn-menu-item[data-danger="true"]:hover { background: var(--bad-soft); color: var(--bad); }
+
+/* ---- feedback -------------------------------------------------------- */
+
+.cn-rows { display: flex; flex-direction: column; }
+
+.cn-skel {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #eef1f6 25%, #f6f8fc 37%, #eef1f6 63%);
+  background-size: 400% 100%;
+  animation: cnSkel 1.3s ease infinite;
+}
+@keyframes cnSkel { from { background-position: 100% 50%; } to { background-position: 0 50%; } }
+
+.cn-loading { padding: 40px 24px; text-align: center; font-size: 12.5px; color: var(--ink-3); }
+
+/* Read-only fields (masked secrets, computed values) look like inputs but
+   must not invite typing. */
+.cn-static {
+  min-height: 36px; padding: 8px 11px; border: 1px solid var(--line-2); border-radius: 8px;
+  background: #f8fafc; font-size: 12.5px; color: var(--ink-2);
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* Toasts: sonner ships its own layout, only the palette is retuned. */
+[data-sonner-toaster] {
+  --normal-bg: var(--panel);
+  --normal-text: var(--ink);
+  --normal-border: var(--line);
+  font-family: inherit;
+}
+[data-sonner-toast] {
+  border-radius: 10px !important;
+  box-shadow: 0 1px 2px rgba(22,35,58,.06), 0 12px 32px -14px rgba(22,35,58,.34) !important;
+  font-size: 12.5px !important;
+}

@@ -1,145 +1,154 @@
 import { useMemo, useState } from "react"
-import { toast } from "sonner"
-import { PageHeader } from "@/components/shared/page-header"
-import { KpiCard } from "@/components/shared/kpi-card"
-import { ProviderAvatar } from "@/components/shared/provider-avatar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Icon } from "@/components/console/icon"
+import { Brand } from "@/components/console/brand"
+import { Card, Filters, PageHead, Select, TableState } from "@/components/console/ui"
+import { ProcurementModal } from "@/components/console/procurement-modal"
 import { useApiQuery } from "@/hooks/use-api-query"
-import { api } from "@/lib/api"
-import { formatCents, formatDate } from "@/lib/format"
-import type { ProcurementRecord, Provider } from "@/lib/types"
+import { Permission, useHasPermission } from "@/lib/auth"
+import { downloadCsv } from "@/lib/csv"
+import { fmt, formatDay } from "@/lib/format"
+import type { Member, ProcurementRecord, Provider } from "@/lib/types"
 
+// 入库记录 -- the ledger the budget gauge on the overview reads from.
 export function ProcurementPage() {
-  const { data: records, refetch } = useApiQuery<ProcurementRecord[]>("/api/procurement")
+  const records = useApiQuery<ProcurementRecord[]>("/api/procurement")
   const { data: providers } = useApiQuery<Provider[]>("/api/providers")
-  const providerName = (id: string) => (providers ?? []).find((p) => p.ID === id)?.Name ?? id
-  const providerKind = (id: string) => (providers ?? []).find((p) => p.ID === id)?.Kind
+  const canRecord = useHasPermission(Permission.ProviderRecordProcurement)
+  const canSeeMembers = useHasPermission(Permission.OrgManageMembers)
+  const { data: members } = useApiQuery<Member[]>(canSeeMembers ? "/api/members" : null)
 
-  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState("")
   const [providerId, setProviderId] = useState("")
-  const [amount, setAmount] = useState("")
-  const [note, setNote] = useState("")
+  const [window, setWindow] = useState("90")
+  const [recording, setRecording] = useState(false)
 
-  const monthTotal = useMemo(() => {
-    const now = new Date()
-    return (records ?? [])
-      .filter((r) => {
-        const d = new Date(r.RecordedAt)
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      })
-      .reduce((sum, r) => sum + r.AmountCents, 0)
-  }, [records])
+  const providerById = useMemo(() => new Map((providers ?? []).map((p) => [p.ID, p])), [providers])
+  const memberById = useMemo(() => new Map((members ?? []).map((m) => [m.ID, m])), [members])
 
-  const record = async () => {
-    try {
-      await api.post("/api/procurement", { ProviderID: providerId, AmountCents: Math.round(Number(amount) * 100), Note: note })
-      setOpen(false)
-      setAmount("")
-      setNote("")
-      refetch()
-      toast.success("已登记入库")
-    } catch {
-      toast.error("登记失败")
+  const rows = (records.data ?? []).filter((r) => {
+    const name = providerById.get(r.ProviderID)?.Name ?? ""
+    if (q && !`${name}${r.Note}`.toLowerCase().includes(q.toLowerCase())) return false
+    if (providerId && r.ProviderID !== providerId) return false
+    if (window !== "all") {
+      const cutoff = Date.now() - Number(window) * 86400000
+      if (new Date(r.RecordedAt).getTime() < cutoff) return false
     }
-  }
+    return true
+  })
+  const total = rows.reduce((s, r) => s + r.AmountCents, 0)
+
+  const exportCsv = () =>
+    downloadCsv(
+      "fluxa-procurement.csv",
+      ["入库时间", "供应商", "备注", "登记人", "金额(元)"],
+      rows.map((r) => [
+        formatDay(r.RecordedAt),
+        providerById.get(r.ProviderID)?.Name ?? r.ProviderID,
+        r.Note,
+        memberById.get(r.RecordedByMemberID)?.Name ?? r.RecordedByMemberID,
+        (r.AmountCents / 100).toFixed(2),
+      ]),
+    )
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="入库记录" />
+    <div className="cn-page">
+      <PageHead title="入库记录" sub="采购充值流水，决定各供应商的可用余额">
+        <button className="cn-btn" onClick={exportCsv}>
+          <Icon name="download" size={14} />
+          导出
+        </button>
+        {canRecord && (
+          <button className="cn-btn cn-btn-pri" onClick={() => setRecording(true)}>
+            <Icon name="package-plus" size={14} />
+            登记入库
+          </button>
+        )}
+      </PageHead>
 
-      <div className="grid grid-cols-2 gap-3">
-        <KpiCard label="本月入库总额" value={formatCents(monthTotal)} />
-        <KpiCard label="入库笔数" value={String((records ?? []).length)} />
-      </div>
+      <Filters
+        placeholder="搜索供应商或备注…"
+        value={q}
+        onValue={setQ}
+        right={
+          <span className="cn-count">
+            {rows.length} 笔 · 合计 {fmt(total)}
+          </span>
+        }
+      >
+        <Select
+          label="供应商"
+          value={providerId}
+          onValue={setProviderId}
+          options={[
+            { value: "", label: "全部供应商" },
+            ...(providers ?? []).map((p) => ({ value: p.ID, label: p.Name })),
+          ]}
+        />
+        <Select
+          label="时间范围"
+          value={window}
+          onValue={setWindow}
+          options={[
+            { value: "30", label: "近 30 天" },
+            { value: "90", label: "近 90 天" },
+            { value: "365", label: "近一年" },
+            { value: "all", label: "全部" },
+          ]}
+        />
+      </Filters>
 
-      <div className="flex justify-end">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>登记入库</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>登记入库</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-3.5">
-              <div>
-                <Label className="mb-1.5 text-xs">供应商</Label>
-                <Select value={providerId} onValueChange={setProviderId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="选择供应商" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(providers ?? []).map((p) => (
-                      <SelectItem key={p.ID} value={p.ID}>
-                        {p.Name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 text-xs">金额（¥）</Label>
-                <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="50000" />
-              </div>
-              <div>
-                <Label className="mb-1.5 text-xs">备注</Label>
-                <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Q3 预算（可选）" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button disabled={!providerId || !amount} onClick={() => void record()}>
-                登记
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-[var(--shadow-card)]">
-        <table className="w-full text-[11.5px]">
+      <Card>
+        <table className="cn-table">
           <thead>
-            <tr className="text-left text-[10.5px] font-semibold text-muted-foreground">
-              <th className="p-3 font-semibold">供应商</th>
-              <th className="p-3 font-semibold">时间</th>
-              <th className="p-3 font-semibold">金额</th>
-              <th className="p-3 font-semibold">备注</th>
+            <tr>
+              <th>入库时间</th>
+              <th>供应商</th>
+              <th>备注</th>
+              <th>登记人</th>
+              <th className="cn-r">金额</th>
             </tr>
           </thead>
           <tbody>
-            {(records ?? []).map((r) => (
-              <tr key={r.ID} className="border-t border-border">
-                <td className="p-3">
-                  <span className="flex items-center text-foreground">
-                    <ProviderAvatar name={providerName(r.ProviderID)} kind={providerKind(r.ProviderID)} />
-                    {providerName(r.ProviderID)}
-                  </span>
-                </td>
-                <td className="p-3 text-muted-foreground">{formatDate(r.RecordedAt)}</td>
-                <td className="p-3 font-mono tabular-nums">{formatCents(r.AmountCents)}</td>
-                <td className="p-3 text-muted-foreground">{r.Note || "—"}</td>
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const p = providerById.get(r.ProviderID)
+              return (
+                <tr key={r.ID}>
+                  <td className="cn-mono-cell" style={{ color: "var(--ink-2)" }}>
+                    {formatDay(r.RecordedAt)}
+                  </td>
+                  <td>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 560 }}>
+                      <Brand kind={p?.Kind} size={14} />
+                      {p?.Name ?? "未知供应商"}
+                    </span>
+                  </td>
+                  <td style={{ color: "var(--ink-3)" }}>{r.Note || "—"}</td>
+                  <td style={{ color: "var(--ink-2)" }}>
+                    {memberById.get(r.RecordedByMemberID)?.Name ?? "—"}
+                  </td>
+                  <td className="cn-r cn-mono" style={{ fontSize: 12.5, fontWeight: 600 }}>
+                    {fmt(r.AmountCents)}
+                  </td>
+                </tr>
+              )
+            })}
+            <TableState
+              colSpan={5}
+              loading={records.loading}
+              empty={rows.length === 0}
+              title="还没有入库记录"
+              desc="登记一笔采购充值后，概览的预算表盘才有基准。"
+            />
           </tbody>
         </table>
-        {(records ?? []).length === 0 && <p className="p-4 text-xs text-muted-foreground">暂无入库记录</p>}
-      </div>
+      </Card>
+
+      <ProcurementModal
+        open={recording}
+        providers={providers ?? []}
+        onClose={() => setRecording(false)}
+        onDone={() => records.refetch()}
+      />
     </div>
   )
 }

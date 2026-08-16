@@ -1,146 +1,164 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import { PageHeader } from "@/components/shared/page-header"
-import { StatusPill } from "@/components/shared/status-pill"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Icon } from "@/components/console/icon"
+import { Card, Empty, PageHead, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
-import { useHasPermission, Permission } from "@/lib/auth"
 import { api } from "@/lib/api"
-import { formatCents } from "@/lib/format"
-import type { Model, QuotaRequest } from "@/lib/types"
+import { useAuth } from "@/lib/auth"
+import { fmt, formatAgo } from "@/lib/format"
+import type { QuotaRequest, VirtualKey } from "@/lib/types"
 
-const statusLabel = { pending: "待审批", approved: "已通过", rejected: "已驳回" } as const
-const statusTone = { pending: "warn", approved: "ok", rejected: "bad" } as const
+// 配额申请 -- the form page type. Left: the request. Right: what happened
+// to the ones already sent, including the reviewer's note when rejected --
+// which is the only place an employee finds out why.
+
+const STATUS = {
+  pending: { label: "待审批", tone: "warn" },
+  approved: { label: "已通过", tone: "ok" },
+  rejected: { label: "已驳回", tone: "bad" },
+} as const
 
 export function QuotaRequestsPage() {
-  const { data: models } = useApiQuery<Model[]>("/api/models/published")
-  const { data: mine, refetch: refetchMine } = useApiQuery<QuotaRequest[]>("/api/quota-requests/mine")
-  const isDepartmentLead = useHasPermission(Permission.OrgApproveDepartmentQuota)
-  const isAnyApprover = useHasPermission(Permission.QuotaApproveAny)
-  const canReview = isDepartmentLead || isAnyApprover
-  const { data: pending, refetch: refetchPending } = useApiQuery<QuotaRequest[]>(
-    "/api/quota-requests/pending",
-    [canReview],
-  )
-  const modelName = (id: string | null) => (models ?? []).find((m) => m.ID === id)?.Name ?? "任意模型"
+  const { member, departmentName } = useAuth()
+  const requests = useApiQuery<QuotaRequest[]>("/api/quota-requests/mine")
+  const { data: keys } = useApiQuery<VirtualKey[]>("/api/virtual-keys")
 
-  const [modelId, setModelId] = useState("")
   const [amount, setAmount] = useState("")
   const [reason, setReason] = useState("")
-  const [submitting, setSubmitting] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  // Same scoping as 我的用量: an admin's own quota, not the org's.
+  const mine = (keys ?? []).filter(
+    (k) => k.Status === "active" && k.OwnerType === "member" && k.OwnerMemberID === member?.ID,
+  )
+  const quota = mine.reduce((s, k) => s + k.BudgetCents, 0)
+  const used = mine.reduce((s, k) => s + k.SpentCents, 0)
+  const rate = quota > 0 ? (used / quota) * 100 : 0
 
   const submit = async () => {
-    setSubmitting(true)
+    const yuan = Number(amount)
+    if (!Number.isFinite(yuan) || yuan <= 0) {
+      toast.error("请填写正确的申请金额")
+      return
+    }
+    if (!reason.trim()) {
+      toast.error("请写清申请事由")
+      return
+    }
+    setBusy(true)
     try {
-      await api.post("/api/quota-requests", { ModelID: modelId || null, AmountCents: Math.round(Number(amount) * 100), Reason: reason })
+      await api.post("/api/quota-requests", {
+        ModelID: null,
+        AmountCents: Math.round(yuan * 100),
+        Reason: reason.trim(),
+      })
+      toast.success("已提交申请，等待审批")
       setAmount("")
       setReason("")
-      refetchMine()
-      toast.success("申请已提交")
+      requests.refetch()
     } catch {
-      toast.error("提交失败")
+      toast.error("提交失败，请稍后再试")
     } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const decide = async (id: string, approve: boolean) => {
-    try {
-      await api.post(`/api/quota-requests/${id}/decide`, { approve })
-      refetchPending()
-      toast.success(approve ? "已通过" : "已驳回")
-    } catch {
-      toast.error("操作失败")
+      setBusy(false)
     }
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="配额申请" />
+    <div className="cn-page">
+      <PageHead title="配额申请" sub="额度不够时向部门负责人申请追加；通过后从部门额度池划拨" />
 
-      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-          <p className="mb-3.5 text-[12.5px] font-semibold text-foreground">新建申请</p>
-          <div className="flex max-w-[360px] flex-col gap-3.5">
-            <div>
-              <Label className="mb-1.5 text-xs">申请模型</Label>
-              <Select value={modelId} onValueChange={setModelId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="选择模型…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(models ?? []).map((m) => (
-                    <SelectItem key={m.ID} value={m.ID}>
-                      {m.Name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="mb-1.5 text-xs">申请额度（¥）</Label>
-              <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
-            </div>
-            <div>
-              <Label className="mb-1.5 text-xs">用途说明</Label>
-              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="简要说明用途…" />
-            </div>
-            <Button disabled={submitting || !amount} className="self-start" onClick={() => void submit()}>
-              提交申请
-            </Button>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-          <p className="mb-3.5 text-[12.5px] font-semibold text-foreground">我的申请记录</p>
-          <div className="flex flex-col">
-            {(mine ?? []).map((q) => (
-              <div key={q.ID} className="flex items-center justify-between border-t border-border py-2 text-xs first:border-t-0">
-                <span className="text-foreground">
-                  {formatCents(q.AmountCents)} · {modelName(q.ModelID)}
-                </span>
-                <StatusPill tone={statusTone[q.Status]}>{statusLabel[q.Status]}</StatusPill>
+      <div className="cn-docs">
+        <Card title="发起申请" flush={false}>
+          <div className="cn-form">
+            <div className="cn-form-row">
+              <label className="cn-form-label">当前额度</label>
+              <div className="cn-quota-bar">
+                <i
+                  style={{
+                    width: `${Math.min(100, rate)}%`,
+                    background: rate > 75 ? "var(--warn)" : "var(--brand)",
+                  }}
+                />
               </div>
-            ))}
-            {(mine ?? []).length === 0 && <p className="py-2 text-xs text-muted-foreground">还没有申请记录</p>}
+              <div className="cn-input-hint">
+                {quota > 0
+                  ? `已用 ${fmt(used)} / ${fmt(quota)} · 剩余 ${fmt(Math.max(0, quota - used))}`
+                  : "你名下还没有生效中的 Key"}
+              </div>
+            </div>
+
+            <div className="cn-form-row">
+              <label className="cn-form-label" htmlFor="req-amount">
+                申请金额 <span>必填</span>
+              </label>
+              <input
+                id="req-amount"
+                className="cn-input"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="2000"
+              />
+              <div className="cn-input-hint">单位为元。超过部门额度池剩余的申请，审批人会看到透支提示。</div>
+            </div>
+
+            <div className="cn-form-row">
+              <label className="cn-form-label" htmlFor="req-reason">
+                申请事由 <span>必填</span>
+              </label>
+              <textarea
+                id="req-reason"
+                className="cn-input"
+                rows={4}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="多模态评测集需要额外额度，预计跑 3 轮，每轮约 60 万 token。"
+              />
+              <div className="cn-input-hint">写清用途和预估量，审批会更快。</div>
+            </div>
+
+            <div className="cn-form-row">
+              <label className="cn-form-label">审批人</label>
+              <div className="cn-static">
+                <Icon name="users" size={14} />
+                {departmentName ? `${departmentName} 负责人` : "部门负责人"}
+                <span style={{ marginLeft: "auto", color: "var(--ink-3)", fontSize: 11.5 }}>由部门归属决定</span>
+              </div>
+            </div>
+
+            <div className="cn-form-foot">
+              <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+                <Icon name="send" size={14} />
+                {busy ? "提交中…" : "提交申请"}
+              </button>
+            </div>
           </div>
-        </div>
+        </Card>
+
+        <Card title="我的申请记录" note={`${(requests.data ?? []).length} 条`}>
+          {(requests.data ?? []).length === 0 ? (
+            <Empty icon="inbox" title="还没有申请记录" desc="额度不够时在左边提一单，通过后立即生效。" />
+          ) : (
+            <div className="cn-todo">
+              {(requests.data ?? []).map((r) => {
+                const st = STATUS[r.Status] ?? STATUS.pending
+                return (
+                  <div key={r.ID} className="cn-todo-item">
+                    <div className="cn-todo-top">
+                      <span className="cn-todo-title" style={{ fontFamily: "var(--mono)", fontSize: 13.5 }}>
+                        {fmt(r.AmountCents)}
+                      </span>
+                      <Tag tone={st.tone}>{st.label}</Tag>
+                      <span className="cn-todo-time">{formatAgo(r.CreatedAt)}</span>
+                    </div>
+                    <p className="cn-todo-desc">{r.Reason || "未填写事由。"}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
       </div>
-
-      {canReview && (
-        <div className="rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-          <p className="mb-3.5 text-[12.5px] font-semibold text-foreground">待我审批</p>
-          <div className="flex flex-col">
-            {(pending ?? []).map((q) => (
-              <div key={q.ID} className="flex items-center justify-between gap-2.5 border-t border-border py-2.5 text-xs first:border-t-0">
-                <span className="text-foreground">
-                  {formatCents(q.AmountCents)} · {modelName(q.ModelID)}
-                  {q.Reason && <span className="ml-1.5 text-muted-foreground">· {q.Reason}</span>}
-                </span>
-                <div className="flex flex-none gap-3">
-                  <button className="font-semibold text-primary" onClick={() => void decide(q.ID, true)}>
-                    通过
-                  </button>
-                  <button className="font-semibold text-muted-foreground" onClick={() => void decide(q.ID, false)}>
-                    驳回
-                  </button>
-                </div>
-              </div>
-            ))}
-            {(pending ?? []).length === 0 && <p className="py-2 text-xs text-muted-foreground">没有待审批的申请</p>}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

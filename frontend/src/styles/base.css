@@ -1,0 +1,50 @@
+/* Reset + document shell.
+   Ported from designs/fluxa-console-overview/base.css, minus the stage
+   chrome: in the real app the console fills the viewport instead of
+   sitting inside a mockup window, so `.screen` is the root element. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { margin: 0; padding: 0; height: 100%; }
+
+body {
+  background: #f4f6fa;
+  color: #16233a;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+    "Noto Sans SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+:root {
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+input, textarea, select { font: inherit; color: inherit; }
+table { border-collapse: collapse; }
+a { color: inherit; text-decoration: none; }
+
+/* The console root fills the window and owns its own scrolling. */
+.screen {
+  height: 100%;
+  display: flex;
+  min-height: 0;
+  font-family: inherit;
+}
+
+/* No stock macOS scrollbars anywhere inside the app. */
+.screen ::-webkit-scrollbar { width: 10px; height: 10px; }
+.screen ::-webkit-scrollbar-thumb {
+  background: currentColor;
+  opacity: .12;
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.screen ::-webkit-scrollbar-track { background: transparent; }
+
+/* Numeric text is tabular everywhere -- money columns must not jitter. */
+.tnum { font-variant-numeric: tabular-nums; }

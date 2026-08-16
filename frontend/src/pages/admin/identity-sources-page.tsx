@@ -1,136 +1,165 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { PageHeader } from "@/components/shared/page-header"
-import { StatusPill } from "@/components/shared/status-pill"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Icon } from "@/components/console/icon"
+import { Brand } from "@/components/console/brand"
+import { Card, Field, Modal, PageHead, Switch, Tag } from "@/components/console/ui"
 import { api } from "@/lib/api"
 import type { AuthSettings, IdentityConfig } from "@/lib/types"
-import { FeishuIcon, DingTalkIcon } from "@/components/shared/brand-icons"
-import type { IconProps } from "@/components/shared/brand-icons"
-import type { ComponentType } from "react"
 
-// WeCom has no real icon wired up yet -- no clean, redistributable
-// source was found (not in Simple Icons or lobe-icons, no official
-// Linux app package to pull from the way Feishu and DingTalk's were).
-// It stays on the letter avatar until a real asset turns up.
-const providers: { key: string; label: string; letter: string; icon?: ComponentType<IconProps> }[] = [
-  { key: "feishu", label: "飞书", letter: "飞", icon: FeishuIcon },
-  { key: "wecom", label: "企业微信", letter: "企" },
-  { key: "dingtalk", label: "钉钉", letter: "钉", icon: DingTalkIcon },
+// 身份源 -- the pluggable-adapter card variant, shared with the notify
+// channel page. OAuth credentials live in the database, not in a config
+// file, so they can be rotated without a redeploy.
+//
+// Only Feishu has a login route behind it today (internal/user/identity).
+// WeCom and DingTalk are drawn because the design does, but their config
+// buttons stay disabled rather than storing credentials nothing reads.
+const SOURCES = [
+  { key: "feishu", name: "飞书", implemented: true },
+  { key: "wecom", name: "企业微信", implemented: false },
+  { key: "dingtalk", name: "钉钉", implemented: false },
 ]
 
-function IdentityCard({
-  providerKey,
-  label,
-  letter,
-  icon: Icon,
-}: {
-  providerKey: string
-  label: string
-  letter: string
-  icon?: ComponentType<IconProps>
-}) {
-  const [config, setConfig] = useState<IdentityConfig | null>(null)
-  const [open, setOpen] = useState(false)
-  const [appId, setAppId] = useState("")
-  const [appSecret, setAppSecret] = useState("")
-  const [callbackPath, setCallbackPath] = useState(`/api/auth/${providerKey}/callback`)
-
-  const load = () => {
-    api.get<IdentityConfig>(`/api/identity-configs/${providerKey}`).then(setConfig)
-  }
-  useEffect(load, [providerKey])
-
-  const save = async (enabled: boolean) => {
-    try {
-      await api.put(`/api/identity-configs/${providerKey}`, {
-        AppID: appId,
-        AppSecret: appSecret,
-        CallbackPath: callbackPath,
-        Enabled: enabled,
-      })
-      setOpen(false)
-      load()
-      toast.success("已保存")
-    } catch {
-      toast.error("保存失败")
-    }
-  }
-
+export function IdentitySourcesPage() {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2.5">
-          {Icon ? (
-            <span className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-card ring-1 ring-inset ring-border">
-              <Icon className="size-5" />
-            </span>
-          ) : (
-            <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-[12.5px] font-bold text-accent-foreground">
-              {letter}
-            </span>
-          )}
-          <span className="text-[13px] font-semibold text-foreground">{label}</span>
-        </span>
-        <StatusPill tone={config?.Enabled ? "ok" : "warn"}>{config?.Enabled ? "已启用" : "未配置"}</StatusPill>
+    <div className="cn-page">
+      <PageHead title="身份源" sub="OAuth 凭证填在这里，不写死在配置文件；回调地址需要在对应平台后台登记" />
+
+      <div className="cn-grid cn-grid-auto">
+        {SOURCES.map((s) => (
+          <IdentityCard key={s.key} sourceKey={s.key} name={s.name} implemented={s.implemented} />
+        ))}
       </div>
-      <div className="flex flex-col gap-1.5">
-        <Row k="App ID" v={config?.AppID || "—"} />
-        <Row k="回调地址" v={config?.CallbackPath || callbackPath} />
-      </div>
-      <div className="flex justify-end">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <Button variant="link" className="h-auto p-0 text-[11.5px]" onClick={() => setOpen(true)}>
-            {config?.Enabled ? "编辑" : "配置"}
-          </Button>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>配置{label}</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-3.5">
-              <div>
-                <Label className="mb-1.5 text-xs">App ID</Label>
-                <Input value={appId} onChange={(e) => setAppId(e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 text-xs">App Secret</Label>
-                <Input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} type="password" />
-              </div>
-              <div>
-                <Label className="mb-1.5 text-xs">回调路径</Label>
-                <Input value={callbackPath} onChange={(e) => setCallbackPath(e.target.value)} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => void save(false)}>
-                保存草稿
-              </Button>
-              <Button disabled={!appId || !appSecret} onClick={() => void save(true)}>
-                保存并启用
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+
+      <LocalAccountCard />
     </div>
   )
 }
 
-function Row({ k, v }: { k: string; v: string }) {
+function IdentityCard({
+  sourceKey,
+  name,
+  implemented,
+}: {
+  sourceKey: string
+  name: string
+  implemented: boolean
+}) {
+  const [config, setConfig] = useState<IdentityConfig | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [appId, setAppId] = useState("")
+  const [appSecret, setAppSecret] = useState("")
+  const [callback, setCallback] = useState(`/api/auth/${sourceKey}/callback`)
+  const [busy, setBusy] = useState(false)
+
+  const load = () => {
+    api
+      .get<IdentityConfig>(`/api/identity-configs/${sourceKey}`)
+      .then((c) => {
+        setConfig(c)
+        if (c?.AppID) setAppId(c.AppID)
+        if (c?.CallbackPath) setCallback(c.CallbackPath)
+      })
+      .catch(() => setConfig(null))
+  }
+  useEffect(load, [sourceKey])
+
+  const save = async (enabled: boolean, secret = appSecret) => {
+    setBusy(true)
+    try {
+      await api.put(`/api/identity-configs/${sourceKey}`, {
+        AppID: appId,
+        AppSecret: secret,
+        CallbackPath: callback,
+        Enabled: enabled,
+      })
+      setEditing(false)
+      setAppSecret("")
+      load()
+      toast.success("已保存")
+    } catch {
+      toast.error("保存失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const configured = !!config?.AppID
+
   return (
-    <div className="flex justify-between gap-2.5 text-[11.5px]">
-      <span className="text-muted-foreground">{k}</span>
-      <span className="truncate font-mono text-foreground">{v}</span>
+    <div className="cn-card cn-span-2">
+      <div className="cn-cfg-card">
+        <span className="cn-cfg-logo">
+          {sourceKey === "wecom" ? (
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-3)" }}>企</span>
+          ) : (
+            <Brand kind={sourceKey} size={20} />
+          )}
+        </span>
+        <div className="cn-cfg-main">
+          <div className="cn-cfg-name">
+            {name}
+            {!implemented ? (
+              <Tag tone="warn">待实现</Tag>
+            ) : config?.Enabled ? (
+              <Tag tone="ok">已启用</Tag>
+            ) : configured ? (
+              <Tag tone="warn">已配置 · 未启用</Tag>
+            ) : (
+              <Tag tone="warn">未配置</Tag>
+            )}
+          </div>
+          <div className="cn-cfg-sub">
+            {config?.AppID || "App ID 未填写"} · {config?.CallbackPath || callback}
+          </div>
+        </div>
+        <div className="cn-cfg-acts">
+          <button className="cn-btn" disabled={!implemented} onClick={() => setEditing(true)}>
+            <Icon name="edit" size={14} />
+            配置
+          </button>
+          <Switch
+            on={!!config?.Enabled}
+            label={`启用${name}登录`}
+            disabled={!implemented || !configured}
+            onToggle={() => void save(!config?.Enabled, "")}
+          />
+        </div>
+      </div>
+
+      <Modal
+        open={editing}
+        title={`配置${name}`}
+        sub="App Secret 保存后只回显掩码，更换需要重新填写完整值"
+        onClose={() => setEditing(false)}
+        footer={
+          <>
+            <button className="cn-btn" disabled={busy} onClick={() => void save(false)}>
+              保存但不启用
+            </button>
+            <button className="cn-btn cn-btn-pri" disabled={busy || !appId || !appSecret} onClick={() => void save(true)}>
+              保存并启用
+            </button>
+          </>
+        }
+      >
+        <div className="cn-form">
+          <Field label="App ID" optional="必填">
+            <input className="cn-input" value={appId} onChange={(e) => setAppId(e.target.value)} />
+          </Field>
+          <Field label="App Secret" optional="必填" hint="只写不读：保存后无法再取回明文。">
+            <input
+              className="cn-input"
+              type="password"
+              value={appSecret}
+              onChange={(e) => setAppSecret(e.target.value)}
+              placeholder={configured ? "已保存，留空表示不修改" : ""}
+            />
+          </Field>
+          <Field label="回调路径" hint={`需要在${name}开放平台后台登记同样的地址。`}>
+            <input className="cn-input" value={callback} onChange={(e) => setCallback(e.target.value)} />
+          </Field>
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -139,7 +168,7 @@ function LocalAccountCard() {
   const [settings, setSettings] = useState<AuthSettings | null>(null)
 
   const load = () => {
-    api.get<AuthSettings>("/api/auth-settings").then(setSettings)
+    api.get<AuthSettings>("/api/auth-settings").then(setSettings).catch(() => setSettings(null))
   }
   useEffect(load, [])
 
@@ -147,45 +176,52 @@ function LocalAccountCard() {
     if (!settings) return
     const next = { ...settings, ...patch }
     setSettings(next)
-    await api.put("/api/auth-settings", next)
+    try {
+      await api.put("/api/auth-settings", next)
+    } catch {
+      toast.error("保存失败")
+      load()
+    }
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-[12.5px] font-bold text-accent-foreground">兜</span>
-          <span className="text-[13px] font-semibold text-foreground">本地账号兜底</span>
+    <Card title="本地账号" note="没有统一 IM 的兜底方案">
+      <div className="cn-cfg-card">
+        <span className="cn-cfg-logo">
+          <Icon name="smartphone" size={18} />
         </span>
-        <StatusPill tone={settings?.LocalAccountEnabled ? "ok" : "warn"}>
-          {settings?.LocalAccountEnabled ? "已启用" : "已关闭"}
-        </StatusPill>
+        <div className="cn-cfg-main">
+          <div className="cn-cfg-name">开放自注册</div>
+          <div className="cn-cfg-sub" style={{ fontFamily: "inherit" }}>
+            允许用手机号 / 邮箱注册，验证码从「短信 / 邮件配置」的通道发出
+          </div>
+        </div>
+        <div className="cn-cfg-acts">
+          <Switch
+            on={!!settings?.LocalAccountEnabled}
+            label="开放自注册"
+            onToggle={() => void update({ LocalAccountEnabled: !settings?.LocalAccountEnabled })}
+          />
+        </div>
       </div>
-      <div className="flex items-center justify-between text-[12.5px] text-foreground">
-        启用本地账号注册/登录
-        <Switch checked={settings?.LocalAccountEnabled ?? false} onCheckedChange={(v) => void update({ LocalAccountEnabled: v })} />
+      <div className="cn-cfg-card" style={{ borderTop: "1px solid var(--line-2)" }}>
+        <span className="cn-cfg-logo">
+          <Icon name="shield-check" size={18} />
+        </span>
+        <div className="cn-cfg-main">
+          <div className="cn-cfg-name">注册后需管理员审批</div>
+          <div className="cn-cfg-sub" style={{ fontFamily: "inherit" }}>
+            关闭后自注册账号立即可用，不再进入待审核队列
+          </div>
+        </div>
+        <div className="cn-cfg-acts">
+          <Switch
+            on={!!settings?.LocalAccountRequiresApproval}
+            label="注册后需管理员审批"
+            onToggle={() => void update({ LocalAccountRequiresApproval: !settings?.LocalAccountRequiresApproval })}
+          />
+        </div>
       </div>
-      <div className="flex items-center justify-between text-[12.5px] text-foreground">
-        注册后需管理员审批
-        <Switch
-          checked={settings?.LocalAccountRequiresApproval ?? true}
-          onCheckedChange={(v) => void update({ LocalAccountRequiresApproval: v })}
-        />
-      </div>
-    </div>
-  )
-}
-
-export function IdentitySourcesPage() {
-  return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="身份源" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {providers.map((p) => (
-          <IdentityCard key={p.key} providerKey={p.key} label={p.label} letter={p.letter} icon={p.icon} />
-        ))}
-        <LocalAccountCard />
-      </div>
-    </div>
+    </Card>
   )
 }

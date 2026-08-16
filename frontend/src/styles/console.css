@@ -1,0 +1,775 @@
+/* 方向 C — 数据运营台（Stripe / 企业控制台）
+   规则：内容区不是白底而是冷灰底，白卡片靠柔和阴影浮起来；正文用深海军
+   蓝而不是纯黑（长时间阅读更轻）。最大的结构主张是右侧多一条 300px 的
+   「待办栏」——熔断、超预算、待审批这些要人动手的东西不该藏在卡片里排队，
+   它们是管理员打开首页的真正理由。 */
+
+.cn {
+  position: relative;   /* 抽屉和遮罩相对这一层定位 */
+  --bg: #f4f6fa;
+  --panel: #fff;
+  --ink: #16233a;
+  --ink-2: #57647a;
+  --ink-3: #8b97ab;
+  --line: #e5e9f0;
+  --line-2: #eef1f6;
+  --brand: #2f5fea;
+  --brand-soft: #ebefff;
+  --ok: #12805c;
+  --ok-soft: #e3f5ee;
+  --warn: #9a5e23;
+  --warn-soft: #fdf0dd;
+  --bad: #c0392f;
+  --bad-soft: #fdeae8;
+  --shadow: 0 1px 2px rgba(22,35,58,.05), 0 4px 14px -6px rgba(22,35,58,.10);
+
+  background: var(--bg);
+  color: var(--ink);
+  letter-spacing: -0.004em;
+}
+
+/* ---- sidebar -------------------------------------------------------- */
+
+.cn-side {
+  width: 232px; flex: none; display: flex; flex-direction: column;
+  background: var(--panel); border-right: 1px solid var(--line); padding: 14px 10px 10px;
+  transition: width .18s ease, padding .18s ease;
+}
+.cn-brand { display: flex; align-items: center; gap: 9px; padding: 0 6px 14px; }
+.cn-brand-name { font-size: 15px; font-weight: 650; letter-spacing: -0.02em; }
+.cn-brand-sub { font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+
+.cn-side-toggle {
+  margin-left: auto; width: 26px; height: 26px; border-radius: 7px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--ink-3);
+}
+.cn-side-toggle:hover { background: #f2f5fa; color: var(--ink); }
+
+/* ---- 收起态：60px 图标栏 -------------------------------------------- */
+/* 只改容器宽度和标签可见性，导航项本身还是同一套组件和状态色。
+   收起后分组标签没地方放，改用一条 hairline 保留分组边界；角标退化成
+   一个 7px 圆点，仍然能看出「安全事件有未读」。 */
+
+.cn[data-side="collapsed"] .cn-side { width: 60px; padding-left: 8px; padding-right: 8px; }
+.cn[data-side="collapsed"] .cn-brand { flex-direction: column; gap: 8px; padding: 0 0 12px; }
+.cn[data-side="collapsed"] .cn-brand-text { display: none; }
+.cn[data-side="collapsed"] .cn-side-toggle { margin-left: 0; }
+
+.cn[data-side="collapsed"] .cn-nav { overflow: visible; gap: 10px; }
+.cn[data-side="collapsed"] .cn-group-label { display: none; }
+.cn[data-side="collapsed"] .cn-nav > div + div { border-top: 1px solid var(--line-2); padding-top: 10px; }
+
+.cn[data-side="collapsed"] .cn-item { justify-content: center; padding: 0; height: 36px; position: relative; }
+.cn[data-side="collapsed"] .cn-item-label { display: none; }
+.cn[data-side="collapsed"] .cn-badge {
+  position: absolute; top: 4px; right: 7px; min-width: 0; width: 7px; height: 7px;
+  padding: 0; font-size: 0; box-shadow: 0 0 0 2px var(--panel);
+}
+/* 收起后必须靠 tooltip 才认得出图标，所以它是这个形态的必要件，不是装饰 */
+.cn[data-side="collapsed"] .cn-item::after {
+  content: attr(data-label); position: absolute; left: calc(100% + 10px); top: 50%;
+  transform: translateY(-50%); z-index: 20; white-space: nowrap;
+  background: var(--ink); color: #fff; font-size: 11.5px; font-weight: 520;
+  padding: 5px 9px; border-radius: 6px;
+  opacity: 0; pointer-events: none; transition: opacity .12s;
+}
+.cn[data-side="collapsed"] .cn-item:hover::after { opacity: 1; }
+
+.cn[data-side="collapsed"] .cn-side-foot { justify-content: center; padding: 10px 0 2px; }
+.cn[data-side="collapsed"] .cn-side-foot-text,
+.cn[data-side="collapsed"] .cn-side-foot > svg { display: none; }
+
+.cn-nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.cn-group-label { padding: 0 8px 6px; font-size: 10.5px; font-weight: 620; color: var(--ink-3); letter-spacing: .05em; }
+.cn-items { display: flex; flex-direction: column; gap: 2px; }
+.cn-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  height: 33px; padding: 0 9px; border-radius: 7px;
+  font-size: 13px; color: var(--ink-2); text-align: left;
+}
+.cn-item:hover { background: #f5f7fb; color: var(--ink); }
+.cn-item-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cn-item[data-on="true"] { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+.cn-badge {
+  margin-left: auto; min-width: 18px; height: 17px; padding: 0 5px; border-radius: 999px;
+  background: var(--bad); color: #fff; font-size: 10px; font-weight: 650;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.cn-side-foot {
+  margin-top: 8px; padding: 10px 8px 2px; border-top: 1px solid var(--line-2);
+  display: flex; align-items: center; gap: 9px;
+}
+.cn-av {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  background: var(--brand-soft); color: var(--brand);
+  font-size: 12px; font-weight: 650;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(47,95,234,.16);
+}
+
+/* ---- top bar -------------------------------------------------------- */
+
+.cn-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cn-top {
+  flex: none; height: 56px; display: flex; align-items: center; gap: 12px;
+  padding: 0 20px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.cn-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); }
+.cn-crumb b { color: var(--ink); font-weight: 600; }
+
+.cn-search {
+  margin-left: 8px; display: flex; align-items: center; gap: 8px;
+  width: 260px; height: 34px; padding: 0 10px;
+  border-radius: 8px; background: #f4f6fa; border: 1px solid transparent;
+  color: var(--ink-3); font-size: 12.5px;
+}
+.cn-search:hover { border-color: var(--line); background: #fff; }
+
+.cn-top-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.cn-ghost {
+  width: 34px; height: 34px; border-radius: 8px; position: relative;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2);
+}
+.cn-ghost:hover { background: #f4f6fa; color: var(--ink); }
+.cn-idchip {
+  display: inline-flex; align-items: center; gap: 8px; height: 34px;
+  padding: 0 10px 0 6px; border-radius: 999px; border: 1px solid var(--line);
+  font-size: 12px; color: var(--ink-2);
+}
+.cn-idchip:hover { border-color: #d3dae6; background: #fbfcfe; }
+
+/* ---- content + right rail ------------------------------------------- */
+
+.cn-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+/* 页面容器统一走 pages.css 的 .cn-page */
+
+.cn-head { display: flex; align-items: flex-end; gap: 14px; }
+.cn-h1 { margin: 0; font-size: 22px; font-weight: 660; letter-spacing: -0.028em; }
+.cn-h1-sub { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.cn-head-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.cn-seg { display: flex; background: #eaeef4; padding: 3px; border-radius: 8px; }
+.cn-seg button { height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 560; color: var(--ink-2); }
+.cn-seg button[data-on="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(22,35,58,.10); }
+
+.cn-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 13px;
+  border-radius: 8px; border: 1px solid var(--line); background: #fff;
+  font-size: 12.5px; font-weight: 560; box-shadow: 0 1px 1px rgba(22,35,58,.04);
+}
+.cn-btn:hover { border-color: #d3dae6; }
+.cn-btn-pri { background: var(--brand); border-color: var(--brand); color: #fff; }
+.cn-btn-pri:hover { background: #2750cf; border-color: #2750cf; }
+
+/* ---- cards ---------------------------------------------------------- */
+
+.cn-card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 11px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+}
+.cn-card-head {
+  display: flex; align-items: center; gap: 10px; padding: 13px 15px 12px;
+  border-bottom: 1px solid var(--line-2);
+}
+.cn-card-title { font-size: 13.5px; font-weight: 620; letter-spacing: -0.012em; }
+.cn-card-note { font-size: 11.5px; color: var(--ink-3); }
+.cn-card-link { margin-left: auto; font-size: 12px; font-weight: 560; color: var(--brand); display: inline-flex; align-items: center; gap: 3px; }
+.cn-card-link:hover { text-decoration: underline; }
+.cn-card-body { padding: 15px; }
+.cn-flush { padding: 0; }
+
+/* ---- KPI ------------------------------------------------------------ */
+
+.cn-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.cn-kpi {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+  box-shadow: var(--shadow); padding: 14px 15px 12px; position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.cn-kpi-label { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); font-weight: 540; }
+.cn-kpi-ico {
+  width: 22px; height: 22px; border-radius: 6px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--brand-soft); color: var(--brand);
+}
+.cn-kpi-ico[data-t="ok"] { background: var(--ok-soft); color: var(--ok); }
+.cn-kpi-ico[data-t="warn"] { background: var(--warn-soft); color: var(--warn); }
+.cn-kpi-ico[data-t="bad"] { background: var(--bad-soft); color: var(--bad); }
+.cn-kpi-val {
+  margin-top: 10px; font-size: 25px; font-weight: 660; letter-spacing: -0.034em;
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.cn-kpi-val small { font-size: 14px; font-weight: 560; color: var(--ink-3); }
+.cn-kpi-foot { margin-top: 8px; font-size: 11.5px; color: var(--ink-3); display: flex; align-items: center; gap: 6px; }
+.cn-up { color: var(--ok); font-weight: 620; display: inline-flex; align-items: center; gap: 2px; }
+.cn-down { color: var(--bad); font-weight: 620; display: inline-flex; align-items: center; gap: 2px; }
+.cn-kpi-spark { position: absolute; right: 0; bottom: 0; width: 96px; height: 40px; opacity: .55; }
+.cn-kpi-meter { margin-top: 9px; height: 5px; border-radius: 5px; background: #eaeef4; overflow: hidden; }
+.cn-kpi-meter i { display: block; height: 100%; border-radius: 5px; background: var(--brand); }
+
+/* ---- chart ---------------------------------------------------------- */
+
+/* 所有行共用同一套 4 栏网格，卡片用 span 决定占几栏：
+     KPI 行     1 / 1 / 1 / 1
+     图表行     2 / 1 / 1
+     预览行     2 / 2
+   竖向分界线因此是「构造出来的」而不是「算出来的」。之前三行各写各的
+   比例（repeat(4,1fr) / 2fr 1fr 1fr / 1fr 1fr），三栏那行多一个 14px
+   gap，算出来的分界线比上下行差 7px 和 3px —— 差一点比差很多更显眼。 */
+.cn-kpis, .cn-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.cn-span-2 { grid-column: span 2; }
+/* 配置类卡片（身份源 / 发信通道 / 审批通道）互相独立，不是同排对比，
+   高度按各自内容收，不然内容少的那张会被拉出一块空洞。 */
+.cn-grid-auto { align-items: start; }
+
+/* 半宽表格。这两张是快速预览而不是查数的地方，全宽只会把列间距拉开、
+   显得空。压到一半后要相应收紧：左右内边距 15→12，进度条 62→46，
+   所有单元格 nowrap（半宽下换行比截断更难看，宁可让内容决定列宽）。 */
+.cn-preview .cn-card-head { padding: 12px 13px 11px; }
+.cn-preview .cn-table th { padding: 8px 10px; white-space: nowrap; }
+.cn-preview .cn-table td { padding: 9px 10px; white-space: nowrap; }
+.cn-preview .cn-usage-track { width: 46px; }
+.cn-preview .cn-usage { gap: 7px; }
+
+/* 1440 下 6 列放得开，1280 下「实时调用」的表格会撑到 500px、超出 468px
+   的卡片把状态列裁掉。所以每张表标一个「窄了就让位」的列：预览要保住的
+   是「在跑什么、正不正常」（时间/模型/耗时/费用/状态），归属信息（成员、
+   人数）最先让位。按卡片自身宽度判断，不看视口。 */
+/* 断点按卡片自身宽度判断，不看视口 —— 侧边栏收起、卡片换栏位，它自己
+   会算对。两条规则各自只命中一种卡里才有的元素，不会串。 */
+.cn-grid > .cn-card { container-type: inline-size; container-name: card; }
+
+@container card (max-width: 520px) {
+  .cn-col-optional { display: none; }
+}
+/* 1280 下构成卡掉到 ~230px，6 个供应商名里 5 个会截断——这时先让百分比
+   列走：卡片顶部那条堆叠条已经把占比画出来了，数字是第二遍表达；
+   供应商名字截断则是真的信息丢失。 */
+@container card (max-width: 250px) {
+  .cn-share-pct { display: none; }
+}
+
+/* ---- 抽屉 ------------------------------------------------------------ */
+/* 无界列表的正确容器：可滚动、可筛选、盖在页面上而不挤压布局。
+   汇总条和铃铛角标都指向它。 */
+
+.cn-scrim {
+  position: absolute; inset: 0; z-index: 40;
+  background: rgba(16, 24, 40, .30); animation: cnFade .16s ease;
+}
+.cn-drawer {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 424px; z-index: 41;
+  background: var(--panel); border-left: 1px solid var(--line);
+  box-shadow: -14px 0 40px -18px rgba(22, 35, 58, .34);
+  display: flex; flex-direction: column; animation: cnSlide .18s ease;
+}
+@keyframes cnFade { from { opacity: 0; } }
+@keyframes cnSlide { from { transform: translateX(28px); opacity: .3; } }
+
+.cn-drawer-head {
+  display: flex; align-items: center; gap: 9px; flex: none;
+  padding: 15px 16px 13px; border-bottom: 1px solid var(--line-2);
+}
+.cn-drawer-title { font-size: 14.5px; font-weight: 660; letter-spacing: -0.022em; }
+.cn-rail-count {
+  min-width: 18px; height: 17px; padding: 0 5px; border-radius: 999px; flex: none;
+  background: var(--ink); color: #fff; font-size: 10px; font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cn-drawer-close {
+  margin-left: auto; width: 28px; height: 28px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--ink-3);
+}
+.cn-drawer-close:hover { background: #f2f5fa; color: var(--ink); }
+
+.cn-drawer-filters {
+  display: flex; gap: 6px; flex: none; padding: 11px 16px;
+  border-bottom: 1px solid var(--line-2); overflow-x: auto;
+}
+.cn-chip {
+  height: 26px; padding: 0 10px; border-radius: 999px; flex: none;
+  border: 1px solid var(--line); background: #fff;
+  font-size: 11.5px; font-weight: 560; color: var(--ink-2); white-space: nowrap;
+}
+.cn-chip:hover { border-color: #d3dae6; }
+.cn-chip[data-on="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.cn-chip span { opacity: .55; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+.cn-drawer-list { flex: 1; min-height: 0; overflow-y: auto; }
+.cn-drawer-empty { padding: 48px 24px; text-align: center; color: var(--ink-3); font-size: 12.5px; }
+.cn-drawer-empty b { display: block; color: var(--ink-2); font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+
+.cn-bell-badge {
+  position: absolute; top: 2px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; background: var(--bad); color: #fff;
+  font-size: 9.5px; font-weight: 680; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+.cn-chart-top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.cn-chart-big { font-size: 24px; font-weight: 660; letter-spacing: -0.034em; font-variant-numeric: tabular-nums; }
+.cn-legend { margin-left: auto; display: flex; gap: 14px; font-size: 11.5px; color: var(--ink-2); }
+.cn-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cn-legend i { width: 9px; height: 3px; border-radius: 2px; background: var(--brand); }
+.cn-legend i.prev { background: #c3cbd8; }
+.cn-plot { display: grid; grid-template-columns: 42px 1fr; gap: 0 8px; }
+.cn-yaxis { display: flex; flex-direction: column; justify-content: space-between; font-size: 10.5px; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; height: 172px; }
+.cn-xaxis { grid-column: 2; display: flex; justify-content: space-between; margin-top: 7px; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* ---- stacked share bar ---------------------------------------------- */
+
+.cn-stack { display: flex; height: 12px; border-radius: 999px; overflow: hidden; gap: 2px; margin-bottom: 14px; }
+.cn-stack i { display: block; height: 100%; }
+.cn-share { display: flex; flex-direction: column; gap: 2px; }
+.cn-share-row {
+  display: flex; align-items: center; gap: 6px; padding: 7px 0;
+  border-top: 1px solid var(--line-2); font-size: 12.5px;
+}
+.cn-share-row:first-child { border-top: 0; }
+.cn-swatch { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.cn-share-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px; }
+.cn-share-name span { overflow: hidden; text-overflow: ellipsis; }
+.cn-share-pct { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--ink-3); width: 37px; text-align: right; flex: none; }
+/* 四分之一宽下放不进 ¥27,649.00，改走紧凑单位；整列共用一个量级，
+   不会出现 ¥6.8万 和 ¥7,719 混排。列宽和上面两个 gap 都是量着最长的
+   「Azure OpenAI 东亚」（108px）定的，目前留 5px 余量 —— 供应商名字
+   是这张卡的主语，宁可挤右边两列也不能让它带省略号。 */
+.cn-share-val { font-variant-numeric: tabular-nums; font-weight: 560; width: 44px; text-align: right; flex: none; }
+
+/* ---- tables --------------------------------------------------------- */
+
+.cn-table { width: 100%; font-size: 12.5px; }
+.cn-table th {
+  text-align: left; font-size: 11px; font-weight: 620; color: var(--ink-3);
+  padding: 9px 15px; background: #fafbfd; border-bottom: 1px solid var(--line-2);
+  letter-spacing: .02em;
+}
+.cn-table td { padding: 10px 15px; border-bottom: 1px solid var(--line-2); }
+.cn-table tr:last-child td { border-bottom: 0; }
+.cn-table tbody tr:hover { background: #fafbfd; }
+/* th 的 text-align:left 权重是 (0,1,1)，会盖过裸 .cn-r 的 (0,1,0) ——
+   数值列右对齐、表头却贴在左边。必须写成 th.cn-r 才压得住。 */
+.cn-r, .cn-table th.cn-r { text-align: right; }
+.cn-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11.5px; }
+
+.cn-tag {
+  display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px;
+  border-radius: 999px; font-size: 10.5px; font-weight: 620;
+}
+.cn-tag i { width: 5px; height: 5px; border-radius: 50%; }
+.cn-tag[data-t="ok"] { background: var(--ok-soft); color: var(--ok); }
+.cn-tag[data-t="ok"] i { background: var(--ok); }
+.cn-tag[data-t="warn"] { background: var(--warn-soft); color: var(--warn); }
+.cn-tag[data-t="warn"] i { background: var(--warn); }
+.cn-tag[data-t="bad"] { background: var(--bad-soft); color: var(--bad); }
+.cn-tag[data-t="bad"] i { background: var(--bad); }
+
+.cn-usage { display: flex; align-items: center; gap: 8px; }
+.cn-usage-track { width: 62px; height: 5px; border-radius: 5px; background: #eaeef4; overflow: hidden; flex: none; }
+.cn-usage-track i { display: block; height: 100%; border-radius: 5px; background: var(--brand); }
+.cn-usage-track i[data-over="true"] { background: var(--warn); }
+
+/* ---- 待办条目（抽屉内复用） ------------------------------------------ */
+
+.cn-todo { display: flex; flex-direction: column; }
+.cn-todo-item { padding: 12px 14px; border-top: 1px solid var(--line-2); }
+.cn-todo-item:first-child { border-top: 0; }
+.cn-todo-top { display: flex; align-items: center; gap: 8px; }
+.cn-todo-ico {
+  width: 26px; height: 26px; border-radius: 7px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cn-todo-ico[data-t="bad"] { background: var(--bad-soft); color: var(--bad); }
+.cn-todo-ico[data-t="warn"] { background: var(--warn-soft); color: var(--warn); }
+.cn-todo-ico[data-t="brand"] { background: var(--brand-soft); color: var(--brand); }
+.cn-todo-title { font-size: 12.5px; font-weight: 600; }
+.cn-todo-time { margin-left: auto; font-size: 10.5px; color: var(--ink-3); }
+.cn-todo-desc { margin: 7px 0 0; font-size: 12px; line-height: 1.6; color: var(--ink-2); text-wrap: pretty; }
+.cn-todo-acts { display: flex; gap: 6px; margin-top: 10px; }
+.cn-mini-btn {
+  height: 27px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line);
+  font-size: 11.5px; font-weight: 570; background: #fff;
+}
+.cn-mini-btn:hover { border-color: #d3dae6; background: #fbfcfe; }
+.cn-mini-pri { background: var(--ink); border-color: var(--ink); color: #fff; }
+.cn-mini-pri:hover { background: #23324c; border-color: #23324c; }
+
+.cn-budget-num { font-size: 26px; font-weight: 680; letter-spacing: -0.036em; font-variant-numeric: tabular-nums; }
+.cn-budget-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; }
+.cn-gauge-wrap { display: flex; align-items: center; gap: 14px; }
+
+/* 预算的来源就是入库记录，放在同一张卡里，「还剩多少」和「哪来的」
+   一眼能对上，顺带把这张卡的高度补齐到和同排两张一致。 */
+.cn-budget-recent { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+.cn-budget-recent-label {
+  display: flex; align-items: center; font-size: 11px;
+  color: var(--ink-3); font-weight: 600; margin-bottom: 2px;
+}
+.cn-budget-recent-label a { margin-left: auto; color: var(--brand); font-weight: 560; }
+.cn-mini-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0; font-size: 12px; border-top: 1px solid var(--line-2);
+}
+.cn-mini-row:first-of-type { border-top: 0; }
+.cn-mini-date { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: none; }
+.cn-mini-name {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cn-mini-amt { font-variant-numeric: tabular-nums; font-weight: 570; flex: none; }
+
+/* ---- KPI 可操作态 ---------------------------------------------------- */
+/* 首页不设独立待办区。哪个指标出问题，哪张 KPI 卡自己长出「需处理」标和
+   一个带条数的入口，点进去是按该类型预筛过的抽屉。KPI 负责「哪儿出事、
+   多严重」，抽屉负责「全部有哪些、怎么处理」——各管一段，零额外高度。 */
+
+.cn-kpi-flag {
+  margin-left: auto; height: 18px; padding: 0 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 680; flex: none;
+  display: inline-flex; align-items: center;
+}
+.cn-kpi[data-sev="bad"] .cn-kpi-flag { background: var(--bad-soft); color: var(--bad); }
+.cn-kpi[data-sev="warn"] .cn-kpi-flag { background: var(--warn-soft); color: var(--warn); }
+.cn-kpi-action {
+  margin-top: auto; padding-top: 9px; display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 620; color: var(--brand); align-self: flex-start;
+}
+.cn-kpi-action:hover { text-decoration: underline; }
+.cn-kpi[data-sev="bad"] .cn-kpi-action { color: var(--bad); }
+.cn-kpi[data-sev="warn"] .cn-kpi-action { color: var(--warn); }
+/* 七种页型的共用构件（DESIGN.md 6.3）。
+   核心系统（色板 / 卡片 / 表格 / 表单控件）在 console.css，这里只放
+   「页型级」的骨架：筛选行、主从两栏、链式配置、表单页、对话测试页、
+   文档页、页脚。全站复用同一套，不为单个页面另开样式。 */
+
+/* ---- 页头 ------------------------------------------------------------ */
+
+.cn-page { padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.cn-page-head { display: flex; align-items: flex-end; gap: 14px; }
+.cn-page-title { margin: 0; font-size: 22px; font-weight: 660; letter-spacing: -0.028em; }
+.cn-page-sub { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.cn-page-acts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* ---- 内容区页脚（不随内容滚动） -------------------------------------- */
+
+.cn-foot {
+  flex: none; height: 38px; display: flex; align-items: center; gap: 12px;
+  padding: 0 20px; border-top: 1px solid var(--line); background: var(--panel);
+  font-size: 11.5px; color: var(--ink-3);
+}
+.cn-foot a { color: var(--ink-2); }
+.cn-foot a:hover { color: var(--brand); text-decoration: underline; }
+.cn-foot-sep { color: var(--line-2); }
+
+/* ---- 筛选行 ---------------------------------------------------------- */
+
+.cn-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cn-field {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 11px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+  font-size: 12.5px; color: var(--ink-2); box-shadow: 0 1px 1px rgba(22,35,58,.03);
+}
+.cn-field:hover { border-color: #d3dae6; }
+.cn-field-search { width: 240px; }
+.cn-field-search span { color: var(--ink-3); }
+.cn-field-select { color: var(--ink); font-weight: 520; }
+.cn-field-select svg { color: var(--ink-3); margin-left: 2px; }
+.cn-filters-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.cn-count { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* ---- 表格补充：行内操作 / 空态 --------------------------------------- */
+
+.cn-row-acts { display: flex; gap: 4px; justify-content: flex-end; }
+.cn-icon-act {
+  width: 26px; height: 26px; border-radius: 6px; color: var(--ink-3);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cn-icon-act:hover { background: #f2f5fa; color: var(--ink); }
+.cn-icon-act[data-danger="true"]:hover { background: var(--bad-soft); color: var(--bad); }
+.cn-link-act { font-size: 12px; font-weight: 560; color: var(--brand); }
+.cn-link-act:hover { text-decoration: underline; }
+
+.cn-empty { padding: 52px 24px; text-align: center; }
+.cn-empty-ico {
+  width: 40px; height: 40px; border-radius: 12px; margin: 0 auto 12px;
+  background: #f2f5fa; color: var(--ink-3);
+  display: flex; align-items: center; justify-content: center;
+}
+.cn-empty b { display: block; font-size: 13.5px; font-weight: 620; margin-bottom: 4px; }
+.cn-empty p { margin: 0 0 14px; font-size: 12.5px; color: var(--ink-3); }
+
+.cn-mono-cell { font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.cn-trunc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+
+/* ---- 开关 / 勾选 ----------------------------------------------------- */
+
+.cn-switch {
+  width: 34px; height: 20px; border-radius: 999px; flex: none; position: relative;
+  background: #d7dde8; transition: background .15s;
+}
+.cn-switch[data-on="true"] { background: var(--brand); }
+.cn-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(22,35,58,.24);
+  transition: transform .15s;
+}
+.cn-switch[data-on="true"]::after { transform: translateX(14px); }
+
+.cn-check {
+  width: 17px; height: 17px; border-radius: 5px; flex: none;
+  border: 1.5px solid #ccd4e2; background: #fff;
+  display: inline-flex; align-items: center; justify-content: center; color: #fff;
+}
+.cn-check[data-on="true"] { background: var(--brand); border-color: var(--brand); }
+.cn-check[data-locked="true"] { background: #cdd6e6; border-color: #cdd6e6; }
+
+/* ---- 两栏主从页 ------------------------------------------------------ */
+
+.cn-md { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 14px; align-items: start; }
+.cn-md-list { display: flex; flex-direction: column; }
+.cn-md-item {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 10px 14px; border-top: 1px solid var(--line-2); font-size: 13px;
+}
+.cn-md-item:first-child { border-top: 0; }
+.cn-md-item:hover { background: #fafbfd; }
+.cn-md-item[data-on="true"] { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+.cn-md-item-main { flex: 1; min-width: 0; }
+.cn-md-item-sub { font-size: 11px; color: var(--ink-3); margin-top: 2px; font-weight: 440; }
+.cn-md-item[data-on="true"] .cn-md-item-sub { color: #6f8ae0; }
+.cn-md-count { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.cn-md-item[data-on="true"] .cn-md-count { color: var(--brand); }
+
+/* 权限矩阵 */
+.cn-matrix { width: 100%; font-size: 12.5px; }
+.cn-matrix th, .cn-matrix td { padding: 9px 12px; border-bottom: 1px solid var(--line-2); }
+.cn-matrix thead th {
+  background: #fafbfd; font-size: 11px; font-weight: 620; color: var(--ink-3);
+  text-align: center; white-space: nowrap;
+}
+.cn-matrix thead th:first-child { text-align: left; }
+.cn-matrix td { text-align: center; }
+.cn-matrix td:first-child { text-align: left; }
+.cn-matrix tbody tr:hover { background: #fafbfd; }
+.cn-matrix-group td {
+  background: #f6f8fc; font-size: 11px; font-weight: 620; color: var(--ink-2);
+  letter-spacing: .03em; padding: 7px 12px;
+}
+.cn-matrix-key { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin-left: 8px; }
+.cn-matrix .cn-check { margin: 0 auto; }
+
+/* ---- 链式配置页 ------------------------------------------------------ */
+
+.cn-chain { display: flex; flex-direction: column; }
+.cn-chain-row {
+  display: flex; align-items: center; gap: 0; padding: 14px 16px;
+  border-top: 1px solid var(--line-2);
+}
+.cn-chain-row:first-child { border-top: 0; }
+.cn-chain-row:hover { background: #fafbfd; }
+.cn-chain-node {
+  border: 1px solid var(--line); border-radius: 9px; background: var(--panel);
+  padding: 8px 11px; min-width: 0; box-shadow: 0 1px 1px rgba(22,35,58,.03);
+}
+.cn-chain-node[data-t="cond"] { background: #f6f8fc; border-style: dashed; flex: 1; }
+.cn-chain-node[data-t="target"] { border-color: #c7d5fb; background: #f7f9ff; }
+.cn-chain-label { font-size: 10.5px; color: var(--ink-3); font-weight: 600; letter-spacing: .04em; }
+.cn-chain-value { margin-top: 3px; font-size: 13px; font-weight: 570; display: flex; align-items: center; gap: 6px; }
+.cn-chain-value em { font-style: normal; font-weight: 440; color: var(--ink-3); font-size: 11.5px; }
+.cn-chain-arrow { flex: none; color: #b8c2d4; padding: 0 10px; display: flex; align-items: center; }
+.cn-chain-acts { margin-left: 14px; flex: none; display: flex; gap: 4px; }
+.cn-chain-ceiling {
+  display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px;
+  border-radius: 999px; background: var(--warn-soft); color: var(--warn);
+  font-size: 10.5px; font-weight: 620; margin-left: 6px;
+}
+
+/* ---- 表单页 ---------------------------------------------------------- */
+
+.cn-form { display: flex; flex-direction: column; gap: 15px; }
+.cn-form-row { display: flex; flex-direction: column; gap: 6px; }
+.cn-form-label { font-size: 12.5px; font-weight: 570; }
+.cn-form-label span { font-weight: 440; color: var(--ink-3); margin-left: 6px; font-size: 11.5px; }
+.cn-input {
+  height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); font-size: 13px; color: var(--ink); width: 100%;
+  box-shadow: 0 1px 1px rgba(22,35,58,.03);
+}
+.cn-input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(47,95,234,.14); }
+textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: vertical; }
+.cn-input-hint { font-size: 11.5px; color: var(--ink-3); }
+.cn-form-foot { display: flex; gap: 8px; padding-top: 3px; }
+
+.cn-quota-bar { height: 6px; border-radius: 6px; background: #eaeef4; overflow: hidden; }
+.cn-quota-bar i { display: block; height: 100%; border-radius: 6px; background: var(--brand); }
+
+/* ---- 对话测试页（Playground） ---------------------------------------- */
+
+.cn-play { display: grid; grid-template-columns: minmax(0, 1fr) 296px; gap: 14px; min-height: 0; flex: 1; }
+.cn-chat { display: flex; flex-direction: column; min-height: 0; }
+.cn-chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.cn-msg { display: flex; gap: 10px; max-width: 84%; }
+.cn-msg[data-role="user"] { align-self: flex-end; flex-direction: row-reverse; }
+.cn-msg-av {
+  width: 26px; height: 26px; border-radius: 8px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 660;
+}
+.cn-msg[data-role="user"] .cn-msg-av { background: var(--brand-soft); color: var(--brand); }
+.cn-msg[data-role="assistant"] .cn-msg-av { background: #f2f5fa; color: var(--ink-2); }
+.cn-msg-body {
+  font-size: 13px; line-height: 1.75; padding: 9px 13px; border-radius: 11px;
+  border: 1px solid var(--line-2); background: var(--panel); text-wrap: pretty;
+}
+.cn-msg[data-role="user"] .cn-msg-body { background: var(--brand); border-color: var(--brand); color: #fff; }
+.cn-chat-input {
+  flex: none; border-top: 1px solid var(--line-2); padding: 12px 14px;
+  display: flex; align-items: flex-end; gap: 9px;
+}
+.cn-chat-input .cn-input { flex: 1; }
+.cn-send {
+  width: 36px; height: 36px; border-radius: 9px; flex: none;
+  background: var(--brand); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cn-send:hover { background: #2750cf; }
+
+.cn-diag { display: flex; flex-direction: column; }
+.cn-diag-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+  border-top: 1px solid var(--line-2); font-size: 12.5px;
+}
+.cn-diag-row:first-child { border-top: 0; }
+.cn-diag-k { color: var(--ink-3); flex: none; width: 76px; }
+.cn-diag-v { flex: 1; min-width: 0; text-align: right; font-weight: 560; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.cn-diag-v.mono { font-family: var(--mono); font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* ---- 文档 / 说明页 --------------------------------------------------- */
+
+.cn-docs { display: grid; grid-template-columns: minmax(0, 1fr) 296px; gap: 14px; align-items: start; }
+.cn-kv { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-top: 1px solid var(--line-2); font-size: 13px; }
+.cn-kv:first-child { border-top: 0; }
+.cn-kv-k { width: 96px; flex: none; color: var(--ink-3); font-size: 12.5px; }
+.cn-kv-v { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cn-tabs { display: flex; gap: 2px; padding: 3px; background: #eef1f6; border-radius: 8px; }
+.cn-tabs button {
+  height: 26px; padding: 0 12px; border-radius: 6px;
+  font-size: 12px; font-weight: 560; color: var(--ink-2);
+}
+.cn-tabs button[data-on="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(22,35,58,.10); }
+
+.cn-code {
+  margin: 0; padding: 14px 16px; background: #0f1729; color: #d6dcea;
+  font-family: var(--mono); font-size: 12px; line-height: 1.8;
+  overflow-x: auto; white-space: pre; tab-size: 2;
+}
+.cn-code .k { color: #7ea2ff; }
+.cn-code .s { color: #7fd6a6; }
+.cn-code .c { color: #6b7893; }
+.cn-code-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--line-2);
+}
+.cn-copy {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  height: 27px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--line);
+  font-size: 11.5px; font-weight: 560; color: var(--ink-2); background: var(--panel);
+}
+.cn-copy:hover { border-color: #d3dae6; color: var(--ink); }
+
+.cn-steps { display: flex; flex-direction: column; }
+.cn-step { display: flex; gap: 11px; padding: 12px 16px; border-top: 1px solid var(--line-2); }
+.cn-step:first-child { border-top: 0; }
+.cn-step-n {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  background: var(--brand-soft); color: var(--brand);
+  font-size: 11px; font-weight: 680; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cn-step[data-done="true"] .cn-step-n { background: var(--ok-soft); color: var(--ok); }
+.cn-step-t { font-size: 12.5px; font-weight: 570; }
+.cn-step-d { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.65; }
+
+/* ---- 卡片变体（身份源 / 发信通道） ------------------------------------ */
+
+.cn-cfg-card { display: flex; align-items: center; gap: 13px; padding: 15px 16px; }
+.cn-cfg-logo {
+  width: 38px; height: 38px; border-radius: 11px; flex: none;
+  border: 1px solid var(--line); background: var(--panel);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cn-cfg-main { flex: 1; min-width: 0; }
+.cn-cfg-name { font-size: 13.5px; font-weight: 620; display: flex; align-items: center; gap: 8px; }
+.cn-cfg-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; font-family: var(--mono); }
+.cn-cfg-acts { display: flex; align-items: center; gap: 10px; flex: none; }
+
+/* ---- 登录页 ---------------------------------------------------------- */
+
+.cn-login {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 24px; position: relative; background: var(--bg);
+}
+.cn-login-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(52% 46% at 50% 0%, rgba(47,95,234,.10), transparent 68%),
+    radial-gradient(38% 34% at 88% 96%, rgba(124,58,237,.07), transparent 70%);
+}
+.cn-login-card {
+  position: relative; width: 392px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(22,35,58,.05), 0 24px 56px -28px rgba(22,35,58,.30);
+  padding: 30px 30px 26px;
+}
+.cn-login-brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 22px; }
+.cn-login-title { font-size: 18px; font-weight: 680; letter-spacing: -0.026em; }
+.cn-login-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 5px; text-align: center; }
+.cn-login-btn {
+  display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%;
+  height: 42px; border-radius: 10px; font-size: 13.5px; font-weight: 600;
+  border: 1px solid var(--line); background: var(--panel);
+}
+.cn-login-btn:hover { border-color: #d3dae6; background: #fbfcfe; }
+.cn-login-btn-pri {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+  box-shadow: 0 2px 8px -2px rgba(47,95,234,.45);
+}
+.cn-login-btn-pri:hover { background: #2750cf; border-color: #2750cf; }
+.cn-login-btns { display: flex; flex-direction: column; gap: 10px; }
+.cn-login-or { display: flex; align-items: center; gap: 12px; margin: 18px 0; font-size: 11.5px; color: var(--ink-3); }
+.cn-login-or::before, .cn-login-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.cn-login-foot { margin-top: 20px; text-align: center; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+.cn-login-foot a { color: var(--brand); }
+.cn-login-back {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px;
+  color: var(--ink-3); margin-bottom: 16px;
+}
+.cn-login-back:hover { color: var(--ink); }
+
+.cn-qr {
+  width: 176px; height: 176px; margin: 4px auto 16px; border-radius: 12px;
+  border: 1px solid var(--line); background: #fff; padding: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.cn-qr-note { text-align: center; font-size: 12.5px; color: var(--ink-2); }
+.cn-qr-note b { display: block; font-weight: 620; color: var(--ink); margin-bottom: 4px; }
+
+.cn-code-input { display: flex; gap: 8px; }
+.cn-code-input .cn-input { flex: 1; }
+.cn-code-send {
+  flex: none; height: 36px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid var(--line); font-size: 12.5px; font-weight: 560; color: var(--brand);
+  background: var(--panel);
+}
+.cn-code-send:hover { border-color: #c7d5fb; background: #f7f9ff; }
+
+.cn-notice {
+  display: flex; gap: 10px; padding: 11px 13px; border-radius: 10px;
+  background: var(--warn-soft); font-size: 12px; line-height: 1.7; color: #7a4a1c;
+}
+.cn-notice svg { flex: none; margin-top: 2px; }

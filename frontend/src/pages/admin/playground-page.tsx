@@ -1,43 +1,61 @@
-import { useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
-import { PageHeader } from "@/components/shared/page-header"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Icon } from "@/components/console/icon"
+import { Brand } from "@/components/console/brand"
+import { Card, Empty, PageHead, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
-import { formatCents } from "@/lib/format"
-import type { Model } from "@/lib/types"
+import { Permission, useHasPermission } from "@/lib/auth"
+import { fmt, fmtNum } from "@/lib/format"
+import type { CallLog, Model, Provider, VirtualKey } from "@/lib/types"
+
+// Playground -- the chat page type. The point of the screen is not the
+// conversation, it is the panel on the right: did the request land on the
+// model and provider you expected, and what did it cost.
+//
+// The diagnostics are real, not estimated. The gateway honours an
+// inbound X-Request-Id (internal/gateway/pipeline.go), so the page mints
+// one, sends it, then finds that exact row in the call log and reads the
+// provider, tokens and cost the gateway itself recorded.
 
 interface ChatMessage {
   role: "user" | "assistant"
   content: string
 }
 
-interface Diagnostics {
+interface Diag {
+  requestId: string
   latencyMs: number
-  costCents: number
   status: "success" | "failed"
+  log?: CallLog
 }
 
 export function PlaygroundPage() {
   const { data: models } = useApiQuery<Model[]>("/api/models/published")
+  const { data: providers } = useApiQuery<Provider[]>("/api/providers")
+  const keys = useApiQuery<VirtualKey[]>("/api/virtual-keys")
+  const canReadLogs = useHasPermission(Permission.AuditViewCallLogs)
+  const canMakeKeys = useHasPermission(Permission.OrgManageKeys)
+
   const [modelId, setModelId] = useState("")
   const [secret, setSecret] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
-  const [diag, setDiag] = useState<Diagnostics | null>(null)
+  const [creatingKey, setCreatingKey] = useState(false)
+  const [diag, setDiag] = useState<Diag | null>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const model = (models ?? []).find((m) => m.ID === modelId)
+  const provider = providers?.find((p) => p.ID === diag?.log?.ProviderID)
+
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" })
+  }, [messages])
 
   const createTestKey = async () => {
+    if (creatingKey) return
+    setCreatingKey(true)
     try {
       const res = await api.post<{ key: { ID: string }; secret: string }>("/api/virtual-keys", {
         Name: "Playground 测试 Key",
@@ -45,129 +63,234 @@ export function PlaygroundPage() {
         BudgetCents: 1000,
       })
       setSecret(res.secret)
-      toast.success("已创建一个 ¥10 的测试 Key，仅用于本次 Playground 会话")
+      keys.refetch()
+      toast.success("已创建一个 ¥10 的测试 Key，仅用于本次会话")
     } catch {
-      toast.error("创建测试 Key 失败，请确认你有 Key 管理权限")
+      toast.error("创建失败，请确认你有 Key 管理权限")
+    } finally {
+      setCreatingKey(false)
     }
   }
 
   const send = async () => {
-    if (!input.trim() || !model || !secret) return
+    if (!input.trim() || !model || !secret || busy) return
     const next = [...messages, { role: "user" as const, content: input }]
     setMessages(next)
     setInput("")
     setBusy(true)
-    const start = performance.now()
+
+    const requestId = crypto.randomUUID()
+    const started = performance.now()
     try {
       const res = await fetch("/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
-        body: JSON.stringify({ model: model.ModelIdentifier, messages: next.map((m) => ({ role: m.role, content: m.content })) }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${secret}`,
+          "X-Request-Id": requestId,
+        },
+        body: JSON.stringify({
+          model: model.ModelIdentifier,
+          messages: next.map((m) => ({ role: m.role, content: m.content })),
+        }),
       })
-      const latencyMs = Math.round(performance.now() - start)
+      const latencyMs = Math.round(performance.now() - started)
       if (!res.ok) {
-        setDiag({ latencyMs, costCents: 0, status: "failed" })
-        toast.error("调用失败")
+        setDiag({ requestId, latencyMs, status: "failed" })
+        toast.error("调用失败，看右侧诊断和调用日志定位")
         return
       }
       const body = await res.json()
       const reply = body.choices?.[0]?.message?.content ?? "（无返回内容）"
       setMessages((prev) => [...prev, { role: "assistant", content: reply }])
-      setDiag({ latencyMs, costCents: 0, status: "success" })
+      setDiag({ requestId, latencyMs, status: "success" })
+
+      // The gateway writes the call log after it responds, so give it a
+      // beat before looking the row up.
+      if (canReadLogs) {
+        setTimeout(() => {
+          void api
+            .get<CallLog[]>("/api/call-logs")
+            .then((logs) => {
+              const log = logs.find((l) => l.RequestID === requestId)
+              if (log) setDiag((d) => (d && d.requestId === requestId ? { ...d, log } : d))
+            })
+            .catch(() => {})
+        }, 600)
+      }
     } catch {
-      setDiag({ latencyMs: Math.round(performance.now() - start), costCents: 0, status: "failed" })
+      setDiag({ requestId, latencyMs: Math.round(performance.now() - started), status: "failed" })
       toast.error("请求出错")
     } finally {
       setBusy(false)
     }
   }
 
+  const ready = !!model && !!secret
+
   return (
-    <div className="flex h-full flex-col gap-4">
-      <PageHeader title="Playground" />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={modelId} onValueChange={setModelId}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="选择模型" />
-          </SelectTrigger>
-          <SelectContent>
-            {(models ?? []).map((m) => (
-              <SelectItem key={m.ID} value={m.ID}>
-                {m.Name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {secret ? (
-          <span className="text-[11.5px] text-ok">测试 Key 已就绪</span>
-        ) : (
-          <>
-            <Button variant="outline" onClick={() => void createTestKey()}>
-              创建测试 Key
-            </Button>
-            <Input
-              placeholder="或粘贴已有 Key（vk-...）"
-              className="w-[220px]"
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-            />
-          </>
-        )}
-        <div className="flex-1" />
-        <Button variant="outline" onClick={() => setMessages([])}>
+    <div className="cn-page" style={{ flex: 1, minHeight: 0 }}>
+      <PageHead title="Playground" sub="验证路由和 Provider 是否真的按预期生效，右侧给出这次请求的完整诊断">
+        <select
+          className="cn-field cn-field-select"
+          value={modelId}
+          aria-label="模型"
+          onChange={(e) => setModelId(e.target.value)}
+        >
+          <option value="">选择模型</option>
+          {(models ?? []).map((m) => (
+            <option key={m.ID} value={m.ID}>
+              {m.Name}
+            </option>
+          ))}
+        </select>
+        <button className="cn-btn" onClick={() => { setMessages([]); setDiag(null) }}>
+          <Icon name="refresh" size={14} />
           清空对话
-        </Button>
-      </div>
+        </button>
+      </PageHead>
 
-      <div className="flex flex-1 gap-4">
-        <div className="flex flex-1 flex-col">
-          <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto pb-1">
+      {!secret && (
+        <Card flush={false}>
+          <div className="cn-notice">
+            <Icon name="key" size={14} />
+            <span>
+              Playground 走的是真实网关，需要一个虚拟 Key 才能发请求。
+              {canMakeKeys ? "可以直接创建一个 ¥10 的临时 Key，也可以粘贴已有 Key。" : "请向管理员申请一个 Key 并粘贴到这里。"}
+            </span>
+          </div>
+          <div className="cn-filters" style={{ marginTop: 12 }}>
+            {canMakeKeys && (
+              <button className="cn-btn cn-btn-pri" disabled={creatingKey} onClick={() => void createTestKey()}>
+                <Icon name="plus" size={14} />
+                {creatingKey ? "创建中…" : "创建测试 Key"}
+              </button>
+            )}
+            <label className="cn-field" style={{ width: 280 }}>
+              <Icon name="key" size={14} />
+              <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="粘贴已有 Key（sk-flx-…）" />
+            </label>
+          </div>
+        </Card>
+      )}
+
+      <div className="cn-play">
+        <div className="cn-card cn-chat">
+          <div className="cn-card-head">
+            <span className="cn-card-title">对话</span>
+            <span className="cn-card-note">{model ? `${model.Name} · ${model.ModelIdentifier}` : "未选定模型"}</span>
+          </div>
+          <div className="cn-chat-body" ref={bodyRef}>
+            {messages.length === 0 && (
+              <Empty
+                icon="terminal"
+                title="还没有对话"
+                desc={ready ? "在下面输入一条消息，右侧会给出这次请求的完整诊断。" : "先选好模型、准备好 Key，再开始测试。"}
+              />
+            )}
             {messages.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                <div
-                  className={
-                    m.role === "user"
-                      ? "max-w-[78%] rounded-xl rounded-br-[4px] bg-primary px-3.5 py-2.5 text-[12.5px] text-primary-foreground"
-                      : "max-w-[78%] rounded-xl rounded-bl-[4px] border border-border bg-card px-3.5 py-2.5 text-[12.5px] text-foreground shadow-[var(--shadow-card)]"
-                  }
-                >
-                  {m.content}
-                </div>
+              <div key={i} className="cn-msg" data-role={m.role}>
+                <span className="cn-msg-av">
+                  {m.role === "user" ? "我" : provider?.Kind ? <Brand kind={provider.Kind} size={13} /> : "AI"}
+                </span>
+                <div className="cn-msg-body">{m.content}</div>
               </div>
             ))}
-            {messages.length === 0 && <p className="text-xs text-muted-foreground">选择模型、准备好 Key 后，在下方输入消息开始测试</p>}
+            {busy && (
+              <div className="cn-msg" data-role="assistant">
+                <span className="cn-msg-av">…</span>
+                <div className="cn-msg-body" style={{ color: "var(--ink-3)" }}>
+                  正在等待上游返回…
+                </div>
+              </div>
+            )}
           </div>
-          <div className="mt-3.5 flex gap-2">
-            <Input
-              placeholder="输入消息，测试这个模型…"
+          <div className="cn-chat-input">
+            <textarea
+              className="cn-input"
+              rows={2}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void send()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  void send()
+                }
+              }}
+              placeholder={ready ? "输入消息，Enter 发送，Shift + Enter 换行" : "先选择模型并准备好 Key"}
             />
-            <Button disabled={busy || !input.trim() || !model || !secret} onClick={() => void send()}>
-              发送
-            </Button>
+            <button className="cn-send" disabled={!ready || busy || !input.trim()} onClick={() => void send()}>
+              <Icon name="send" size={16} />
+            </button>
           </div>
         </div>
 
-        <div className="hidden w-[196px] flex-none flex-col gap-2.5 rounded-lg border border-border bg-card p-3.5 shadow-[var(--shadow-card)] md:flex">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">请求诊断</p>
-          <DiagRow k="总耗时" v={diag ? `${diag.latencyMs}ms` : "—"} />
-          <DiagRow k="命中模型" v={model?.Name ?? "—"} />
-          <DiagRow k="状态" v={diag ? (diag.status === "success" ? "成功" : "失败") : "—"} />
-          <DiagRow k="预估费用" v={diag ? formatCents(diag.costCents) : "—"} />
-        </div>
+        <Card title="本次请求诊断" note={diag ? diag.requestId.slice(0, 8) : "尚未发起"}>
+          {!diag ? (
+            <Empty icon="sliders" title="还没有可诊断的请求" desc="发出第一条消息后，这里会显示实际命中的模型和费用。" />
+          ) : (
+            <div className="cn-diag">
+              <DiagRow k="状态">
+                <Tag tone={diag.status === "success" ? "ok" : "bad"}>
+                  {diag.status === "success" ? "成功" : "失败"}
+                </Tag>
+              </DiagRow>
+              <DiagRow k="请求模型">{model?.ModelIdentifier ?? "—"}</DiagRow>
+              <DiagRow k="实际模型">
+                <Brand kind={provider?.Kind} size={13} />
+                {model?.Name ?? "—"}
+              </DiagRow>
+              <DiagRow k="供应商">{provider?.Name ?? (diag.log ? "—" : "等待日志…")}</DiagRow>
+              <DiagRow k="总耗时" mono>
+                {diag.latencyMs}ms
+              </DiagRow>
+              <DiagRow k="网关耗时" mono>
+                {diag.log ? `${diag.log.LatencyMS}ms` : "—"}
+              </DiagRow>
+              <DiagRow k="Token" mono>
+                {diag.log ? `${fmtNum(diag.log.InputTokens)} 入 / ${fmtNum(diag.log.OutputTokens)} 出` : "—"}
+              </DiagRow>
+              <DiagRow k="本次费用" mono strong>
+                {diag.log ? fmt(diag.log.CostCents) : "—"}
+              </DiagRow>
+              <DiagRow k="Request ID" mono>
+                {diag.requestId.slice(0, 18)}…
+                <button
+                  className="cn-icon-act"
+                  title="复制"
+                  onClick={() => void navigator.clipboard.writeText(diag.requestId).then(() => toast.success("已复制 Request ID"))}
+                >
+                  <Icon name="copy" size={13} />
+                </button>
+              </DiagRow>
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   )
 }
 
-function DiagRow({ k, v }: { k: string; v: string }) {
+function DiagRow({
+  k,
+  mono,
+  strong,
+  children,
+}: {
+  k: string
+  mono?: boolean
+  strong?: boolean
+  children: ReactNode
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
-      <span className="whitespace-nowrap text-muted-foreground">{k}</span>
-      <span className="truncate font-mono tabular-nums text-foreground">{v}</span>
+    <div className="cn-diag-row">
+      <span className="cn-diag-k">{k}</span>
+      <span
+        className={mono ? "cn-diag-v mono" : "cn-diag-v"}
+        style={strong ? { color: "var(--ink)", fontWeight: 620 } : undefined}
+      >
+        {children}
+      </span>
     </div>
   )
 }

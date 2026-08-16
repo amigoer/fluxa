@@ -1,11 +1,8 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { LoginLayout } from "@/layouts/login-layout"
-import { Logo } from "@/components/shared/logo"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { LoginShell } from "@/layouts/login-layout"
+import { FluxaLogo } from "@/components/console/brand"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
@@ -41,32 +38,64 @@ export function SetupPage() {
   }
 
   return (
-    <LoginLayout>
-      <div className="flex flex-col items-center gap-4">
-        <Logo size={44} />
-        <div className="text-center">
-          <p className="text-[19px] font-bold text-foreground">初始化 Fluxa</p>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">首次部署，创建企业和第一个超管账号</p>
+    <LoginShell>
+      <div className="cn-login-card">
+        <div className="cn-login-brand">
+          <FluxaLogo size={44} radius={13} />
+          <div style={{ textAlign: "center" }}>
+            <div className="cn-login-title">初始化 Fluxa</div>
+            <div className="cn-login-sub">首次部署，创建企业和第一个超管账号</div>
+          </div>
         </div>
 
-        <form className="mt-2 flex w-full flex-col gap-3.5" onSubmit={onSubmit}>
-          <div>
-            <Label className="mb-1.5 text-xs">企业名称</Label>
-            <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder="例如：某某科技有限公司" />
+        <form className="cn-form" onSubmit={onSubmit}>
+          <div className="cn-form-row">
+            <label className="cn-form-label" htmlFor="setup-org">
+              企业名称 <span>必填</span>
+            </label>
+            <input
+              id="setup-org"
+              className="cn-input"
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
+              required
+              placeholder="例如：某某科技有限公司"
+            />
           </div>
-          <div>
-            <Label className="mb-1.5 text-xs">你的姓名</Label>
-            <Input value={adminName} onChange={(e) => setAdminName(e.target.value)} required placeholder="超管账号姓名" />
+          <div className="cn-form-row">
+            <label className="cn-form-label" htmlFor="setup-name">
+              你的姓名 <span>必填</span>
+            </label>
+            <input
+              id="setup-name"
+              className="cn-input"
+              value={adminName}
+              onChange={(e) => setAdminName(e.target.value)}
+              required
+              placeholder="超管账号姓名"
+            />
           </div>
-          <div>
-            <Label className="mb-1.5 text-xs">邮箱</Label>
-            <Input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required placeholder="用于登录和通知" />
+          <div className="cn-form-row">
+            <label className="cn-form-label" htmlFor="setup-email">
+              邮箱 <span>必填</span>
+            </label>
+            <input
+              id="setup-email"
+              className="cn-input"
+              type="email"
+              value={adminEmail}
+              onChange={(e) => setAdminEmail(e.target.value)}
+              required
+              placeholder="用于登录和通知"
+            />
+            <div className="cn-input-hint">这个邮箱同时是超管账号的登录标识。</div>
           </div>
-          <Button type="submit" disabled={submitting} className="mt-1">
+
+          <button className="cn-login-btn cn-login-btn-pri" type="submit" disabled={submitting}>
             {submitting ? "创建中…" : "创建并进入"}
-          </Button>
+          </button>
         </form>
       </div>
-    </LoginLayout>
+    </LoginShell>
   )
 }

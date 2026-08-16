@@ -1,138 +1,215 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { PageHeader } from "@/components/shared/page-header"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Icon } from "@/components/console/icon"
+import { Card, Empty, Field, Modal, PageHead } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
+import { Permission, useHasPermission } from "@/lib/auth"
+import { fmt } from "@/lib/format"
 import type { Model, RoutingRule } from "@/lib/types"
 
+// 我的路由配置 -- the chain page type, employee side. Personal rules win
+// over the global chain; anything that misses every personal rule falls
+// back to whatever the admin configured.
 export function MyRoutingPage() {
-  const { data: rules, refetch } = useApiQuery<RoutingRule[]>("/api/routing/mine")
+  const rules = useApiQuery<RoutingRule[]>("/api/routing/mine")
   const { data: models } = useApiQuery<Model[]>("/api/models/published")
-  const modelName = (id: string | null) => (models ?? []).find((m) => m.ID === id)?.Name ?? "—"
+  const canSeeGlobal = useHasPermission(Permission.ProviderManageRouting)
+  const global = useApiQuery<RoutingRule[]>(canSeeGlobal ? "/api/routing/global" : null)
+  const [adding, setAdding] = useState(false)
 
-  const [open, setOpen] = useState(false)
-  const [condition, setCondition] = useState("默认")
-  const [targetModelId, setTargetModelId] = useState("")
-  const [fallbackModelId, setFallbackModelId] = useState("")
-  const [costCeiling, setCostCeiling] = useState("")
+  const modelById = useMemo(() => new Map((models ?? []).map((m) => [m.ID, m])), [models])
+  const nameOf = (id?: string | null) => (id ? (modelById.get(id)?.Name ?? "—") : null)
 
-  const create = async () => {
+  return (
+    <div className="cn-page">
+      <PageHead title="我的路由配置" sub="个人规则优先于全局规则；没有命中的请求会回落到管理员配置的全局链路">
+        <button className="cn-btn cn-btn-pri" onClick={() => setAdding(true)}>
+          <Icon name="plus" size={14} />
+          新增规则
+        </button>
+      </PageHead>
+
+      <Card title="个人规则" note="自上而下匹配，命中即停">
+        {(rules.data ?? []).length === 0 ? (
+          <Empty
+            icon="waypoints"
+            title="还没有个人规则"
+            desc="没有个人规则时，你的请求直接走管理员配置的全局链路。"
+          />
+        ) : (
+          <div className="cn-chain">
+            {(rules.data ?? []).map((r) => (
+              <div key={r.ID} className="cn-chain-row">
+                <div className="cn-chain-node" data-t="cond">
+                  <div className="cn-chain-label">当我</div>
+                  <div className="cn-chain-value">{r.ConditionLabel}</div>
+                </div>
+                <span className="cn-chain-arrow">
+                  <Icon name="arrow-right" size={16} />
+                </span>
+                <div className="cn-chain-node" data-t="target" style={{ width: 214 }}>
+                  <div className="cn-chain-label">就用</div>
+                  <div className="cn-chain-value">
+                    {nameOf(r.TargetModelID)}
+                    {r.CostCeilingCents && (
+                      <span className="cn-chain-ceiling">
+                        <Icon name="wallet" size={10} />≤ {fmt(r.CostCeilingCents)}/次
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="cn-chain-arrow">
+                  <Icon name="arrow-right" size={16} />
+                </span>
+                <div className="cn-chain-node" style={{ width: 190 }}>
+                  <div className="cn-chain-label">它不可用时</div>
+                  <div className="cn-chain-value">{nameOf(r.FallbackModelID) ?? <em>回落全局规则</em>}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card title="全局兜底" note="管理员配置 · 只读">
+        {canSeeGlobal && (global.data ?? []).length > 0 ? (
+          <div className="cn-chain">
+            {(global.data ?? []).map((r) => (
+              <div key={r.ID} className="cn-chain-row" style={{ opacity: 0.72 }}>
+                <div className="cn-chain-node" data-t="cond">
+                  <div className="cn-chain-label">条件</div>
+                  <div className="cn-chain-value">{r.ConditionLabel}</div>
+                </div>
+                <span className="cn-chain-arrow">
+                  <Icon name="arrow-right" size={16} />
+                </span>
+                <div className="cn-chain-node" style={{ width: 214 }}>
+                  <div className="cn-chain-label">就用</div>
+                  <div className="cn-chain-value">{nameOf(r.TargetModelID)}</div>
+                </div>
+                <span className="cn-chain-arrow">
+                  <Icon name="arrow-right" size={16} />
+                </span>
+                <div className="cn-chain-node" style={{ width: 190 }}>
+                  <div className="cn-chain-label">它不可用时</div>
+                  <div className="cn-chain-value">{nameOf(r.FallbackModelID) ?? <em>直接返回错误</em>}</div>
+                </div>
+                <div className="cn-chain-acts">
+                  <Icon name="lock" size={14} style={{ color: "var(--ink-3)" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="cn-card-body">
+            <div className="cn-notice">
+              <Icon name="lock" size={14} />
+              <span>
+                全局链路由管理员维护，员工看不到它的细节。以上个人规则都没有命中的请求，会按管理员配置的顺序转发。
+              </span>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <AddRuleModal
+        open={adding}
+        models={models ?? []}
+        onClose={() => setAdding(false)}
+        onDone={() => rules.refetch()}
+      />
+    </div>
+  )
+}
+
+function AddRuleModal({
+  open,
+  models,
+  onClose,
+  onDone,
+}: {
+  open: boolean
+  models: Model[]
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [label, setLabel] = useState("")
+  const [target, setTarget] = useState("")
+  const [fallback, setFallback] = useState("")
+  const [ceiling, setCeiling] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    if (!label || !target) {
+      toast.error("请填写条件并选择目标模型")
+      return
+    }
+    setBusy(true)
     try {
       await api.post("/api/routing/mine", {
-        ConditionLabel: condition,
-        TargetModelID: targetModelId,
-        FallbackModelID: fallbackModelId || null,
-        CostCeilingCents: costCeiling ? Math.round(Number(costCeiling) * 100) : null,
+        ConditionLabel: label,
+        TargetModelID: target,
+        FallbackModelID: fallback || null,
+        CostCeilingCents: ceiling ? Math.round(Number(ceiling) * 100) : null,
       })
-      setOpen(false)
-      refetch()
-      toast.success("路由规则已创建")
+      toast.success("已新增个人规则")
+      setLabel("")
+      setCeiling("")
+      onDone()
+      onClose()
     } catch {
-      toast.error("创建失败")
+      toast.error("新增失败")
+    } finally {
+      setBusy(false)
     }
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
-        title="我的路由配置"
-        action={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>添加规则</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>添加个人路由规则</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-3.5">
-                <div>
-                  <Label className="mb-1.5 text-xs">条件</Label>
-                  <Input value={condition} onChange={(e) => setCondition(e.target.value)} placeholder="默认 / 代码类任务 / 长文本（>50K）" />
-                </div>
-                <div>
-                  <Label className="mb-1.5 text-xs">目标模型</Label>
-                  <Select value={targetModelId} onValueChange={setTargetModelId}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="选择模型" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(models ?? []).map((m) => (
-                        <SelectItem key={m.ID} value={m.ID}>
-                          {m.Name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="mb-1.5 text-xs">备用模型（可选）</Label>
-                  <Select value={fallbackModelId} onValueChange={setFallbackModelId}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="不设置" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(models ?? []).map((m) => (
-                        <SelectItem key={m.ID} value={m.ID}>
-                          {m.Name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="mb-1.5 text-xs">备用模型成本上限（¥，可选）</Label>
-                  <Input value={costCeiling} onChange={(e) => setCostCeiling(e.target.value)} placeholder="不设置则无上限" />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button disabled={!targetModelId} onClick={() => void create()}>
-                  创建
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        }
-      />
-
-      <div className="rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="flex flex-col">
-          {(rules ?? []).map((r) => (
-            <div key={r.ID} className="flex flex-wrap items-center gap-2 border-t border-border py-3 text-xs first:border-t-0">
-              <span className="rounded-md border border-dashed border-border px-2.5 py-1.5 text-muted-foreground">{r.ConditionLabel}</span>
-              <span className="text-muted-foreground">→</span>
-              <span className="rounded-md border border-border bg-background px-2.5 py-1.5 text-foreground">{modelName(r.TargetModelID)}</span>
-              {r.FallbackModelID && (
-                <>
-                  <span className="text-muted-foreground">→</span>
-                  <span className="rounded-md border border-border bg-background px-2.5 py-1.5 text-foreground">
-                    {modelName(r.FallbackModelID)}（备用）
-                  </span>
-                </>
-              )}
-            </div>
-          ))}
-          {(rules ?? []).length === 0 && <p className="py-2 text-xs text-muted-foreground">还没有配置个人路由，将使用全局默认路由</p>}
-        </div>
+    <Modal
+      open={open}
+      title="新增个人路由规则"
+      sub="个人规则优先于全局规则"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="cn-btn" onClick={onClose}>
+            取消
+          </button>
+          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+            保存
+          </button>
+        </>
+      }
+    >
+      <div className="cn-form">
+        <Field label="当我" optional="必填" hint="写成一句人话，例如「请求 gpt-4 系列」。">
+          <input className="cn-input" value={label} onChange={(e) => setLabel(e.target.value)} />
+        </Field>
+        <Field label="就用" optional="必填">
+          <select className="cn-input" value={target} onChange={(e) => setTarget(e.target.value)}>
+            <option value="">选择模型</option>
+            {models.map((m) => (
+              <option key={m.ID} value={m.ID}>
+                {m.Name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="它不可用时" hint="留空则回落到管理员配置的全局链路。">
+          <select className="cn-input" value={fallback} onChange={(e) => setFallback(e.target.value)}>
+            <option value="">回落全局规则</option>
+            {models.map((m) => (
+              <option key={m.ID} value={m.ID}>
+                {m.Name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="单次费用上限" hint="单位元，留空表示不限。">
+          <input className="cn-input" inputMode="decimal" value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
+        </Field>
       </div>
-    </div>
+    </Modal>
   )
 }

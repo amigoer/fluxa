@@ -17,6 +17,7 @@ interface MeResponse {
   permissions: Record<string, unknown>
   roleName: string
   departmentName: string
+  orgName: string
 }
 
 interface AuthState {
@@ -27,8 +28,10 @@ interface AuthState {
   // control, that's what `permissions` is for.
   roleName: string
   departmentName: string
+  orgName: string
   loading: boolean
   refresh: () => Promise<void>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -42,7 +45,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<Set<string>>(new Set())
   const [roleName, setRoleName] = useState("")
   const [departmentName, setDepartmentName] = useState("")
+  const [orgName, setOrgName] = useState("")
   const [loading, setLoading] = useState(true)
+
+  const clear = () => {
+    setMember(null)
+    setPermissions(new Set())
+    setRoleName("")
+    setDepartmentName("")
+    setOrgName("")
+  }
 
   const refresh = async () => {
     setLoading(true)
@@ -52,15 +64,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPermissions(new Set(Object.keys(res.permissions ?? {})))
       setRoleName(res.roleName)
       setDepartmentName(res.departmentName)
+      setOrgName(res.orgName ?? "")
     } catch (err) {
-      if (err instanceof ApiError) {
-        setMember(null)
-        setPermissions(new Set())
-        setRoleName("")
-        setDepartmentName("")
-      }
+      if (err instanceof ApiError) clear()
     } finally {
       setLoading(false)
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await api.post("/api/auth/logout")
+    } finally {
+      clear()
     }
   }
 
@@ -70,7 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ member, permissions, roleName, departmentName, loading, refresh }}>
+    <AuthContext.Provider
+      value={{ member, permissions, roleName, departmentName, orgName, loading, refresh, logout }}
+    >
       {children}
     </AuthContext.Provider>
   )

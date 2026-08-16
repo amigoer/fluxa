@@ -104,6 +104,16 @@ export interface VirtualKey {
   CreatedAt: string
 }
 
+// A department pool's live state. Remaining is never stored -- the
+// backend recomputes it as Total - Spoken on every read (see
+// internal/provider/quota/approval.go), and it may legitimately be
+// negative when approvals have overdrawn the pool.
+export interface QuotaBalance {
+  Total: number
+  Spoken: number
+  Remaining: number
+}
+
 export interface QuotaRequest {
   ID: string
   RequestedByMemberID: string

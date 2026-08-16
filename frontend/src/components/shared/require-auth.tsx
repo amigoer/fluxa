@@ -6,7 +6,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { member, loading } = useAuth()
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">加载中…</div>
+    return (
+      <div className="screen cn" style={{ alignItems: "center", justifyContent: "center" }}>
+        <span className="cn-loading">加载中…</span>
+      </div>
+    )
   }
   if (!member) {
     return <Navigate to="/login" replace />

@@ -486,11 +486,20 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The org name is display-only, but every authenticated screen shows
+	// it (the sidebar brand block), so it rides along with /api/me rather
+	// than costing a second round trip on every page load.
+	orgName := ""
+	if org, err := h.repo.GetOrganization(r.Context()); err == nil {
+		orgName = org.Name
+	}
+
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"member":         member,
 		"permissions":    principal.Permissions,
 		"roleName":       role.Name,
 		"departmentName": departmentName,
+		"orgName":        orgName,
 	})
 }
 

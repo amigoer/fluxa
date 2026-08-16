@@ -1,151 +1,502 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { PageHeader } from "@/components/shared/page-header"
-import { StatusPill } from "@/components/shared/status-pill"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
+import { Icon } from "@/components/console/icon"
+import { Card, Field, Filters, Modal, PageHead, Select, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
-import type { Department, Member } from "@/lib/types"
+import { Permission, useHasPermission } from "@/lib/auth"
+import { fmt, formatAgo } from "@/lib/format"
+import type { CallLog, Department, Member, QuotaBalance, Role } from "@/lib/types"
 
-const statusLabel = { active: "在职", pending_review: "待审批", disabled: "已停用" } as const
-const statusTone = { active: "ok", pending_review: "warn", disabled: "bad" } as const
+// 成员与部门 -- the master/detail page type: departments on the left,
+// that department's members and quota pool on the right.
+
+const STATUS = {
+  active: { label: "正常", tone: "ok" },
+  pending_review: { label: "待审核", tone: "warn" },
+  disabled: { label: "已停用", tone: "bad" },
+} as const
 
 export function MembersPage() {
-  const { data: departments, refetch: refetchDepartments } = useApiQuery<Department[]>("/api/departments")
-  const [selected, setSelected] = useState<string | null>(null)
-  const { data: members, refetch: refetchMembers } = useApiQuery<Member[]>(
-    selected ? `/api/members?departmentId=${selected}` : "/api/members",
-    [selected],
+  const departments = useApiQuery<Department[]>("/api/departments")
+  const members = useApiQuery<Member[]>("/api/members")
+  const { data: roles } = useApiQuery<Role[]>("/api/roles")
+  const { data: calls } = useApiQuery<CallLog[]>("/api/call-logs")
+  const canManageDepts = useHasPermission(Permission.OrgManageDepartments)
+  const canSeePool = useHasPermission(Permission.OrgApproveDepartmentQuota)
+
+  const [dept, setDept] = useState<string>("all")
+  const [q, setQ] = useState("")
+  const [roleFilter, setRoleFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [creatingDept, setCreatingDept] = useState(false)
+  const [editing, setEditing] = useState<Member | null>(null)
+  const [adjusting, setAdjusting] = useState(false)
+
+  const pool = useApiQuery<QuotaBalance>(
+    canSeePool && dept !== "all" ? `/api/department-quota-pools/${dept}` : null,
+    [dept],
   )
 
-  const [open, setOpen] = useState(false)
-  const [deptName, setDeptName] = useState("")
+  const roleById = useMemo(() => new Map((roles ?? []).map((r) => [r.ID, r])), [roles])
+  const current = (departments.data ?? []).find((d) => d.ID === dept)
+
+  // Per-member month spend and last activity, both rolled up from the
+  // call log in one pass.
+  const activity = useMemo(() => {
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+    const out = new Map<string, { spend: number; last: string }>()
+    for (const c of calls ?? []) {
+      const cur = out.get(c.MemberID) ?? { spend: 0, last: "" }
+      if (new Date(c.OccurredAt) >= monthStart) cur.spend += c.CostCents
+      if (!cur.last || new Date(c.OccurredAt) > new Date(cur.last)) cur.last = c.OccurredAt
+      out.set(c.MemberID, cur)
+    }
+    return out
+  }, [calls])
 
   const counts = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const m of members ?? []) {
-      const key = m.DepartmentID ?? "none"
-      map.set(key, (map.get(key) ?? 0) + 1)
+    const out = new Map<string, number>()
+    for (const m of members.data ?? []) {
+      if (m.DepartmentID) out.set(m.DepartmentID, (out.get(m.DepartmentID) ?? 0) + 1)
     }
-    return map
-  }, [members])
+    return out
+  }, [members.data])
 
-  const createDepartment = async () => {
-    try {
-      await api.post("/api/departments", { Name: deptName })
-      setOpen(false)
-      setDeptName("")
-      refetchDepartments()
-      toast.success("部门已创建")
-    } catch {
-      toast.error("创建失败")
-    }
-  }
+  const list = (members.data ?? []).filter((m) => {
+    if (dept !== "all" && m.DepartmentID !== dept) return false
+    if (q && !`${m.Name}${m.Email ?? ""}${m.Phone ?? ""}`.toLowerCase().includes(q.toLowerCase())) return false
+    if (roleFilter && m.RoleID !== roleFilter) return false
+    if (statusFilter && m.Status !== statusFilter) return false
+    return true
+  })
 
   const approve = async (id: string) => {
-    await api.post(`/api/members/${id}/approve`)
-    refetchMembers()
-    toast.success("已通过")
+    try {
+      await api.post(`/api/members/${id}/approve`)
+      toast.success("已通过审核")
+      members.refetch()
+    } catch {
+      toast.error("操作失败")
+    }
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
-        title="成员与部门"
-        action={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>添加部门</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>添加部门</DialogTitle>
-              </DialogHeader>
-              <div>
-                <Label className="mb-1.5 text-xs">部门名称</Label>
-                <Input value={deptName} onChange={(e) => setDeptName(e.target.value)} />
-              </div>
-              <DialogFooter>
-                <Button disabled={!deptName} onClick={() => void createDepartment()}>
-                  创建
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        }
-      />
-
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex w-full flex-none flex-col gap-0.5 lg:w-[180px]">
-          <button
-            className={cn(
-              "flex justify-between rounded-md px-2.5 py-2 text-[12.5px] text-muted-foreground",
-              !selected && "bg-accent font-semibold text-accent-foreground",
-            )}
-            onClick={() => setSelected(null)}
-          >
-            全部成员
+    <div className="cn-page">
+      <PageHead title="成员与部门" sub="部门与成员由身份源同步，本地注册的账号需管理员审核后启用">
+        <button
+          className="cn-btn"
+          onClick={() => {
+            members.refetch()
+            departments.refetch()
+            toast.success("已刷新")
+          }}
+        >
+          <Icon name="refresh" size={14} />
+          刷新
+        </button>
+        {canManageDepts && (
+          <button className="cn-btn cn-btn-pri" onClick={() => setCreatingDept(true)}>
+            <Icon name="plus" size={14} />
+            新建部门
           </button>
-          {(departments ?? []).map((d) => (
-            <button
-              key={d.ID}
-              className={cn(
-                "flex justify-between rounded-md px-2.5 py-2 text-[12.5px] text-muted-foreground",
-                selected === d.ID && "bg-accent font-semibold text-accent-foreground",
-              )}
-              onClick={() => setSelected(d.ID)}
-            >
-              {d.Name}
-              <span className="text-[11px] text-muted-foreground">{counts.get(d.ID) ?? 0}</span>
-            </button>
-          ))}
-        </div>
+        )}
+      </PageHead>
 
-        <div className="flex-1 overflow-x-auto rounded-lg border border-border bg-card shadow-[var(--shadow-card)]">
-          <table className="w-full text-[11.5px]">
-            <thead>
-              <tr className="text-left text-[10.5px] font-semibold text-muted-foreground">
-                <th className="p-3 font-semibold">姓名</th>
-                <th className="p-3 font-semibold">邮箱 / 手机号</th>
-                <th className="p-3 font-semibold">状态</th>
-                <th className="p-3 font-semibold">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(members ?? []).map((m) => (
-                <tr key={m.ID} className="border-t border-border">
-                  <td className="p-3 text-foreground">{m.Name}</td>
-                  <td className="p-3 text-muted-foreground">{m.Email ?? m.Phone ?? "—"}</td>
-                  <td className="p-3">
-                    <StatusPill tone={statusTone[m.Status]}>{statusLabel[m.Status]}</StatusPill>
-                  </td>
-                  <td className="p-3">
-                    {m.Status === "pending_review" ? (
-                      <button className="font-semibold text-primary" onClick={() => void approve(m.ID)}>
-                        审批
-                      </button>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
+      <div className="cn-md">
+        <Card>
+          <div className="cn-md-list">
+            <button className="cn-md-item" data-on={dept === "all"} onClick={() => setDept("all")}>
+              <div className="cn-md-item-main">
+                <div>全部成员</div>
+              </div>
+              <span className="cn-md-count">{(members.data ?? []).length}</span>
+            </button>
+            {(departments.data ?? []).map((d) => (
+              <button key={d.ID} className="cn-md-item" data-on={d.ID === dept} onClick={() => setDept(d.ID)}>
+                <div className="cn-md-item-main">
+                  <div>{d.Name}</div>
+                  {d.LeadMemberID && (
+                    <div className="cn-md-item-sub">
+                      负责人 {(members.data ?? []).find((m) => m.ID === d.LeadMemberID)?.Name ?? "—"}
+                    </div>
+                  )}
+                </div>
+                <span className="cn-md-count">{counts.get(d.ID) ?? 0}</span>
+              </button>
+            ))}
+            {(departments.data ?? []).length === 0 && (
+              <div className="cn-md-item" style={{ color: "var(--ink-3)" }}>
+                还没有部门
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+          {current && canSeePool && (
+            <Card flush={false}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, color: "var(--ink-3)", marginBottom: 6 }}>{current.Name} 额度池</div>
+                  <div className="cn-quota-bar">
+                    <i
+                      style={{
+                        width: `${poolPct(pool.data)}%`,
+                        background: poolPct(pool.data) > 90 ? "var(--warn)" : "var(--brand)",
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginTop: 7, fontSize: 11.5, color: "var(--ink-3)" }}>
+                    {pool.data && pool.data.Total > 0
+                      ? `已分配 ${fmt(pool.data.Spoken)} / ${fmt(pool.data.Total)} · 剩余 ${fmt(pool.data.Remaining)}`
+                      : "尚未设置额度池"}
+                  </div>
+                </div>
+                {canManageDepts && (
+                  <button className="cn-btn" onClick={() => setAdjusting(true)}>
+                    <Icon name="wallet" size={14} />
+                    调整额度池
+                  </button>
+                )}
+              </div>
+            </Card>
+          )}
+
+          <Filters
+            placeholder="搜索姓名或邮箱…"
+            value={q}
+            onValue={setQ}
+            right={<span className="cn-count">{list.length} 人</span>}
+          >
+            <Select
+              label="角色"
+              value={roleFilter}
+              onValue={setRoleFilter}
+              options={[
+                { value: "", label: "全部角色" },
+                ...(roles ?? []).map((r) => ({ value: r.ID, label: r.Name })),
+              ]}
+            />
+            <Select
+              label="状态"
+              value={statusFilter}
+              onValue={setStatusFilter}
+              options={[
+                { value: "", label: "全部状态" },
+                { value: "active", label: "正常" },
+                { value: "pending_review", label: "待审核" },
+                { value: "disabled", label: "已停用" },
+              ]}
+            />
+          </Filters>
+
+          <Card>
+            <table className="cn-table">
+              <thead>
+                <tr>
+                  <th>成员</th>
+                  <th>角色</th>
+                  <th>状态</th>
+                  <th className="cn-r">本月花费</th>
+                  <th className="cn-r">最近活跃</th>
+                  <th className="cn-r">操作</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {(members ?? []).length === 0 && <p className="p-4 text-xs text-muted-foreground">暂无成员</p>}
+              </thead>
+              <tbody>
+                {list.map((m) => {
+                  const a = activity.get(m.ID)
+                  const st = STATUS[m.Status] ?? STATUS.active
+                  return (
+                    <tr key={m.ID}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                          <span className="cn-av" style={{ width: 26, height: 26, fontSize: 11 }}>
+                            {m.Name.slice(0, 1)}
+                          </span>
+                          <div>
+                            <div style={{ fontWeight: 570 }}>{m.Name}</div>
+                            <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 1 }}>
+                              {m.Email ?? m.Phone ?? "—"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ color: "var(--ink-2)" }}>{roleById.get(m.RoleID)?.Name ?? "—"}</td>
+                      <td>
+                        <Tag tone={st.tone}>{st.label}</Tag>
+                      </td>
+                      <td className="cn-r cn-mono">{a?.spend ? fmt(a.spend) : "—"}</td>
+                      <td className="cn-r cn-mono" style={{ color: "var(--ink-3)" }}>
+                        {a?.last ? formatAgo(a.last) : "—"}
+                      </td>
+                      <td>
+                        <div className="cn-row-acts">
+                          {m.Status === "pending_review" && (
+                            <button className="cn-mini-btn cn-mini-pri" onClick={() => void approve(m.ID)}>
+                              通过
+                            </button>
+                          )}
+                          <button className="cn-icon-act" title="编辑" onClick={() => setEditing(m)}>
+                            <Icon name="edit" size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                <TableState
+                  colSpan={6}
+                  loading={members.loading}
+                  empty={list.length === 0}
+                  title="没有匹配的成员"
+                  desc="成员来自身份源同步或本地注册，不在这里手动创建。"
+                />
+              </tbody>
+            </table>
+          </Card>
         </div>
       </div>
+
+      <NewDepartmentModal
+        open={creatingDept}
+        onClose={() => setCreatingDept(false)}
+        onDone={() => departments.refetch()}
+      />
+      <EditMemberModal
+        member={editing}
+        departments={departments.data ?? []}
+        roles={roles ?? []}
+        onClose={() => setEditing(null)}
+        onDone={() => members.refetch()}
+      />
+      <AdjustPoolModal
+        open={adjusting}
+        department={current}
+        balance={pool.data}
+        onClose={() => setAdjusting(false)}
+        onDone={() => pool.refetch()}
+      />
     </div>
+  )
+}
+
+function poolPct(b?: QuotaBalance): number {
+  if (!b || b.Total <= 0) return 0
+  return Math.min(100, (b.Spoken / b.Total) * 100)
+}
+
+function NewDepartmentModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const [name, setName] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    if (!name.trim()) return
+    setBusy(true)
+    try {
+      await api.post("/api/departments", { name: name.trim() })
+      toast.success("已新建部门")
+      setName("")
+      onDone()
+      onClose()
+    } catch {
+      toast.error("新建失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      title="新建部门"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="cn-btn" onClick={onClose}>
+            取消
+          </button>
+          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+            创建
+          </button>
+        </>
+      }
+    >
+      <div className="cn-form">
+        <Field label="部门名称" optional="必填">
+          <input className="cn-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="研发中心" />
+        </Field>
+      </div>
+    </Modal>
+  )
+}
+
+function EditMemberModal({
+  member,
+  departments,
+  roles,
+  onClose,
+  onDone,
+}: {
+  member: Member | null
+  departments: Department[]
+  roles: Role[]
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [dept, setDept] = useState("")
+  const [role, setRole] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  // Seed from the member being opened rather than from state, so
+  // reopening the dialog on someone else never shows the last person's
+  // values.
+  const deptValue = dept || member?.DepartmentID || ""
+  const roleValue = role || member?.RoleID || ""
+
+  const submit = async () => {
+    if (!member) return
+    setBusy(true)
+    try {
+      if (deptValue !== (member.DepartmentID ?? "")) {
+        await api.patch(`/api/members/${member.ID}/department`, { departmentId: deptValue || null })
+      }
+      if (roleValue !== member.RoleID) {
+        await api.patch(`/api/members/${member.ID}/role`, { roleId: roleValue })
+      }
+      toast.success("已保存")
+      setDept("")
+      setRole("")
+      onDone()
+      onClose()
+    } catch {
+      toast.error("保存失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open={!!member}
+      title={`编辑 ${member?.Name ?? ""}`}
+      sub="成员的部门决定额度池归属，角色决定权限"
+      onClose={() => {
+        setDept("")
+        setRole("")
+        onClose()
+      }}
+      footer={
+        <>
+          <button className="cn-btn" onClick={onClose}>
+            取消
+          </button>
+          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+            保存
+          </button>
+        </>
+      }
+    >
+      <div className="cn-form">
+        <Field label="部门">
+          <select className="cn-input" value={deptValue} onChange={(e) => setDept(e.target.value)}>
+            <option value="">未分配</option>
+            {departments.map((d) => (
+              <option key={d.ID} value={d.ID}>
+                {d.Name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="角色">
+          <select className="cn-input" value={roleValue} onChange={(e) => setRole(e.target.value)}>
+            {roles.map((r) => (
+              <option key={r.ID} value={r.ID}>
+                {r.Name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+    </Modal>
+  )
+}
+
+function AdjustPoolModal({
+  open,
+  department,
+  balance,
+  onClose,
+  onDone,
+}: {
+  open: boolean
+  department?: Department
+  balance?: QuotaBalance
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [total, setTotal] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    if (!department) return
+    const yuan = Number(total)
+    if (!Number.isFinite(yuan) || yuan < 0) {
+      toast.error("请填写正确的金额")
+      return
+    }
+    setBusy(true)
+    try {
+      await api.put(`/api/department-quota-pools/${department.ID}`, { totalCents: Math.round(yuan * 100) })
+      toast.success("已更新额度池")
+      setTotal("")
+      onDone()
+      onClose()
+    } catch {
+      toast.error("更新失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      title={`调整 ${department?.Name ?? ""} 额度池`}
+      sub="部门额度池是审批配额申请时划拨的来源"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="cn-btn" onClick={onClose}>
+            取消
+          </button>
+          <button className="cn-btn cn-btn-pri" disabled={busy} onClick={() => void submit()}>
+            保存
+          </button>
+        </>
+      }
+    >
+      <div className="cn-form">
+        <Field
+          label="额度池总额"
+          optional="必填"
+          hint={
+            balance
+              ? `当前已被 Key 占用 ${fmt(balance.Spoken)}，总额低于这个数会让剩余为负。`
+              : "单位为元。"
+          }
+        >
+          <input
+            className="cn-input"
+            inputMode="decimal"
+            value={total}
+            onChange={(e) => setTotal(e.target.value)}
+            placeholder={balance ? String(balance.Total / 100) : "0"}
+          />
+        </Field>
+      </div>
+    </Modal>
   )
 }
