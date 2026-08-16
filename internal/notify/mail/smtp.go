@@ -4,6 +4,8 @@ package mail
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"mime"
 	"net"
@@ -12,10 +14,38 @@ import (
 	"time"
 )
 
-// dialTimeout bounds both the TCP connect and the TLS handshake. net/smtp
-// has no timeout of its own, so without this a black-holed host hangs the
+// dialTimeout bounds the TCP connect and the TLS handshake. net/smtp has
+// no timeout of its own, so without this a black-holed host hangs the
 // request until the server's own 60s timeout fires.
 const dialTimeout = 15 * time.Second
+
+// conversationTimeout bounds everything after the connect: the greeting,
+// every command, and the message body. Connecting is not the only place a
+// relay can stall -- one that accepts the connection and then says
+// nothing would otherwise hang the request forever, since net/smtp reads
+// the greeting with no deadline and takes no context. A var so tests can
+// shrink it.
+var conversationTimeout = 30 * time.Second
+
+// applyDeadline puts a hard stop on the whole exchange, honouring an
+// earlier deadline from the caller's context if it has one.
+func applyDeadline(ctx context.Context, conn net.Conn) {
+	deadline := time.Now().Add(conversationTimeout)
+	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
+	_ = conn.SetDeadline(deadline)
+}
+
+// tlsRootCAs overrides the roots used to verify a relay's certificate.
+// Production leaves it nil, which means the system pool; the tests set it
+// to trust the throwaway CA they sign their test relay with, so the TLS
+// paths run for real instead of being asserted about.
+var tlsRootCAs *x509.CertPool
+
+func tlsConfig(host string) *tls.Config {
+	return &tls.Config{ServerName: host, RootCAs: tlsRootCAs}
+}
 
 // SMTPSender sends email through a configured SMTP relay. config is
 // expected to hold: host, port, username, password, from_address, and
@@ -54,7 +84,7 @@ func (s *SMTPSender) SendEmail(ctx context.Context, config map[string]any, recip
 	defer func() { _ = client.Close() }()
 
 	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err := client.StartTLS(&tls.Config{ServerName: host}); err != nil {
+		if err := client.StartTLS(tlsConfig(host)); err != nil {
 			return fmt.Errorf("mail: starttls: %w", err)
 		}
 	}
@@ -92,16 +122,23 @@ func (s *SMTPSender) SendEmail(ctx context.Context, config map[string]any, recip
 	return client.Quit()
 }
 
+// implicitTLSPorts are the ports on which the connection is encrypted
+// from the first byte, with no plaintext greeting to upgrade. 465 is the
+// only one in real use; it is a map rather than a literal so the tests
+// can add the ephemeral port their TLS relay landed on.
+var implicitTLSPorts = map[string]bool{"465": true}
+
 // dial opens the connection, wrapping it in TLS up front on 465.
 func dial(ctx context.Context, host, port string) (*smtp.Client, error) {
 	addr := net.JoinHostPort(host, port)
 	d := &net.Dialer{Timeout: dialTimeout}
 
-	if port == "465" {
-		conn, err := tls.DialWithDialer(d, "tcp", addr, &tls.Config{ServerName: host})
+	if implicitTLSPorts[port] {
+		conn, err := tls.DialWithDialer(d, "tcp", addr, tlsConfig(host))
 		if err != nil {
 			return nil, fmt.Errorf("mail: dial %s over tls: %w", addr, err)
 		}
+		applyDeadline(ctx, conn)
 		client, err := smtp.NewClient(conn, host)
 		if err != nil {
 			_ = conn.Close()
@@ -114,6 +151,7 @@ func dial(ctx context.Context, host, port string) (*smtp.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mail: dial %s: %w", addr, err)
 	}
+	applyDeadline(ctx, conn)
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
 		_ = conn.Close()
@@ -148,8 +186,22 @@ func message(fromAddress, fromName, recipient, subject, body string) string {
 // loginAuth implements the non-standard but widely deployed AUTH LOGIN.
 type loginAuth struct{ username, password string }
 
-func (a *loginAuth) Start(_ *smtp.ServerInfo) (string, []byte, error) {
+// Start refuses to hand the password to an unencrypted connection, which
+// is the same guard smtp.PlainAuth applies. Without it this type would be
+// a quiet downgrade: choosing LOGIN over PLAIN would also be choosing to
+// put the credential on the wire in the clear.
+//
+// A loopback relay is exempted for the same reason net/smtp exempts it --
+// there is no network to intercept, and local test relays speak plaintext.
+func (a *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	if !server.TLS && !isLocalhost(server.Name) {
+		return "", nil, errors.New("mail: refusing to send credentials over an unencrypted connection")
+	}
 	return "LOGIN", nil, nil
+}
+
+func isLocalhost(name string) bool {
+	return name == "localhost" || name == "127.0.0.1" || name == "::1"
 }
 
 func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {

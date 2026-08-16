@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	netmail "net/mail"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -14,17 +17,41 @@ import (
 	"github.com/amigoer/fluxa/internal/notify"
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
+	"github.com/amigoer/fluxa/internal/platform/ratelimit"
 	"github.com/amigoer/fluxa/internal/rbac"
 	"github.com/amigoer/fluxa/internal/user/identity"
 )
 
 const otpTTL = 5 * time.Minute
 
+// OTP rate limits.
+//
+// Everything a caller can observe is enforced in memory, keyed on the
+// address as typed, because those checks run before the account lookup
+// and so answer identically for a registered and an unknown address. The
+// one database-backed limit is the daily ceiling: it survives restarts
+// and is shared across replicas, but it can only ever accumulate for a
+// real account, which is why the login path never lets it change the
+// reply (see requestLoginOTP).
+const (
+	otpCooldownWindow     = 60 * time.Second
+	otpBurstPerIdentifier = 5
+	otpBurstWindow        = 10 * time.Minute
+	otpBurstPerIP         = 20
+	otpIPWindow           = time.Hour
+	otpDailyPerIdentifier = 10
+)
+
 // errNoNotifyChannel marks the one OTP failure that is a deployment
 // misconfiguration rather than a fault: local accounts are switched on
 // but no SMS or email channel exists to carry the code. Callers turn it
 // into a 503 the caller can act on instead of an opaque 500.
 var errNoNotifyChannel = errors.New("user: no enabled notify channel configured")
+
+// errOTPRateLimited is returned once any of the four limits is hit. It is
+// deliberately one error rather than four: telling the caller which limit
+// they tripped tells an attacker how to pace the next attempt.
+var errOTPRateLimited = errors.New("user: too many verification code requests")
 
 // Handler wires the User module's HTTP surface: setup, login (Feishu +
 // local OTP), session-authenticated member/department/role/identity
@@ -37,15 +64,25 @@ type Handler struct {
 	sessions *SessionManager
 	feishu   *identity.FeishuAdapter
 	baseURL  string
+
+	// Limiters for the OTP endpoints, which are public, take an arbitrary
+	// address, and now that the mail channel actually delivers, make the
+	// server send real mail (and real, billable SMS) on demand.
+	otpCooldown      *ratelimit.Window
+	otpPerIdentifier *ratelimit.Window
+	otpPerIP         *ratelimit.Window
 }
 
 func NewHandler(service *Service, repo *Repo, sessions *SessionManager, baseURL string) *Handler {
 	return &Handler{
-		service:  service,
-		repo:     repo,
-		sessions: sessions,
-		feishu:   identity.NewFeishuAdapter(),
-		baseURL:  baseURL,
+		service:          service,
+		repo:             repo,
+		sessions:         sessions,
+		feishu:           identity.NewFeishuAdapter(),
+		baseURL:          baseURL,
+		otpCooldown:      ratelimit.NewWindow(1, otpCooldownWindow),
+		otpPerIdentifier: ratelimit.NewWindow(otpBurstPerIdentifier, otpBurstWindow),
+		otpPerIP:         ratelimit.NewWindow(otpBurstPerIP, otpIPWindow),
 	}
 }
 
@@ -299,7 +336,54 @@ type otpRequest struct {
 	Identifier string `json:"identifier"`
 }
 
+// allowOTPRequest applies the burst limits that must answer identically
+// whether or not the identifier belongs to an account.
+//
+// Order matters on the login path: these run before the account lookup,
+// so a limited caller and an unknown address get the same reply. Checking
+// after the lookup would have turned the limiter itself into an oracle
+// for which addresses are registered.
+func (h *Handler) allowOTPRequest(r *http.Request, identifier string) bool {
+	// All three are consulted, not short-circuited: a caller who trips one
+	// window should still have the attempt counted against the others,
+	// otherwise the cheapest limit to trip would shield the rest.
+	okCooldown := h.otpCooldown.Allow(identifier)
+	okBurst := h.otpPerIdentifier.Allow(identifier)
+	okIP := h.otpPerIP.Allow(clientIP(r))
+	return okCooldown && okBurst && okIP
+}
+
+func clientIP(r *http.Request) string {
+	// chi's RealIP middleware has already resolved this from the proxy
+	// headers where one is in front; RemoteAddr is what is left otherwise.
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// checkOTPQuota enforces the daily ceiling on codes sent to one address.
+// It reads from local_otp_codes rather than memory so that it holds
+// across a restart and across replicas -- the property that matters for
+// the limit whose job is to bound how much mail one address can be made
+// to receive, rather than to blunt a burst.
+func (h *Handler) checkOTPQuota(ctx context.Context, identifier string) error {
+	count, _, err := h.repo.CountOTPsSince(ctx, identifier, time.Now().Add(-24*time.Hour))
+	if err != nil {
+		return err
+	}
+	if count >= otpDailyPerIdentifier {
+		return errOTPRateLimited
+	}
+	return nil
+}
+
 func (h *Handler) sendOTP(ctx context.Context, identifier string, purpose OTPPurpose) error {
+	if err := h.checkOTPQuota(ctx, identifier); err != nil {
+		return err
+	}
+
 	code, err := identity.GenerateOTP()
 	if err != nil {
 		return err
@@ -307,13 +391,13 @@ func (h *Handler) sendOTP(ctx context.Context, identifier string, purpose OTPPur
 	if err := h.repo.CreateOTP(ctx, identifier, purpose, identity.HashOTP(code), time.Now().Add(otpTTL)); err != nil {
 		return err
 	}
-	return h.deliverOTP(ctx, identifier, code)
+	return h.deliverOTP(ctx, identifier, code, purpose)
 }
 
 // deliverOTP sends code through whichever channel (SMS or email) is
 // configured for identifier's shape, using the pluggable notify package
 // (DESIGN.md 7.1: not hardcoded to one vendor).
-func (h *Handler) deliverOTP(ctx context.Context, identifier, code string) error {
+func (h *Handler) deliverOTP(ctx context.Context, identifier, code string, purpose OTPPurpose) error {
 	kind := NotifyChannelEmail
 	if isPhone(identifier) {
 		kind = NotifyChannelSMS
@@ -333,16 +417,22 @@ func (h *Handler) deliverOTP(ctx context.Context, identifier, code string) error
 		return fmt.Errorf("%w: %s is enabled but not configured", errNoNotifyChannel, kind)
 	}
 
-	message := fmt.Sprintf("Your Fluxa verification code is %s, valid for 5 minutes.", code)
+	// SMS carries the bare code because the vendor's template supplies the
+	// wording; email carries the whole sentence, in the console's language.
+	body := fmt.Sprintf("你的 Fluxa 验证码是 %s，5 分钟内有效。\r\n\r\n如果这不是你本人的操作，忽略这封邮件即可。", code)
 	if kind == NotifyChannelSMS {
 		err = notify.SendSMS(ctx, channel.Provider, channel.Config, identifier, code)
 	} else {
-		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, "Fluxa 验证码", message)
+		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, "Fluxa 验证码", body)
 	}
 	if err != nil {
+		// Recorded before returning: "我没收到验证码" is otherwise
+		// unanswerable from the server side, since the request itself
+		// leaves no trace of having tried.
+		_ = h.repo.LogNotifyFailed(ctx, kind, identifier, string(purpose), err)
 		return err
 	}
-	return h.repo.LogNotifySent(ctx, kind, identifier, string(OTPPurposeLogin))
+	return h.repo.LogNotifySent(ctx, kind, identifier, string(purpose))
 }
 
 func isPhone(identifier string) bool {
@@ -369,6 +459,10 @@ func (h *Handler) requestRegisterOTP(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	if !h.allowOTPRequest(r, req.Identifier) {
+		writeOTPError(w, errOTPRateLimited)
+		return
+	}
 	if err := h.sendOTP(r.Context(), req.Identifier, OTPPurposeRegister); err != nil {
 		writeOTPError(w, err)
 		return
@@ -382,6 +476,10 @@ func (h *Handler) requestRegisterOTP(w http.ResponseWriter, r *http.Request) {
 func writeOTPError(w http.ResponseWriter, err error) {
 	if errors.Is(err, errNoNotifyChannel) {
 		httpx.Error(w, http.StatusServiceUnavailable, i18n.KeyNotifyChannelMissing, err.Error())
+		return
+	}
+	if errors.Is(err, errOTPRateLimited) {
+		httpx.Error(w, http.StatusTooManyRequests, i18n.KeyTooManyRequests, err.Error())
 		return
 	}
 	httpx.InternalError(w, err)
@@ -471,12 +569,30 @@ func (h *Handler) requestLoginOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ahead of the account lookup on purpose: the burst windows count
+	// registered and unknown addresses alike, so a 429 here says nothing
+	// about whether the address exists. The durable daily cap inside
+	// sendOTP can only accumulate for a real account, so it stays behind
+	// this uniform gate rather than being the first thing a prober meets.
+	if !h.allowOTPRequest(r, req.Identifier) {
+		writeOTPError(w, errOTPRateLimited)
+		return
+	}
+
 	if _, err := h.repo.FindLocalAccountByIdentifier(r.Context(), req.Identifier); err != nil {
 		// Do not reveal whether the identifier is registered.
 		httpx.JSON(w, http.StatusOK, nil)
 		return
 	}
 	if err := h.sendOTP(r.Context(), req.Identifier, OTPPurposeLogin); err != nil {
+		if errors.Is(err, errOTPRateLimited) {
+			// The daily ceiling only ever accumulates for an address that
+			// has an account, so answering 429 here would confirm one
+			// exists. Give the same reply an unknown address gets; the
+			// windows above are what tell an honest caller to slow down.
+			httpx.JSON(w, http.StatusOK, nil)
+			return
+		}
 		writeOTPError(w, err)
 		return
 	}
@@ -879,7 +995,9 @@ func (h *Handler) putNotifyChannel(w http.ResponseWriter, r *http.Request) {
 	// the login page offers local accounts -- treats the flag as a promise
 	// that a code will arrive.
 	if channel.Enabled && !notify.Configured(channel.Provider, channel.Config) {
-		httpx.Error(w, http.StatusBadRequest, i18n.KeyValidationFailed,
+		// Its own key rather than the generic validation one: "请求参数有误"
+		// tells an admin nothing about which box to go back and fill.
+		httpx.Error(w, http.StatusBadRequest, i18n.KeyNotifyChannelIncomplete,
 			"the channel is missing required credentials and cannot be enabled")
 		return
 	}
@@ -914,8 +1032,13 @@ func (h *Handler) testNotifyChannel(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if req.Recipient == "" {
-		httpx.Error(w, http.StatusBadRequest, i18n.KeyValidationFailed, "recipient is required")
+	// Parsed, not just checked for emptiness: the browser trims and type
+	// checks the field, and anything calling the API directly does not.
+	// A malformed address otherwise reaches the relay and comes back as a
+	// confusing upstream error.
+	recipient, err := parseEmailAddress(req.Recipient)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, i18n.KeyValidationFailed, err.Error())
 		return
 	}
 
@@ -931,18 +1054,42 @@ func (h *Handler) testNotifyChannel(w http.ResponseWriter, r *http.Request) {
 
 	body := "这是一封来自 Fluxa 的测试邮件。\r\n\r\n" +
 		"收到它说明发信通道配置正确，本地账号的注册和登录验证码可以正常送达。"
-	if err := notify.SendEmail(r.Context(), channel.Provider, channel.Config, req.Recipient, "Fluxa 测试邮件", body); err != nil {
+	if err := notify.SendEmail(r.Context(), channel.Provider, channel.Config, recipient, "Fluxa 测试邮件", body); err != nil {
+		_ = h.repo.LogNotifyFailed(r.Context(), kind, recipient, notifyPurposeTest, err)
 		// The upstream message is the entire value of this button:
 		// "authentication failed" and "connection timed out" need
-		// different fixes, and only the relay knows which happened.
-		httpx.Error(w, http.StatusBadGateway, i18n.KeyValidationFailed, err.Error())
+		// different fixes, and only the relay knows which happened. It
+		// travels under its own key so the frontend renders the detail
+		// rather than replacing it with generic validation copy.
+		httpx.Error(w, http.StatusBadGateway, i18n.KeyNotifySendFailed, err.Error())
 		return
 	}
-	if err := h.repo.LogNotifySent(r.Context(), kind, req.Recipient, "test"); err != nil {
+	if err := h.repo.LogNotifySent(r.Context(), kind, recipient, notifyPurposeTest); err != nil {
 		httpx.InternalError(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, nil)
+}
+
+// notifyPurposeTest marks a message sent by the 测试 button rather than by
+// an authentication flow.
+const notifyPurposeTest = "test"
+
+// parseEmailAddress accepts what a mail server will: one addr-spec, with
+// no display name and no group syntax.
+func parseEmailAddress(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", errors.New("recipient is required")
+	}
+	addr, err := netmail.ParseAddress(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("%q is not a valid email address", trimmed)
+	}
+	if addr.Name != "" || addr.Address != trimmed {
+		return "", fmt.Errorf("%q must be a bare email address", trimmed)
+	}
+	return addr.Address, nil
 }
 
 // -- helpers --------------------------------------------------------------

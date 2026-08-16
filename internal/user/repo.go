@@ -357,6 +357,29 @@ func (r *Repo) FindLocalAccountByIdentifier(ctx context.Context, identifier stri
 }
 
 // CreateOTP stores a new one-time code, hashed, for identifier/purpose.
+// CountOTPsSince reports how many codes were issued to identifier since
+// `since`, and when the most recent one went out. Both come from one
+// query because the caller needs both to answer "may I send another?".
+//
+// This is the durable half of the OTP rate limit: it survives a restart
+// and is shared across replicas, which the in-process limiter is not.
+func (r *Repo) CountOTPsSince(ctx context.Context, identifier string, since time.Time) (int, time.Time, error) {
+	var count int
+	var latest *time.Time
+	err := r.pool.QueryRow(ctx, `
+		SELECT count(*), max(created_at) FROM local_otp_codes
+		WHERE identifier = $1 AND created_at >= $2`,
+		identifier, since,
+	).Scan(&count, &latest)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	if latest == nil {
+		return count, time.Time{}, nil
+	}
+	return count, *latest, nil
+}
+
 func (r *Repo) CreateOTP(ctx context.Context, identifier string, purpose OTPPurpose, codeHash string, expiresAt time.Time) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO local_otp_codes (identifier, purpose, code_hash, expires_at)
@@ -366,28 +389,47 @@ func (r *Repo) CreateOTP(ctx context.Context, identifier string, purpose OTPPurp
 	return err
 }
 
-// ConsumeOTP atomically marks the newest unconsumed, unexpired code for
-// identifier/purpose as consumed if its hash matches, returning whether
-// it matched. Using UPDATE ... RETURNING makes the check-and-consume a
-// single round trip so two concurrent attempts can't both succeed.
+// maxOTPAttempts is how many guesses one code will tolerate before it is
+// spent. Five is comfortably more than a person mistypes and nowhere near
+// enough to search a six-digit space.
+const maxOTPAttempts = 5
+
+// ConsumeOTP atomically marks the newest live code for identifier/purpose
+// as consumed if its hash matches, returning whether it matched. Using
+// UPDATE ... RETURNING makes the check-and-consume a single round trip so
+// two concurrent attempts can't both succeed.
+//
+// The row is selected without matching the hash, and every attempt --
+// right or wrong -- increments the counter, which is what makes a wrong
+// guess cost something. Selecting by hash instead (as this did before)
+// meant a wrong guess simply found no row and could be repeated forever.
 func (r *Repo) ConsumeOTP(ctx context.Context, identifier string, purpose OTPPurpose, codeHash string) (bool, error) {
-	var id string
+	var matched bool
 	err := r.pool.QueryRow(ctx, `
-		UPDATE local_otp_codes SET consumed_at = now()
+		UPDATE local_otp_codes
+		SET attempts = attempts + 1,
+		    consumed_at = CASE WHEN code_hash = $3 THEN now() ELSE consumed_at END
 		WHERE id = (
 			SELECT id FROM local_otp_codes
-			WHERE identifier = $1 AND purpose = $2 AND code_hash = $3
+			WHERE identifier = $1 AND purpose = $2
 			  AND consumed_at IS NULL AND expires_at > now()
+			  AND attempts < $4
 			ORDER BY created_at DESC
 			LIMIT 1
 		)
-		RETURNING id`,
-		identifier, purpose, codeHash,
-	).Scan(&id)
+		RETURNING code_hash = $3`,
+		identifier, purpose, codeHash, maxOTPAttempts,
+	).Scan(&matched)
 	if errors.Is(err, pgx.ErrNoRows) {
+		// No live code left: never issued, already used, expired, or its
+		// attempts are spent. All of these are "invalid code" to the
+		// caller -- distinguishing them would say more than it should.
 		return false, nil
 	}
-	return err == nil, err
+	if err != nil {
+		return false, err
+	}
+	return matched, nil
 }
 
 // -- Sessions -----------------------------------------------------------
@@ -476,19 +518,52 @@ func (r *Repo) UpsertNotifyChannel(ctx context.Context, c NotifyChannel) error {
 	return err
 }
 
+// Outcomes recorded in notify_log.
+const (
+	NotifyStatusSent   = "sent"
+	NotifyStatusFailed = "failed"
+)
+
+// failureTextLimit keeps one pathological upstream message from bloating
+// the row. Every SMTP error worth reading fits well inside it.
+const failureTextLimit = 500
+
+// LogNotifySent records a delivered message.
 func (r *Repo) LogNotifySent(ctx context.Context, kind NotifyChannelKind, recipient, purpose string) error {
+	return r.logNotify(ctx, kind, recipient, purpose, NotifyStatusSent, "")
+}
+
+// LogNotifyFailed records an attempt the vendor rejected, with the reason.
+// Failures were previously not recorded at all, which left "the code never
+// arrived" with nothing on the server side to look at.
+func (r *Repo) LogNotifyFailed(ctx context.Context, kind NotifyChannelKind, recipient, purpose string, cause error) error {
+	text := cause.Error()
+	if len(text) > failureTextLimit {
+		text = text[:failureTextLimit]
+	}
+	return r.logNotify(ctx, kind, recipient, purpose, NotifyStatusFailed, text)
+}
+
+func (r *Repo) logNotify(ctx context.Context, kind NotifyChannelKind, recipient, purpose, status, failure string) error {
+	var errText *string
+	if failure != "" {
+		errText = &failure
+	}
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO notify_log (kind, recipient, purpose) VALUES ($1, $2, $3)`,
-		kind, recipient, purpose,
+		`INSERT INTO notify_log (kind, recipient, purpose, status, error) VALUES ($1, $2, $3, $4, $5)`,
+		kind, recipient, purpose, status, errText,
 	)
 	return err
 }
 
+// CountNotifySentThisMonth counts delivered messages only: a failed
+// attempt costs no quota at the vendor and should not read as usage.
 func (r *Repo) CountNotifySentThisMonth(ctx context.Context, kind NotifyChannelKind) (int, error) {
 	var n int
 	err := r.pool.QueryRow(ctx, `
 		SELECT count(*) FROM notify_log
-		WHERE kind = $1 AND sent_at >= date_trunc('month', now())`, kind,
+		WHERE kind = $1 AND status = $2 AND sent_at >= date_trunc('month', now())`,
+		kind, NotifyStatusSent,
 	).Scan(&n)
 	return n, err
 }

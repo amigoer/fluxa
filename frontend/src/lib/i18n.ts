@@ -63,3 +63,52 @@ export type TranslationKey = keyof typeof zhCN
 export function t(key: TranslationKey): string {
   return zhCN[key]
 }
+
+// The i18n.Key values the backend returns on errors. Without this the
+// only thing a page could show was the server's English `detail`, so
+// every failure toast read like a stack trace in an otherwise Chinese
+// console.
+const errorText: Record<string, string> = {
+  "auth.invalid_credentials": "验证码或凭据无效",
+  "auth.account_pending_review": "账号待管理员审批",
+  "auth.session_expired": "登录已过期，请重新登录",
+  "auth.notify_channel_missing": "尚未配置可用的发信通道",
+  "notify.send_failed": "发送失败",
+  "notify.channel_incomplete": "必填项没有填完，无法启用该通道",
+  "rbac.permission_denied": "没有权限执行该操作",
+  "quota.exceeded": "配额已用尽",
+  "provider.unavailable": "上游服务不可用",
+  "common.validation_failed": "请求参数有误",
+  "common.not_found": "资源不存在",
+  "common.too_many_requests": "操作过于频繁，请稍后再试",
+  "common.internal_error": "服务器内部错误",
+}
+
+// Keys whose server-side detail is the actionable part. For an SMTP
+// failure "认证失败" and "连接超时" need different fixes, and only the
+// relay knows which happened -- dropping the detail to keep the copy tidy
+// would throw away the reason the admin pressed the button.
+const detailedErrorKeys = new Set(["notify.send_failed"])
+
+type KeyedError = { key: string; detail?: string }
+
+function isKeyedError(err: unknown): err is KeyedError {
+  return typeof err === "object" && err !== null && typeof (err as KeyedError).key === "string"
+}
+
+// tError renders an API error for display. Pass the fallback the call
+// site would have shown on its own.
+export function tError(err: unknown, fallback: string): string {
+  if (!isKeyedError(err)) return fallback
+
+  const text = errorText[err.key]
+  if (!text) {
+    // An unmapped key still beats a generic message when the server
+    // bothered to explain itself.
+    return err.detail || fallback
+  }
+  if (detailedErrorKeys.has(err.key) && err.detail) {
+    return `${text}：${err.detail}`
+  }
+  return text
+}

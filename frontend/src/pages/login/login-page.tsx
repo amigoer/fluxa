@@ -70,7 +70,11 @@ export function LoginPage() {
           ? "管理员还没有配置短信 / 邮件通道，验证码发不出来"
           : key === "common.validation_failed"
             ? "本地账号登录未启用"
-            : "发送失败，请检查手机号 / 邮箱",
+            : // Without this the rate limiter reads as a bad address and
+              // sends people off to "fix" a phone number that was fine.
+              key === "common.too_many_requests"
+              ? "验证码请求过于频繁，请稍后再试"
+              : "发送失败，请检查手机号 / 邮箱",
       )
     } finally {
       setBusy(false)

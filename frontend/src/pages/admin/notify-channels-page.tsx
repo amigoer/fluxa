@@ -5,6 +5,7 @@ import { Icon } from "@/components/console/icon"
 import { Card, Field, Input, Modal, PageHead, Switch, Tag } from "@/components/console/ui"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { tError } from "@/lib/i18n"
 import type { NotifyChannel } from "@/lib/types"
 
 // 短信 / 邮件配置 -- same pluggable-adapter card variant as 身份源. These
@@ -77,6 +78,7 @@ type ChannelSpec = (typeof CHANNELS)[number]
 function ChannelCard({ spec }: { spec: ChannelSpec }) {
   const { member } = useAuth()
   const [channel, setChannel] = useState<NotifyChannel | null>(null)
+  const [sentThisMonth, setSentThisMonth] = useState(0)
   const [editing, setEditing] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -94,6 +96,7 @@ function ChannelCard({ spec }: { spec: ChannelSpec }) {
       .get<{ channel: NotifyChannel; sentThisMonth: number }>(`/api/notify-channels/${spec.kind}`)
       .then((res) => {
         setChannel(res.channel)
+        setSentThisMonth(res.sentThisMonth ?? 0)
         // Secrets come back masked, so they are deliberately not seeded
         // into the form: an untouched field means "keep what is stored".
         const seed: Record<string, string> = {}
@@ -119,8 +122,11 @@ function ChannelCard({ spec }: { spec: ChannelSpec }) {
       setEditing(false)
       load()
       toast.success("已保存")
-    } catch {
-      toast.error("保存失败")
+    } catch (err) {
+      // Swallowing this used to hide the one thing the admin needed: the
+      // server refuses to enable a channel that is missing required
+      // credentials, and said so, into a generic "保存失败".
+      toast.error(tError(err, "保存失败"))
     } finally {
       setBusy(false)
     }
@@ -142,8 +148,8 @@ function ChannelCard({ spec }: { spec: ChannelSpec }) {
     } catch (err) {
       // The relay's own words, not a generic failure: "认证失败" and
       // "连接超时" need different fixes and this is the only place that
-      // knows which happened.
-      toast.error(err instanceof Error && err.message ? `发送失败：${err.message}` : "发送失败")
+      // knows which happened. tError keeps the detail for this key.
+      toast.error(tError(err, "发送失败"))
     } finally {
       setSending(false)
     }
@@ -204,6 +210,13 @@ function ChannelCard({ spec }: { spec: ChannelSpec }) {
             </span>
           </div>
         ))}
+        {/* The endpoint has always returned this count; nothing displayed
+            it, so the one number that says whether the channel is doing
+            any work was being fetched and dropped. */}
+        <div className="cn-kv">
+          <span className="cn-kv-k">本月已发送</span>
+          <span className="cn-kv-v">{sentThisMonth} 条</span>
+        </div>
       </div>
 
       <Modal

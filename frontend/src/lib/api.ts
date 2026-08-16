@@ -3,11 +3,17 @@
 export class ApiError extends Error {
   status: number
   key: string
+  // Kept separately from `message` because the two are for different
+  // readers: `key` picks the localized sentence a user sees, while
+  // `detail` is the server's own words -- an upstream SMTP failure, say --
+  // which only some call sites should show and none should translate.
+  detail?: string
 
   constructor(status: number, key: string, detail?: string) {
     super(detail || key)
     this.status = status
     this.key = key
+    this.detail = detail
   }
 }
 
