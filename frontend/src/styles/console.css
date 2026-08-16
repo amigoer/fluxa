@@ -58,7 +58,6 @@
 .cn[data-side="collapsed"] .cn-side { width: 60px; padding-left: 8px; padding-right: 8px; }
 .cn[data-side="collapsed"] .cn-brand { flex-direction: column; gap: 8px; padding: 0 0 12px; }
 .cn[data-side="collapsed"] .cn-brand-text { display: none; }
-.cn[data-side="collapsed"] .cn-side-toggle { margin-left: 0; }
 
 .cn[data-side="collapsed"] .cn-nav { overflow: visible; gap: 10px; }
 .cn[data-side="collapsed"] .cn-group-label { display: none; }
@@ -791,7 +790,17 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
    改一处就要改另一处。 */
 
 .cn-matrix-wrap { overflow-x: auto; }
-.cn-nav-toggle { display: none; }
+
+/* Sidebar control, top bar resident: collapses the rail on a desktop and
+   opens the drawer on a phone. It sits here rather than inside the
+   sidebar so it neither slides away with the rail nor becomes
+   unreachable once the drawer is closed. */
+.cn-nav-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; width: 34px; height: 34px; margin-left: -6px;
+  border-radius: 8px; color: var(--ink-2);
+}
+.cn-nav-toggle:hover { background: #f4f6fa; color: var(--ink); }
 
 /* 4 栏在 1180 以下每栏不足 260px，KPI 的 25px 数字和图表都开始挤。 */
 @media (max-width: 1180px) {
@@ -799,13 +808,6 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
 }
 
 @media (max-width: 900px) {
-  .cn-nav-toggle {
-    display: inline-flex; align-items: center; justify-content: center;
-    flex: none; width: 34px; height: 34px; margin-left: -6px;
-    border-radius: 8px; color: var(--ink-2);
-  }
-  .cn-nav-toggle:hover { background: #f4f6fa; color: var(--ink); }
-
   /* 宽度和内边距在这里重写，是为了压过收起态那条同权重规则。布局层已经
      保证窄屏不会带 data-side="collapsed"，但样式不该依赖那个保证。 */
   .cn .cn-side,
@@ -844,6 +846,15 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
 
   .cn-filters-right { margin-left: 0; }
   .cn-field-search { width: 100%; }
+
+  /* 卡片头里塞了标题 + 分段控件 + 操作时（快速接入的「代码示例」就是），
+     375 下 flex 会一路压到逐字换行——「代码/示例」「复/制」。让整行换行，
+     每个元件自身不断字，分段控件不被压缩。 */
+  .cn-card-head, .cn-code-head { flex-wrap: wrap; }
+  .cn-card-title, .cn-card-link, .cn-copy { white-space: nowrap; flex: none; }
+  .cn-tabs { flex: none; }
+  /* margin-left:auto 会把换行后独占一行的按钮顶到最右，贴左更自然。 */
+  .cn-copy { margin-left: 0; }
 
   /* 三段页脚加右侧说明在 375 下会撑出横向滚动。 */
   .cn-foot { height: auto; padding: 9px 14px; flex-wrap: wrap; gap: 6px 10px; }

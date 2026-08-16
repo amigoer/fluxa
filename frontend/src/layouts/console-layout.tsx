@@ -242,7 +242,12 @@ function TodoDrawer({
           "bg-[var(--panel)] p-0 shadow-[-14px_0_40px_-18px_rgba(22,35,58,.34)]"
         }
       >
-        <SheetHeader className="cn-drawer-head block space-y-0 p-0">
+        {/* SheetHeader ships `flex flex-col gap-1.5 p-4`, and Tailwind's
+            utilities layer sits after the `fluxa` layer -- so .cn-drawer-head
+            could never win, and the title, the count and the close button
+            stacked down the top-left corner with no padding. The row is
+            restated as utilities, the way the other primitives here do it. */}
+        <SheetHeader className="cn-drawer-head flex-row items-center gap-[9px] space-y-0 px-4 pt-[15px] pb-[13px]">
           <SheetTitle className="cn-drawer-title text-inherit font-inherit">需要你处理</SheetTitle>
           <SheetDescription className="sr-only">熔断、预算、审批与安全事件的待办队列</SheetDescription>
           <span className="cn-rail-count">{todos.length}</span>
@@ -562,14 +567,19 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
               <div className="cn-brand-name">Fluxa</div>
               <div className="cn-brand-sub">{orgName || "企业 AI 网关"}</div>
             </div>
-            <button
-              className="cn-side-toggle"
-              onClick={() => (narrow ? setNavOpen(false) : setCollapsed((v) => !v))}
-              title={narrow ? "关闭导航" : collapsed ? "展开侧边栏" : "收起侧边栏"}
-              aria-label={narrow ? "关闭导航" : collapsed ? "展开侧边栏" : "收起侧边栏"}
-            >
-              <Icon name={narrow ? "x" : collapsed ? "sidebar-expand" : "sidebar-collapse"} size={17} />
-            </button>
+            {/* Only the drawer needs a close button of its own; collapsing
+                is driven from the top bar, where the control stays put
+                instead of moving with the rail it resizes. */}
+            {narrow && (
+              <button
+                className="cn-side-toggle"
+                onClick={() => setNavOpen(false)}
+                title="关闭导航"
+                aria-label="关闭导航"
+              >
+                <Icon name="x" size={17} />
+              </button>
+            )}
           </div>
 
           <div className="cn-nav">
@@ -607,13 +617,18 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
 
         <div className="cn-body">
           <div className="cn-top">
+            {/* One control, two jobs: on a desktop it collapses the rail
+                beside it, on a phone it opens the rail as a drawer over the
+                content. Both live in the top bar so the button does not
+                move (or vanish) with the thing it operates on. */}
             <button
               className="cn-nav-toggle"
-              onClick={() => setNavOpen(true)}
-              aria-label="打开导航"
-              aria-expanded={navOpen}
+              onClick={() => (narrow ? setNavOpen(true) : setCollapsed((v) => !v))}
+              title={narrow ? "打开导航" : collapsed ? "展开侧边栏" : "收起侧边栏"}
+              aria-label={narrow ? "打开导航" : collapsed ? "展开侧边栏" : "收起侧边栏"}
+              aria-expanded={narrow ? navOpen : !collapsed}
             >
-              <Icon name="menu" size={18} />
+              <Icon name={narrow ? "menu" : collapsed ? "sidebar-expand" : "sidebar-collapse"} size={18} />
             </button>
             <div className="cn-crumb">
               {root} <Icon name="chevron-right" size={12} /> <b>{current}</b>
