@@ -5,10 +5,19 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react"
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -309,113 +318,237 @@ function TodoDrawer({
   )
 }
 
-// ---- top-bar search ---------------------------------------------------
+// ---- command palette --------------------------------------------------
 // The mockup's placeholder promises members, keys and request IDs, so the
-// box does exactly those three: it jumps to a page, to a member, to a key,
-// or hands the raw string to the call log as a filter.
+// palette does exactly those three: it jumps to a page, to a member, to a
+// key, or hands the raw string to the call log as a filter.
+//
+// It used to be a 260px field in the top bar with a panel hung underneath.
+// A centred dialog serves the same job better: the field was the first
+// thing to lose room as the top bar narrowed (on a phone it had to be
+// hidden outright), an absolutely-positioned panel had nowhere to go at
+// that width, and an empty field could only say "type something" -- the
+// palette opens on the nav itself, so it is useful before the first
+// keystroke. The top bar keeps the same 260x34 box as the trigger.
 
-function useOnOutsideClick(ref: { current: HTMLElement | null }, onOut: () => void, active: boolean) {
-  useEffect(() => {
-    if (!active) return
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onOut()
-    }
-    window.addEventListener("mousedown", onDown)
-    return () => window.removeEventListener("mousedown", onDown)
-  }, [ref, onOut, active])
+interface Hit {
+  id: string
+  icon: string
+  label: string
+  hint?: string
+  to: string
 }
 
 function OmniSearch({ pages, logs }: { pages: { to: string; label: string }[]; logs: boolean }) {
   const navigate = useNavigate()
   const { permissions } = useAuth()
-  const [q, setQ] = useState("")
   const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
-  useOnOutsideClick(box, () => setOpen(false), open)
+  const [q, setQ] = useState("")
+  const [active, setActive] = useState(0)
+  const list = useRef<HTMLDivElement>(null)
 
-  const wantsMembers = open && permissions.has(Permission.OrgManageMembers)
-  const members = useApiQuery<Member[]>(wantsMembers ? "/api/members" : null)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setOpen((v) => !v)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
+  // Neither list is worth fetching until the palette is actually open.
+  const members = useApiQuery<Member[]>(
+    open && permissions.has(Permission.OrgManageMembers) ? "/api/members" : null,
+  )
   const keys = useApiQuery<VirtualKey[]>(open ? "/api/virtual-keys" : null)
 
   const needle = q.trim().toLowerCase()
-  const hitPages = needle ? pages.filter((p) => p.label.toLowerCase().includes(needle)).slice(0, 4) : []
-  const hitMembers = needle
-    ? (members.data ?? [])
-        .filter((m) => `${m.Name}${m.Email ?? ""}${m.Phone ?? ""}`.toLowerCase().includes(needle))
-        .slice(0, 4)
-    : []
-  const hitKeys = needle
-    ? (keys.data ?? [])
-        .filter((k) => `${k.Name}${k.SecretPrefix}`.toLowerCase().includes(needle))
-        .slice(0, 4)
-    : []
+
+  const groups = useMemo(() => {
+    const out: { label: string; items: Hit[] }[] = []
+
+    // With an empty box the palette lists the nav itself, so it opens on
+    // something useful instead of an instruction to type.
+    const hitPages = needle ? pages.filter((p) => p.label.toLowerCase().includes(needle)) : pages
+    if (hitPages.length > 0) {
+      out.push({
+        label: needle ? "页面" : "快速跳转",
+        items: hitPages.slice(0, needle ? 5 : 8).map((p) => ({
+          id: `page:${p.to}`,
+          icon: "layout-grid",
+          label: p.label,
+          to: p.to,
+        })),
+      })
+    }
+
+    if (!needle) return out
+
+    const hitMembers = (members.data ?? [])
+      .filter((m) => `${m.Name}${m.Email ?? ""}${m.Phone ?? ""}`.toLowerCase().includes(needle))
+      .slice(0, 5)
+    if (hitMembers.length > 0) {
+      out.push({
+        label: "成员",
+        items: hitMembers.map((m) => ({
+          id: `member:${m.ID}`,
+          icon: "users",
+          label: m.Name,
+          hint: m.Email ?? m.Phone ?? undefined,
+          to: "/admin/members",
+        })),
+      })
+    }
+
+    const hitKeys = (keys.data ?? [])
+      .filter((k) => `${k.Name}${k.SecretPrefix}`.toLowerCase().includes(needle))
+      .slice(0, 5)
+    if (hitKeys.length > 0) {
+      out.push({
+        label: "Key",
+        items: hitKeys.map((k) => ({
+          id: `key:${k.ID}`,
+          icon: "key",
+          label: k.Name,
+          hint: k.SecretPrefix,
+          to: "/admin/keys",
+        })),
+      })
+    }
+
+    // Always last: a request id matches nothing above, and this is what
+    // the placeholder promises it can do with one.
+    if (logs) {
+      out.push({
+        label: "调用日志",
+        items: [
+          {
+            id: "logs",
+            icon: "scroll-text",
+            label: `按 “${q.trim()}” 查请求`,
+            to: `/admin/call-logs?q=${encodeURIComponent(q.trim())}`,
+          },
+        ],
+      })
+    }
+
+    return out
+  }, [needle, q, pages, members.data, keys.data, logs])
+
+  const flat = useMemo(() => groups.flatMap((g) => g.items), [groups])
+
+  useEffect(() => setActive(0), [needle])
+
+  // Keep the highlighted row in view while the keyboard drives it.
+  useEffect(() => {
+    list.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: "nearest" })
+  }, [active])
 
   const go = (to: string) => {
     setOpen(false)
-    setQ("")
     navigate(to)
   }
 
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (flat.length === 0) return
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      setActive((i) => (i + 1) % flat.length)
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault()
+      setActive((i) => (i - 1 + flat.length) % flat.length)
+    } else if (e.key === "Enter") {
+      e.preventDefault()
+      go(flat[active].to)
+    }
+  }
+
   return (
-    <div className="cn-search" ref={box}>
-      <Icon name="search" size={14} />
-      <input
-        value={q}
-        placeholder="搜索成员、Key、请求 ID…"
-        aria-label="搜索"
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setQ(e.target.value)
-          setOpen(true)
+    <>
+      <button className="cn-search" onClick={() => setOpen(true)} aria-label="搜索">
+        <Icon name="search" size={14} />
+        <span className="cn-search-ph">搜索成员、Key、请求 ID…</span>
+        <kbd className="cn-kbd">⌘K</kbd>
+      </button>
+
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v)
+          if (v) setQ("")
         }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setOpen(false)
-          if (e.key === "Enter" && needle && logs) go(`/admin/call-logs?q=${encodeURIComponent(q.trim())}`)
-        }}
-      />
-      {open && needle && (
-        <div className="cn-omni">
-          {hitPages.length > 0 && <div className="cn-omni-group">页面</div>}
-          {hitPages.map((p) => (
-            <button key={p.to} className="cn-omni-item" onClick={() => go(p.to)}>
-              <Icon name="layout-grid" size={14} />
-              <b>{p.label}</b>
-            </button>
-          ))}
+      >
+        <DialogPortal>
+          <DialogOverlay className="z-[60] bg-[rgba(16,24,40,.34)]" />
+          <DialogContent
+            showCloseButton={false}
+            className={[
+              // Sits high rather than dead-centre: the list grows downward,
+              // and a vertically centred palette jumps as results arrive.
+              "top-[12%] translate-y-0 z-[60] flex flex-col gap-0 overflow-hidden p-0",
+              "w-[calc(100%-2rem)] sm:max-w-[560px]",
+              "rounded-[14px] border-[var(--line)] bg-[var(--panel)]",
+              "shadow-[0_1px_2px_rgba(22,35,58,.05),0_26px_60px_-26px_rgba(22,35,58,.42)]",
+            ].join(" ")}
+          >
+            <DialogTitle className="sr-only">搜索</DialogTitle>
+            <DialogDescription className="sr-only">搜索页面、成员、Key 与请求 ID</DialogDescription>
 
-          {hitMembers.length > 0 && <div className="cn-omni-group">成员</div>}
-          {hitMembers.map((m) => (
-            <button key={m.ID} className="cn-omni-item" onClick={() => go("/admin/members")}>
-              <Icon name="users" size={14} />
-              <b>{m.Name}</b>
-              <span>{m.Email ?? m.Phone ?? ""}</span>
-            </button>
-          ))}
+            <div className="cn-omni-field">
+              <Icon name="search" size={16} />
+              <input
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="搜索页面、成员、Key、请求 ID…"
+                aria-label="搜索"
+              />
+            </div>
 
-          {hitKeys.length > 0 && <div className="cn-omni-group">Key</div>}
-          {hitKeys.map((k) => (
-            <button key={k.ID} className="cn-omni-item" onClick={() => go("/admin/keys")}>
-              <Icon name="key" size={14} />
-              <b>{k.Name}</b>
-              <span>{k.SecretPrefix}</span>
-            </button>
-          ))}
+            <div className="cn-omni-list" ref={list}>
+              {flat.length === 0 ? (
+                <div className="cn-omni-empty">没有匹配的结果</div>
+              ) : (
+                groups.map((g) => (
+                  <div key={g.label}>
+                    <div className="cn-omni-group">{g.label}</div>
+                    {g.items.map((it) => {
+                      const i = flat.indexOf(it)
+                      return (
+                        <button
+                          key={it.id}
+                          className="cn-omni-item"
+                          data-active={i === active}
+                          onMouseMove={() => setActive(i)}
+                          onClick={() => go(it.to)}
+                        >
+                          <Icon name={it.icon} size={14} />
+                          <b>{it.label}</b>
+                          {it.hint && <span>{it.hint}</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))
+              )}
+            </div>
 
-          {logs && (
-            <>
-              <div className="cn-omni-group">调用日志</div>
-              <button className="cn-omni-item" onClick={() => go(`/admin/call-logs?q=${encodeURIComponent(q.trim())}`)}>
-                <Icon name="scroll-text" size={14} />
-                <b>按 “{q.trim()}” 查请求</b>
-              </button>
-            </>
-          )}
-          {!logs && hitPages.length + hitMembers.length + hitKeys.length === 0 && (
-            <div className="cn-omni-empty">没有匹配的结果</div>
-          )}
-        </div>
-      )}
-    </div>
+            <div className="cn-omni-foot">
+              <kbd>↑</kbd>
+              <kbd>↓</kbd>
+              <span>选择</span>
+              <kbd>↵</kbd>
+              <span>打开</span>
+              <kbd>esc</kbd>
+              <span>关闭</span>
+            </div>
+          </DialogContent>
+        </DialogPortal>
+      </Dialog>
+    </>
   )
 }
 

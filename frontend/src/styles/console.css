@@ -842,9 +842,15 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
   .cn-page-head { flex-wrap: wrap; align-items: flex-start; }
   .cn-page-acts { margin-left: 0; width: 100%; flex-wrap: wrap; }
 
-  /* 顶栏放不下搜索和面包屑两样。导航已经收进抽屉，面包屑是「我在哪」的
-     唯一线索，所以让搜索退场——它在页面内还有各自的筛选框可用。 */
-  .cn-search { display: none; }
+  /* 顶栏放不下完整搜索框和面包屑两样，但搜索现在是弹窗，触发器可以退化成
+     一个图标按钮和铃铛并排——不必像它还是输入框时那样整个藏起来。 */
+  .cn-search {
+    width: 34px; flex: none; padding: 0; margin-left: auto;
+    justify-content: center; background: none;
+  }
+  .cn-search:hover { background: #f4f6fa; }
+  .cn-search-ph, .cn-kbd { display: none; }
+  .cn-top-right { margin-left: 0; }
 
   .cn-filters-right { margin-left: 0; }
   .cn-field-search { width: 100%; }
