@@ -1,0 +1,50 @@
+/* shadcn/ui's semantic tokens, aliased onto the console's own palette.
+   Nothing here introduces a colour -- every value points at a variable
+   already declared in console.css, so a shadcn component drops into the
+   console already wearing its palette instead of neutral's. That is the
+   whole reason the component layer and the hand-written shell can
+   coexist: they read from one set of tokens.
+
+   `inline` matters: it makes the generated utilities emit
+   `var(--panel)` rather than baking in today's hex, so a token edit in
+   console.css still propagates to every shadcn component. */
+
+@theme inline {
+  --color-background: var(--panel);
+  --color-foreground: var(--ink);
+
+  --color-popover: var(--panel);
+  --color-popover-foreground: var(--ink);
+  --color-card: var(--panel);
+  --color-card-foreground: var(--ink);
+
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--brand);
+
+  --color-primary: var(--brand);
+  --color-primary-foreground: #fff;
+
+  /* shadcn uses `accent` for the hovered/highlighted row in menus and
+     listboxes. The console highlights those with a flat grey wash
+     (.cn-menu-item:hover), not the brand tint, so accent maps there and
+     the brand tint is reserved for the selected row. */
+  --color-accent: #f5f7fb;
+  --color-accent-foreground: var(--ink);
+
+  --color-muted: var(--line-2);
+  --color-muted-foreground: var(--ink-3);
+
+  --color-secondary: var(--line-2);
+  --color-secondary-foreground: var(--ink-2);
+
+  --color-destructive: var(--bad);
+  --color-destructive-foreground: #fff;
+
+  /* Matched to the shapes already in console.css: 6px icon buttons,
+     8px fields/inputs, 10px popovers, 14px dialogs. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+}

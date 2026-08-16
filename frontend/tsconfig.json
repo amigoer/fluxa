@@ -3,5 +3,15 @@
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
-  ]
+  ],
+  // Duplicated from tsconfig.app.json purely so tooling that reads the
+  // root config without following project references resolves `@/*`.
+  // The shadcn CLI is the one that matters: without this it writes new
+  // components to a literal `./@/components/ui/` directory.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
 }

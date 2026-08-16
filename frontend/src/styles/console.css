@@ -4,8 +4,10 @@
    「待办栏」——熔断、超预算、待审批这些要人动手的东西不该藏在卡片里排队，
    它们是管理员打开首页的真正理由。 */
 
-.cn {
-  position: relative;   /* 抽屉和遮罩相对这一层定位 */
+/* 色板挂在 :root 而不是 .cn 上：下拉面板、对话框这类浮层会被 portal 到
+   document.body，挂在 .cn 上的变量它们取不到。取值和层级都没变，只是把
+   声明位置抬高一层。 */
+:root {
   --bg: #f4f6fa;
   --panel: #fff;
   --ink: #16233a;
@@ -22,7 +24,10 @@
   --bad: #c0392f;
   --bad-soft: #fdeae8;
   --shadow: 0 1px 2px rgba(22,35,58,.05), 0 4px 14px -6px rgba(22,35,58,.10);
+}
 
+.cn {
+  position: relative;   /* 抽屉和遮罩相对这一层定位 */
   background: var(--bg);
   color: var(--ink);
   letter-spacing: -0.004em;

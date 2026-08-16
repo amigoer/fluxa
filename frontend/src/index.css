@@ -1,3 +1,24 @@
+/* Cascade layers, declared first so the order is fixed no matter what
+   each import re-declares later. Tailwind's preflight lands in `base`,
+   the console's own stylesheets in `fluxa` directly after it, Tailwind's
+   utilities last. That ordering is the whole trick to running a
+   component library next to a hand-written stylesheet:
+
+     preflight < fluxa   base.css's reset -- the one all 23 screens were
+                         drawn against -- survives contact with Tailwind's.
+     fluxa < utilities   a shadcn component's `border` utility is not
+                         wiped out by base.css's blanket `button { border: 0 }`.
+
+   Leaving the console CSS unlayered would break the second half: an
+   unlayered rule outranks every layered one regardless of specificity. */
+@layer theme, base, fluxa, components, utilities;
+
+@import "tailwindcss";
+/* Supplies the enter/exit utilities (animate-in, fade-in-0, zoom-in-95,
+   slide-in-from-top-2) that every shadcn overlay is written against. */
+@import "tw-animate-css";
+@import "./styles/theme.css";
+
 /* The console's whole visual system is the hi-fi design's own CSS, copied
    over rather than re-derived in a utility framework: designs/
    fluxa-console-overview/{base,console,pages}.css. Keeping the exact
@@ -6,6 +27,6 @@
      base.css    reset + `.screen` root
      console.css palette, sidebar, top bar, cards, tables, drawer
      app.css     the interactive pieces a static mockup never needed */
-@import "./styles/base.css";
-@import "./styles/console.css";
-@import "./styles/app.css";
+@import "./styles/base.css" layer(fluxa);
+@import "./styles/console.css" layer(fluxa);
+@import "./styles/app.css" layer(fluxa);
