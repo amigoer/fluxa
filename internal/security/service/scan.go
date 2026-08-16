@@ -1,27 +1,25 @@
-package security
+package service
 
 import (
 	"context"
 	"strings"
 
 	"github.com/amigoer/fluxa/internal/security/rules"
+	"github.com/amigoer/fluxa/internal/security/types"
 )
 
-type Service struct {
-	repo *Repo
-}
-
-func NewService(repo *Repo) *Service {
-	return &Service{repo: repo}
+// ScanService is the DLP check the gateway runs on every request.
+type ScanService interface {
+	Scan(ctx context.Context, text string) (ScanResult, error)
 }
 
 // Hit records that one rule matched during a Scan, without keeping the
-// actual sensitive substring around: SecurityEvent.Description is a
+// actual sensitive substring around: types.SecurityEvent.Description is a
 // fixed, generic phrase (e.g. "身份证号已脱敏", matching the mockup),
 // never the value itself, so the audit trail doesn't become a second
 // place sensitive data leaks from.
 type Hit struct {
-	Rule DLPRule
+	Rule types.DLPRule
 }
 
 // ScanResult is what Service.Scan found in one piece of request text.
@@ -42,7 +40,7 @@ type ScanResult struct {
 // response" performance rule) or a much more involved sliding-window
 // scan across chunk boundaries; v1 accepts the residual risk of a model
 // echoing sensitive input back and leaves that to v2.
-func (s *Service) Scan(ctx context.Context, text string) (ScanResult, error) {
+func (s *service) Scan(ctx context.Context, text string) (ScanResult, error) {
 	enabledRules, err := s.repo.ListEnabledRulesByPriority(ctx)
 	if err != nil {
 		return ScanResult{}, err
@@ -58,7 +56,7 @@ func (s *Service) Scan(ctx context.Context, text string) (ScanResult, error) {
 
 		result.Hits = append(result.Hits, Hit{Rule: rule})
 
-		if rule.Action == ActionBlock {
+		if rule.Action == types.ActionBlock {
 			result.Blocked = true
 			return result, nil
 		}
@@ -78,9 +76,9 @@ func (s *Service) Scan(ctx context.Context, text string) (ScanResult, error) {
 // 7.3: international types like passport/SSN are an intentionally
 // unimplemented extension point). For keyword rules, Pattern is a
 // comma-separated keyword list.
-func findMatches(rule DLPRule, text string) []string {
+func findMatches(rule types.DLPRule, text string) []string {
 	switch rule.MatchType {
-	case MatchTypeRegexChecksum:
+	case types.MatchTypeRegexChecksum:
 		switch rule.Pattern {
 		case "id_card":
 			return rules.FindIDCards(text)
@@ -90,7 +88,7 @@ func findMatches(rule DLPRule, text string) []string {
 			return rules.FindPhoneNumbers(text)
 		}
 		return nil
-	case MatchTypeKeyword:
+	case types.MatchTypeKeyword:
 		var found []string
 		for _, kw := range strings.Split(rule.Pattern, ",") {
 			kw = strings.TrimSpace(kw)
@@ -119,44 +117,4 @@ func maskValue(value string) string {
 		masked[i] = '*'
 	}
 	return string(masked)
-}
-
-func (s *Service) CreateRule(ctx context.Context, rule DLPRule) (DLPRule, error) {
-	return s.repo.CreateRule(ctx, rule)
-}
-
-func (s *Service) ListRules(ctx context.Context) ([]DLPRule, error) {
-	return s.repo.ListRules(ctx)
-}
-
-func (s *Service) SetRuleEnabled(ctx context.Context, id string, enabled bool) error {
-	return s.repo.UpdateRuleEnabled(ctx, id, enabled)
-}
-
-func (s *Service) DeleteRule(ctx context.Context, id string) error {
-	return s.repo.DeleteRule(ctx, id)
-}
-
-// LogEvent records that a rule fired, for the 安全事件 page.
-func (s *Service) LogEvent(ctx context.Context, memberID, virtualKeyID *string, hit Hit) error {
-	description := hit.Rule.Name + "已" + actionVerb(hit.Rule.Action)
-	_, err := s.repo.LogEvent(ctx, SecurityEvent{
-		MemberID:     memberID,
-		VirtualKeyID: virtualKeyID,
-		RuleID:       &hit.Rule.ID,
-		Description:  description,
-		ActionTaken:  hit.Rule.Action,
-	})
-	return err
-}
-
-func actionVerb(a RuleAction) string {
-	if a == ActionBlock {
-		return "拦截"
-	}
-	return "脱敏"
-}
-
-func (s *Service) ListEvents(ctx context.Context, limit int) ([]SecurityEvent, error) {
-	return s.repo.ListEvents(ctx, limit)
 }

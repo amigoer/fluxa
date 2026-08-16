@@ -1,8 +1,11 @@
-package security
+package handler
 
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/amigoer/fluxa/internal/security/service"
+	"github.com/amigoer/fluxa/internal/security/types"
 
 	"github.com/go-chi/chi/v5"
 
@@ -12,10 +15,10 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service service.Service
 }
 
-func NewHandler(service *Service) *Handler {
+func New(service service.Service) *Handler {
 	return &Handler{service: service}
 }
 
@@ -38,7 +41,7 @@ func (h *Handler) listRules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createRule(w http.ResponseWriter, r *http.Request) {
-	var rule DLPRule
+	var rule types.DLPRule
 	if !decodeJSON(w, r, &rule) {
 		return
 	}

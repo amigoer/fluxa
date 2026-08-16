@@ -1,13 +1,17 @@
-// Package security implements the Security module from DESIGN.md 7.3:
-// DLP rules that identify sensitive content in outbound request text and
-// mask or block it. Checksummed types (ID card, bank card) are validated
-// with their real check-digit algorithms, not just a regex shape match,
-// to cut down on false positives from things that merely look like a
-// number of the right length.
+// Package types holds the Security module's domain entities. The module
+// implements DESIGN.md 7.3: DLP rules that identify sensitive content in
+// outbound request text and mask or block it. Checksummed kinds (ID
+// card, bank card) are validated with their real check-digit algorithms,
+// not just a regex shape match, to cut down on false positives from
+// things that merely look like a number of the right length.
 //
 // v1 only ever scans request content, never the model's response -- see
-// service.go for why.
-package security
+// the service package for why.
+//
+// It imports nothing else from this module, so security/repo,
+// security/service and security/handler can all depend on it without an
+// import cycle.
+package types
 
 import "time"
 

@@ -23,7 +23,7 @@ import (
 	"github.com/amigoer/fluxa/internal/provider/routing"
 	"github.com/amigoer/fluxa/internal/provider"
 	"github.com/amigoer/fluxa/internal/provider/types"
-	"github.com/amigoer/fluxa/internal/security"
+	securityservice "github.com/amigoer/fluxa/internal/security/service"
 )
 
 // longInputTokenThreshold is what pushes a request into the "长文本"
@@ -33,12 +33,12 @@ const longInputTokenThreshold = 50_000
 
 type Pipeline struct {
 	providers *provider.Service
-	security  *security.Service
+	security  securityservice.Service
 	audit     auditservice.Service
 	upstream  *upstreamClient
 }
 
-func NewPipeline(providers *provider.Service, sec *security.Service, aud auditservice.Service) *Pipeline {
+func NewPipeline(providers *provider.Service, sec securityservice.Service, aud auditservice.Service) *Pipeline {
 	return &Pipeline{providers: providers, security: sec, audit: aud, upstream: newUpstreamClient()}
 }
 
