@@ -1,7 +1,12 @@
-// Package audit implements call logs (every proxied request) and
-// operation audit logs (admin actions), kept as two separate tables per
-// DESIGN.md's v2 roadmap note distinguishing them.
-package audit
+// Package types holds the Audit module's domain entities: call logs
+// (every proxied request) and operation audit logs (admin actions), kept
+// as two separate tables per DESIGN.md's v2 roadmap note distinguishing
+// them.
+//
+// It imports nothing else from this module, so audit/repo, audit/service
+// and audit/handler -- and the gateway, which records call logs as it
+// proxies -- can all depend on it without an import cycle.
+package types
 
 import "time"
 

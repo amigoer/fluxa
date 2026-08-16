@@ -1,19 +1,20 @@
-package audit
+package handler
 
 import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/amigoer/fluxa/internal/audit/service"
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/rbac"
 )
 
 type Handler struct {
-	service *Service
+	service service.Service
 }
 
-func NewHandler(service *Service) *Handler {
+func New(service service.Service) *Handler {
 	return &Handler{service: service}
 }
 

@@ -1,4 +1,4 @@
-package audit
+package service
 
 import (
 	"context"
@@ -62,6 +62,12 @@ var skip = map[string]bool{
 	"POST /api/auth/logout": true,
 }
 
+// MutationRecorder is the middleware half of the operation audit trail:
+// it is what actually fills the log OperationLogService reads back.
+type MutationRecorder interface {
+	RecordMutations(next http.Handler) http.Handler
+}
+
 // RecordMutations writes an operation audit entry for every successful
 // state-changing request on the session-authenticated management API.
 //
@@ -77,7 +83,7 @@ var skip = map[string]bool{
 // bodies are deliberately never touched: they carry OAuth app secrets,
 // SMTP passwords and freshly minted virtual keys, none of which belong in
 // a table the whole admin console can read.
-func (s *Service) RecordMutations(next http.Handler) http.Handler {
+func (s *service) RecordMutations(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !mutates(r.Method) {
 			next.ServeHTTP(w, r)

@@ -6,7 +6,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/amigoer/fluxa/internal/audit"
+	audithandler "github.com/amigoer/fluxa/internal/audit/handler"
+	auditrepo "github.com/amigoer/fluxa/internal/audit/repo"
+	auditservice "github.com/amigoer/fluxa/internal/audit/service"
 	"github.com/amigoer/fluxa/internal/gateway"
 	"github.com/amigoer/fluxa/internal/platform/config"
 	"github.com/amigoer/fluxa/internal/provider"
@@ -32,9 +34,9 @@ func wireRoutes(r chi.Router, cfg config.Config, pool *pgxpool.Pool, log *slog.L
 	securityService := security.NewService(securityRepo)
 	securityHandler := security.NewHandler(securityService)
 
-	auditRepo := audit.NewRepo(pool)
-	auditService := audit.NewService(auditRepo)
-	auditHandler := audit.NewHandler(auditService)
+	auditRepo := auditrepo.New(pool)
+	auditService := auditservice.New(auditRepo)
+	auditHandler := audithandler.New(auditService)
 
 	// Session-authenticated management API: everything an admin or
 	// employee reaches through the web UI. Every module's protected

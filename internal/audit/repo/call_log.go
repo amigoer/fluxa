@@ -1,20 +1,19 @@
-package audit
+package repo
 
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/amigoer/fluxa/internal/audit/types"
 )
 
-type Repo struct {
-	pool *pgxpool.Pool
+// CallLogRepo stores and reads the per-request gateway call log.
+type CallLogRepo interface {
+	InsertCallLog(ctx context.Context, l types.CallLog) (types.CallLog, error)
+	ListCallLogs(ctx context.Context, limit int) ([]types.CallLog, error)
+	ListCallLogsByMember(ctx context.Context, memberID string, limit int) ([]types.CallLog, error)
 }
 
-func NewRepo(pool *pgxpool.Pool) *Repo {
-	return &Repo{pool: pool}
-}
-
-func (r *Repo) InsertCallLog(ctx context.Context, l CallLog) (CallLog, error) {
+func (r *repo) InsertCallLog(ctx context.Context, l types.CallLog) (types.CallLog, error) {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO call_logs (member_id, virtual_key_id, provider_id, model_id, request_id, status, latency_ms, input_tokens, output_tokens, cost_cents)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -24,7 +23,7 @@ func (r *Repo) InsertCallLog(ctx context.Context, l CallLog) (CallLog, error) {
 	return l, err
 }
 
-func (r *Repo) ListCallLogs(ctx context.Context, limit int) ([]CallLog, error) {
+func (r *repo) ListCallLogs(ctx context.Context, limit int) ([]types.CallLog, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, member_id, virtual_key_id, provider_id, model_id, request_id, status, latency_ms, input_tokens, output_tokens, cost_cents, occurred_at
 		FROM call_logs ORDER BY occurred_at DESC LIMIT $1`, limit)
@@ -33,9 +32,9 @@ func (r *Repo) ListCallLogs(ctx context.Context, limit int) ([]CallLog, error) {
 	}
 	defer rows.Close()
 
-	var out []CallLog
+	var out []types.CallLog
 	for rows.Next() {
-		var l CallLog
+		var l types.CallLog
 		var member, provider, model *string
 		if err := rows.Scan(&l.ID, &member, &l.VirtualKeyID, &provider, &model, &l.RequestID, &l.Status, &l.LatencyMS, &l.InputTokens, &l.OutputTokens, &l.CostCents, &l.OccurredAt); err != nil {
 			return nil, err
@@ -46,7 +45,7 @@ func (r *Repo) ListCallLogs(ctx context.Context, limit int) ([]CallLog, error) {
 	return out, rows.Err()
 }
 
-func (r *Repo) ListCallLogsByMember(ctx context.Context, memberID string, limit int) ([]CallLog, error) {
+func (r *repo) ListCallLogsByMember(ctx context.Context, memberID string, limit int) ([]types.CallLog, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, member_id, virtual_key_id, provider_id, model_id, request_id, status, latency_ms, input_tokens, output_tokens, cost_cents, occurred_at
 		FROM call_logs WHERE member_id = $1 ORDER BY occurred_at DESC LIMIT $2`, memberID, limit)
@@ -55,44 +54,14 @@ func (r *Repo) ListCallLogsByMember(ctx context.Context, memberID string, limit 
 	}
 	defer rows.Close()
 
-	var out []CallLog
+	var out []types.CallLog
 	for rows.Next() {
-		var l CallLog
+		var l types.CallLog
 		var member, provider, model *string
 		if err := rows.Scan(&l.ID, &member, &l.VirtualKeyID, &provider, &model, &l.RequestID, &l.Status, &l.LatencyMS, &l.InputTokens, &l.OutputTokens, &l.CostCents, &l.OccurredAt); err != nil {
 			return nil, err
 		}
 		l.MemberID, l.ProviderID, l.ModelID = deref(member), deref(provider), deref(model)
-		out = append(out, l)
-	}
-	return out, rows.Err()
-}
-
-func (r *Repo) InsertOperationLog(ctx context.Context, l OperationAuditLog) (OperationAuditLog, error) {
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO operation_audit_logs (actor_member_id, action, detail)
-		VALUES ($1, $2, $3)
-		RETURNING id, occurred_at`,
-		l.ActorMemberID, l.Action, l.Detail,
-	).Scan(&l.ID, &l.OccurredAt)
-	return l, err
-}
-
-func (r *Repo) ListOperationLogs(ctx context.Context, limit int) ([]OperationAuditLog, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, actor_member_id, action, detail, occurred_at
-		FROM operation_audit_logs ORDER BY occurred_at DESC LIMIT $1`, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []OperationAuditLog
-	for rows.Next() {
-		var l OperationAuditLog
-		if err := rows.Scan(&l.ID, &l.ActorMemberID, &l.Action, &l.Detail, &l.OccurredAt); err != nil {
-			return nil, err
-		}
 		out = append(out, l)
 	}
 	return out, rows.Err()

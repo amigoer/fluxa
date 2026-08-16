@@ -16,11 +16,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/amigoer/fluxa/internal/audit"
+	auditservice "github.com/amigoer/fluxa/internal/audit/service"
+	audittypes "github.com/amigoer/fluxa/internal/audit/types"
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
-	"github.com/amigoer/fluxa/internal/provider"
 	"github.com/amigoer/fluxa/internal/provider/routing"
+	"github.com/amigoer/fluxa/internal/provider"
 	"github.com/amigoer/fluxa/internal/provider/types"
 	"github.com/amigoer/fluxa/internal/security"
 )
@@ -33,11 +34,11 @@ const longInputTokenThreshold = 50_000
 type Pipeline struct {
 	providers *provider.Service
 	security  *security.Service
-	audit     *audit.Service
+	audit     auditservice.Service
 	upstream  *upstreamClient
 }
 
-func NewPipeline(providers *provider.Service, sec *security.Service, aud *audit.Service) *Pipeline {
+func NewPipeline(providers *provider.Service, sec *security.Service, aud auditservice.Service) *Pipeline {
 	return &Pipeline{providers: providers, security: sec, audit: aud, upstream: newUpstreamClient()}
 }
 
@@ -60,7 +61,7 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if key.Status != types.VirtualKeyStatusActive {
-		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audit.CallStatusFailed)
+		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audittypes.CallStatusFailed)
 		httpx.Error(w, http.StatusForbidden, i18n.KeyVirtualKeyRevoked, "")
 		return
 	}
@@ -83,7 +84,7 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		for _, hit := range scan.Hits {
 			_ = p.security.LogEvent(ctx, memberIDPtr(key), &key.ID, hit)
 		}
-		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audit.CallStatusFailed)
+		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audittypes.CallStatusFailed)
 		httpx.Error(w, http.StatusForbidden, i18n.KeyValidationFailed, "request blocked by a DLP rule")
 		return
 	}
@@ -103,13 +104,13 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	condition := routingCondition(r, estimatedInputTokens)
 	resolved, err := p.providers.Resolver.Resolve(ctx, memberIDOrEmpty(key), condition, estimatedInputTokens, estimatedOutputTokens)
 	if err != nil {
-		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audit.CallStatusFailed)
+		p.logCall(ctx, key, "", "", r, 0, 0, 0, 0, audittypes.CallStatusFailed)
 		httpx.Error(w, http.StatusServiceUnavailable, i18n.KeyProviderUnavailable, err.Error())
 		return
 	}
 
 	if !modelInScope(key, resolved.Model.ID) {
-		p.logCall(ctx, key, "", resolved.Model.ID, r, 0, 0, 0, 0, audit.CallStatusFailed)
+		p.logCall(ctx, key, "", resolved.Model.ID, r, 0, 0, 0, 0, audittypes.CallStatusFailed)
 		httpx.Error(w, http.StatusForbidden, i18n.KeyModelNotEnabled, "")
 		return
 	}
@@ -127,7 +128,7 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 
 	if callErr != nil || !result.StatusSuccess {
 		_ = p.providers.Breaker.RecordFailure(ctx, providerRec.ID)
-		p.logCall(ctx, key, providerRec.ID, resolved.Model.ID, r, latency, 0, 0, 0, audit.CallStatusFailed)
+		p.logCall(ctx, key, providerRec.ID, resolved.Model.ID, r, latency, 0, 0, 0, audittypes.CallStatusFailed)
 		return
 	}
 
@@ -148,10 +149,10 @@ func (p *Pipeline) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		_ = p.audit.LogOperation(ctx, "", "quota_exceeded_after_call", "key "+key.ID)
 	}
 
-	p.logCall(ctx, key, providerRec.ID, resolved.Model.ID, r, latency, inputTokens, outputTokens, costCents, audit.CallStatusSuccess)
+	p.logCall(ctx, key, providerRec.ID, resolved.Model.ID, r, latency, inputTokens, outputTokens, costCents, audittypes.CallStatusSuccess)
 }
 
-func (p *Pipeline) logCall(ctx context.Context, key types.VirtualKey, providerID, modelID string, r *http.Request, latency time.Duration, inputTokens, outputTokens int, costCents int64, status audit.CallStatus) {
+func (p *Pipeline) logCall(ctx context.Context, key types.VirtualKey, providerID, modelID string, r *http.Request, latency time.Duration, inputTokens, outputTokens int, costCents int64, status audittypes.CallStatus) {
 	memberID := ""
 	if key.OwnerMemberID != nil {
 		memberID = *key.OwnerMemberID
@@ -160,7 +161,7 @@ func (p *Pipeline) logCall(ctx context.Context, key types.VirtualKey, providerID
 	// owned keys failing to log at all (their member_id was an empty
 	// string against a NOT NULL uuid column). The request itself has
 	// already been answered, so a failure here is reported, not returned.
-	if err := p.audit.LogCall(ctx, audit.CallLog{
+	if err := p.audit.LogCall(ctx, audittypes.CallLog{
 		MemberID:     memberID,
 		VirtualKeyID: key.ID,
 		ProviderID:   providerID,
