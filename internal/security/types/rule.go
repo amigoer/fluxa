@@ -10,7 +10,8 @@
 //
 // It imports nothing else from this module, so security/repo,
 // security/service and security/handler can all depend on it without an
-// import cycle.
+// import cycle. One entity per file, named to match the repo, service
+// and handler file that works with it.
 package types
 
 import "time"
@@ -39,14 +40,4 @@ type DLPRule struct {
 	Enabled   bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
-}
-
-type SecurityEvent struct {
-	ID           string
-	MemberID     *string
-	VirtualKeyID *string
-	RuleID       *string
-	Description  string
-	ActionTaken  RuleAction
-	OccurredAt   time.Time
 }
