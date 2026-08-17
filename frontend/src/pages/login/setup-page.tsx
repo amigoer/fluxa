@@ -61,13 +61,11 @@ export function SetupPage() {
 
   return (
     <LoginShell>
-      <div className="cn-login-card">
-        <div className="cn-login-brand">
-          <FluxaLogo size={44} radius={13} />
-          <div style={{ textAlign: "center" }}>
-            <div className="cn-login-title">初始化 Fluxa</div>
-            <div className="cn-login-sub">首次部署，创建企业和第一个超管账号</div>
-          </div>
+      <div>
+        <div className="cn-auth-brand">
+          <FluxaLogo size={38} radius={11} />
+          <h1 className="cn-auth-title">初始化 Fluxa</h1>
+          <p className="cn-auth-sub">首次部署，创建企业和第一个超管账号</p>
         </div>
 
         <form className="cn-form" onSubmit={onSubmit}>

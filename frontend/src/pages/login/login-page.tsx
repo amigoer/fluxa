@@ -109,13 +109,11 @@ export function LoginPage() {
   if (view === "pending") {
     return (
       <LoginShell>
-        <div className="cn-login-card">
-          <div className="cn-login-brand">
-            <FluxaLogo size={44} radius={13} />
-            <div style={{ textAlign: "center" }}>
-              <div className="cn-login-title">注册成功，等待审批</div>
-              <div className="cn-login-sub">管理员通过后，这个账号就能登录并发起调用</div>
-            </div>
+        <div>
+          <div className="cn-auth-brand">
+            <FluxaLogo size={38} radius={11} />
+            <h1 className="cn-auth-title">注册成功，等待审批</h1>
+            <p className="cn-auth-sub">管理员通过后，这个账号就能登录并发起调用</p>
           </div>
           <button className="cn-login-btn" onClick={() => setView("entry")}>
             <Icon name="arrow-left" size={16} />
@@ -130,25 +128,27 @@ export function LoginPage() {
     const isRegister = view === "register"
     return (
       <LoginShell>
-        <div className="cn-login-card">
+        <div>
           <button className="cn-login-back" onClick={() => setView("entry")}>
             <Icon name="arrow-left" size={14} />返回
           </button>
 
-          <div className="cn-login-brand" style={{ marginBottom: 18 }}>
-            <div style={{ textAlign: "center" }}>
-              <div className="cn-login-title">{isRegister ? "注册 Fluxa 账号" : "手机号 / 邮箱登录"}</div>
-              <div className="cn-login-sub">
-                {isRegister ? "注册后需管理员审核，通过即可使用" : "验证码登录，全程不使用密码"}
-              </div>
-            </div>
+          <div className="cn-auth-brand">
+            <h1 className="cn-auth-title">{isRegister ? "注册 Fluxa 账号" : "手机号 / 邮箱登录"}</h1>
+            <p className="cn-auth-sub">
+              {isRegister ? "注册后需管理员审核，通过即可使用" : "验证码登录，全程不使用密码"}
+            </p>
           </div>
 
-          <div className="cn-tabs" style={{ marginBottom: 16 }}>
-            <button data-on={channel === "phone"} onClick={() => setChannel("phone")} style={{ flex: 1 }}>
+          <div
+            className="cn-tabs cn-tabs-seg"
+            data-at={channel === "phone" ? 0 : 1}
+            style={{ marginBottom: 16 }}
+          >
+            <button data-on={channel === "phone"} onClick={() => setChannel("phone")}>
               手机号
             </button>
-            <button data-on={channel === "email"} onClick={() => setChannel("email")} style={{ flex: 1 }}>
+            <button data-on={channel === "email"} onClick={() => setChannel("email")}>
               邮箱
             </button>
           </div>

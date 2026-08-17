@@ -702,6 +702,38 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
 }
 .cn-tabs button[data-on="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(22,35,58,.10); }
 
+/* Equal-width segmented variant, for a choice that sits in a form rather
+   than in a card header: it matches the inputs under it in height, and
+   the selected plate slides between the two instead of blinking from one
+   to the other -- with only two options the movement is what says they
+   are the same control in two states.
+   Only valid for exactly two equal options: the travel is expressed as
+   the plate's own width, which is what makes it CSS alone with nothing
+   to measure. The three-way code-sample tabs stay on the base style. */
+.cn-tabs-seg { position: relative; padding: 4px; gap: 0; }
+.cn-tabs-seg::before {
+  content: ""; position: absolute; z-index: 0;
+  top: 4px; left: 4px; width: calc(50% - 4px); height: calc(100% - 8px);
+  background: #fff; border-radius: 7px; box-shadow: 0 1px 2px rgba(22,35,58,.10);
+  transition: transform .24s cubic-bezier(.32,.72,0,1);
+}
+.cn-tabs-seg[data-at="1"]::before { transform: translateX(100%); }
+/* 30 + 4 padding either side = a 38px track: the 32px of the base style
+   read as cramped next to the inputs, 44 as a slab. This sits a hair
+   above the 36px inputs below it, which is right for a control you pick
+   from rather than type into. */
+.cn-tabs-seg button {
+  position: relative; z-index: 1; flex: 1;
+  height: 30px; font-size: 13px;
+  transition: color .18s ease;
+}
+/* The plate is drawn by the track now, so the button only carries text. */
+.cn-tabs-seg button[data-on="true"] { background: none; box-shadow: none; color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cn-tabs-seg::before, .cn-tabs-seg button { transition: none; }
+}
+
 .cn-code {
   margin: 0; padding: 14px 16px; background: #0f1729; color: #d6dcea;
   font-family: var(--mono); font-size: 12px; line-height: 1.8;
@@ -749,46 +781,92 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
 
 /* ---- 登录页 ---------------------------------------------------------- */
 
-.cn-login {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  padding: 24px; position: relative; background: var(--bg);
+/* ---- 登录页：左表单 / 右展示 ---------------------------------------- */
+
+.cn-auth { flex-direction: row; background: var(--panel); gap: 0; }
+/* Scrolls itself rather than the page: a short viewport must not push
+   the showcase column out of alignment with the form. */
+.cn-auth-main {
+  flex: 1; min-width: 0; overflow-y: auto;
+  display: flex; align-items: center; justify-content: center; padding: 32px 24px;
 }
-.cn-login-bg {
-  position: absolute; inset: 0; pointer-events: none;
-  background:
-    radial-gradient(52% 46% at 50% 0%, rgba(47,95,234,.10), transparent 68%),
-    radial-gradient(38% 34% at 88% 96%, rgba(124,58,237,.07), transparent 70%);
-}
-.cn-login-card {
-  position: relative; width: 392px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(22,35,58,.05), 0 24px 56px -28px rgba(22,35,58,.30);
-  padding: 30px 30px 26px;
-}
-.cn-login-brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 22px; }
-.cn-login-title { font-size: 18px; font-weight: 680; letter-spacing: -0.026em; }
-.cn-login-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 5px; text-align: center; }
+/* The column is a fixed measure rather than a share of the half, so the
+   form keeps the same line length whatever the window does. */
+.cn-auth-col { width: 100%; max-width: 340px; }
+
+.cn-auth-brand { margin-bottom: 26px; }
+.cn-auth-title { font-size: 26px; font-weight: 680; letter-spacing: -0.03em; margin: 18px 0 0; }
+.cn-auth-sub { font-size: 13px; color: var(--ink-3); margin-top: 7px; }
+
 .cn-login-btn {
-  display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%;
-  height: 42px; border-radius: 10px; font-size: 13.5px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; height: 44px; padding: 0 14px; border-radius: 9px;
   border: 1px solid var(--line); background: var(--panel);
+  font-size: 13.5px; font-weight: 560; color: var(--ink);
+  box-shadow: 0 1px 1px rgba(22,35,58,.04);
 }
 .cn-login-btn:hover { border-color: #d3dae6; background: #fbfcfe; }
-.cn-login-btn-pri {
-  background: var(--brand); border-color: var(--brand); color: #fff;
-  box-shadow: 0 2px 8px -2px rgba(47,95,234,.45);
-}
+.cn-login-btn-pri { background: var(--brand); border-color: var(--brand); color: #fff; }
 .cn-login-btn-pri:hover { background: #2750cf; border-color: #2750cf; }
 .cn-login-btns { display: flex; flex-direction: column; gap: 10px; }
 .cn-login-or { display: flex; align-items: center; gap: 12px; margin: 18px 0; font-size: 11.5px; color: var(--ink-3); }
 .cn-login-or::before, .cn-login-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.cn-login-foot { margin-top: 20px; text-align: center; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+.cn-login-foot { margin-top: 20px; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
 .cn-login-foot a { color: var(--brand); }
 .cn-login-back {
-  display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px;
-  color: var(--ink-3); margin-bottom: 16px;
+  display: inline-flex; align-items: center; gap: 5px; margin-bottom: 14px;
+  font-size: 12.5px; color: var(--ink-3);
 }
 .cn-login-back:hover { color: var(--ink); }
+
+/* -- 右侧展示 -- */
+
+.cn-auth-side {
+  flex: none; width: 46%; max-width: 720px; padding: 14px 14px 14px 0;
+  display: flex;
+}
+.cn-auth-side-inner {
+  position: relative; overflow: hidden;
+  flex: 1; min-width: 0; border-radius: 16px; padding: 40px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  color: #fff;
+  /* Cobalt, deepened rather than brightened: this panel sits next to a
+     white form for as long as it takes to sign in, and a saturated field
+     that size is tiring. */
+  background:
+    radial-gradient(120% 90% at 85% 8%, rgba(255,255,255,.16), transparent 62%),
+    linear-gradient(160deg, #2f5fea 0%, #2547b4 52%, #16265c 100%);
+}
+
+/* Bled off the top-right corner rather than centred: a glyph placed in
+   the middle of the empty half would read as the subject, and it is a
+   watermark. */
+.cn-auth-mark { position: absolute; top: -46px; right: -54px; display: grid; pointer-events: none; }
+.cn-auth-mark > span { grid-area: 1 / 1; opacity: 0; transition: opacity .5s ease; color: rgba(255,255,255,.13); }
+.cn-auth-mark > span[data-on="true"] { opacity: 1; }
+
+.cn-auth-slides { position: relative; }
+/* Every slide is laid on the same spot and the tallest sets the height,
+   so the dots below never move as the text changes length. */
+.cn-auth-slide { grid-area: 1 / 1; opacity: 0; transition: opacity .5s ease; }
+.cn-auth-slides { display: grid; }
+.cn-auth-slide[data-on="true"] { opacity: 1; }
+.cn-auth-slide-ico {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 11px; margin-bottom: 18px;
+  background: rgba(255,255,255,.15); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+}
+.cn-auth-slide-title { margin: 0; font-size: 27px; font-weight: 660; letter-spacing: -0.03em; line-height: 1.35; }
+.cn-auth-slide-body { margin: 12px 0 0; font-size: 13.5px; line-height: 1.85; color: rgba(255,255,255,.76); max-width: 30em; }
+
+.cn-auth-dots { display: flex; gap: 7px; margin-top: 30px; }
+.cn-auth-dot { width: 22px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.28); }
+.cn-auth-dot[data-on="true"] { background: #fff; }
+.cn-auth-dot:hover { background: rgba(255,255,255,.6); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cn-auth-slide, .cn-auth-mark > span { transition: none; }
+}
 
 .cn-qr {
   width: 176px; height: 176px; margin: 4px auto 16px; border-radius: 12px;
@@ -897,8 +975,8 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
   .cn-foot { padding: 0 14px; gap: 10px; }
   .cn-foot-links a:not(:last-child) { display: none; }
 
-  .cn-login { padding: 16px; }
-  .cn-login-card { width: 100%; max-width: 392px; padding: 24px 20px 20px; }
+  .cn-auth-side { display: none; }
+  .cn-auth-main { padding: 24px 16px; }
 
   .cn-cfg-card { flex-wrap: wrap; }
   .cn-cfg-acts { width: 100%; justify-content: flex-end; }
