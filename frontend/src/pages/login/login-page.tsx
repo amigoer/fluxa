@@ -38,14 +38,31 @@ export function LoginPage() {
   // internal/user/handler.go. null while loading, so nothing is clickable
   // until we know.
   const [methods, setMethods] = useState<{ feishu: boolean; local: boolean } | null>(null)
+  // Whether the first-run check has come back. It is part of "ready"
+  // because a deployment that still needs setup redirects away, and
+  // painting a sign-in screen first means showing a page the caller is
+  // about to be taken off.
+  const [setupChecked, setSetupChecked] = useState(false)
+  // Long enough that a local answer never reaches it, short enough that a
+  // slow one does not look frozen. Below it the screen stays as it was
+  // rather than announcing a wait that is about to be over: the entry
+  // view was rendering a line of loading text and replacing it a frame
+  // later, which read as a flicker rather than as progress.
+  const [slow, setSlow] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 400)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     api
       .get<{ needsSetup: boolean }>("/api/setup/status")
       .then((res) => {
         if (res.needsSetup) navigate("/setup", { replace: true })
+        else setSetupChecked(true)
       })
-      .catch(() => {})
+      .catch(() => setSetupChecked(true))
   }, [navigate])
 
   useEffect(() => {
@@ -233,19 +250,27 @@ export function LoginPage() {
   }
 
   const nothingConfigured = methods && !methods.feishu && !methods.local
+  const ready = methods !== null && setupChecked
+
+  // Nothing at all until both answers are in: the column is centred, so
+  // adding the buttons afterwards moves everything that was already
+  // drawn. One paint of the finished screen beats two of an unfinished
+  // one. The showcase column is static and paints immediately either
+  // way, so this is never a blank window.
+  if (!ready && !slow) {
+    return <LoginShell>{null}</LoginShell>
+  }
 
   return (
     <LoginShell>
-      <div className="cn-login-card">
-        <div className="cn-login-brand">
-          <FluxaLogo size={44} radius={13} />
-          <div style={{ textAlign: "center" }}>
-            <div className="cn-login-title">登录 Fluxa</div>
-            <div className="cn-login-sub">企业内部 AI 资源分发管理系统</div>
-          </div>
+      <div>
+        <div className="cn-auth-brand">
+          <FluxaLogo size={38} radius={11} />
+          <h1 className="cn-auth-title">欢迎使用 Fluxa</h1>
+          <p className="cn-auth-sub">企业内部 AI 资源分发管理系统</p>
         </div>
 
-        {!methods && <div className="cn-login-sub">加载中…</div>}
+        {!ready && <p className="cn-auth-sub">正在读取管理员开放的登录方式…</p>}
 
         {nothingConfigured && (
           <div className="cn-notice">
