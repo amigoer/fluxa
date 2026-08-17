@@ -7,6 +7,7 @@ import (
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
 	"github.com/amigoer/fluxa/internal/user/identity"
+	"github.com/amigoer/fluxa/internal/user/repo"
 	"github.com/amigoer/fluxa/internal/user/types"
 )
 
@@ -77,6 +78,31 @@ func (h *Handler) verifyRegisterOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Somebody already here who signed up again -- an employee created by
+	// the IM directory before it was switched off, most likely. Proving
+	// control of the address is the same proof signing in would need, so
+	// they get their existing member back rather than a second one with
+	// none of their history on it.
+	if existing, err := h.repo.FindMemberByIdentifier(r.Context(), req.Identifier); err == nil {
+		if err := h.ensureLocalAccount(r.Context(), existing, req.Identifier); err != nil {
+			httpx.InternalError(w, err)
+			return
+		}
+		if existing.Status == types.MemberStatusPendingReview {
+			httpx.JSON(w, http.StatusAccepted, map[string]string{"status": "pending_review"})
+			return
+		}
+		if err := h.sessions.Login(r.Context(), w, existing.ID); err != nil {
+			httpx.InternalError(w, err)
+			return
+		}
+		httpx.JSON(w, http.StatusOK, existing)
+		return
+	} else if !errors.Is(err, repo.ErrNotFound) {
+		httpx.InternalError(w, err)
+		return
+	}
+
 	settings, err := h.service.GetAuthSettings(r.Context())
 	if err != nil {
 		httpx.InternalError(w, err)
@@ -134,6 +160,20 @@ func (h *Handler) verifyRegisterOTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) requestLoginOTP(w http.ResponseWriter, r *http.Request) {
+	// Gated like registration is: an admin who has switched local
+	// accounts off has switched off this way in, and the codes stop
+	// going out. Without this check the toggle only hid the sign-up
+	// form and anybody with an existing account kept their way in.
+	settings, err := h.service.GetAuthSettings(r.Context())
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	if !settings.LocalAccountEnabled {
+		httpx.Error(w, http.StatusForbidden, i18n.KeyValidationFailed, "local accounts are disabled")
+		return
+	}
+
 	var req otpRequest
 	if !decodeJSON(w, r, &req) {
 		return
@@ -149,7 +189,12 @@ func (h *Handler) requestLoginOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.repo.FindLocalAccountByIdentifier(r.Context(), req.Identifier); err != nil {
+	// A local account row is one way to be known here, not the only one:
+	// a member created by an identity source has none, and would be
+	// locked out the day that source is switched off -- or would sign up
+	// again and end up as a second copy of themselves. Falling back to
+	// the member's own address covers the switch without either.
+	if !h.knownForLocalLogin(r.Context(), req.Identifier) {
 		// Do not reveal whether the identifier is registered.
 		httpx.JSON(w, http.StatusOK, nil)
 		return
@@ -190,13 +235,12 @@ func (h *Handler) verifyLoginOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := h.repo.FindLocalAccountByIdentifier(r.Context(), req.Identifier)
+	member, err := h.memberForLocalLogin(r.Context(), req.Identifier)
 	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, i18n.KeyInvalidCredentials, "")
-		return
-	}
-	member, err := h.repo.GetMember(r.Context(), account.MemberID)
-	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			httpx.Error(w, http.StatusBadRequest, i18n.KeyInvalidCredentials, "")
+			return
+		}
 		httpx.InternalError(w, err)
 		return
 	}

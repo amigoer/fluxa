@@ -39,5 +39,17 @@ func (s *service) Bootstrap(ctx context.Context, orgName, adminName, adminEmail 
 		return types.Member{}, fmt.Errorf("user: create first admin: %w", err)
 	}
 
+	// Without this the first admin has an address on their record and no
+	// way to sign in with it: the one-time code path looks for a local
+	// account row, finds none, and answers as though the address were
+	// unknown. They were locked out of the deployment they had just set
+	// up, with no way back in short of editing the database.
+	if _, err := s.repo.CreateLocalAccount(ctx, types.LocalAccount{
+		MemberID: member.ID,
+		Email:    &adminEmail,
+	}); err != nil {
+		return types.Member{}, fmt.Errorf("user: create first admin local account: %w", err)
+	}
+
 	return member, nil
 }
