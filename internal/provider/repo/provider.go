@@ -16,7 +16,6 @@ type ProviderRepo interface {
 	CreateProvider(ctx context.Context, p types.Provider) (types.Provider, error)
 	GetProvider(ctx context.Context, id string) (types.Provider, error)
 	ListProviders(ctx context.Context, orgID string) ([]types.Provider, error)
-	UpdateProviderStatus(ctx context.Context, id string, status types.ProviderStatus) error
 }
 
 func (r *repo) CreateProvider(ctx context.Context, p types.Provider) (types.Provider, error) {
@@ -74,9 +73,4 @@ func (r *repo) ListProviders(ctx context.Context, orgID string) ([]types.Provide
 		out = append(out, p)
 	}
 	return out, rows.Err()
-}
-
-func (r *repo) UpdateProviderStatus(ctx context.Context, id string, status types.ProviderStatus) error {
-	_, err := r.pool.Exec(ctx, `UPDATE providers SET status = $1, updated_at = now() WHERE id = $2`, status, id)
-	return err
 }

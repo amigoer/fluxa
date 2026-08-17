@@ -15,7 +15,6 @@ type SessionRepo interface {
 	CreateSession(ctx context.Context, tokenHash, memberID string, expiresAt time.Time) error
 	GetSession(ctx context.Context, tokenHash string) (SessionRecord, error)
 	RevokeSession(ctx context.Context, tokenHash string) error
-	RevokeAllSessionsForMember(ctx context.Context, memberID string) error
 }
 
 // SessionRecord is the row shape sessions are stored/read as; token_hash
@@ -49,16 +48,5 @@ func (r *repo) GetSession(ctx context.Context, tokenHash string) (SessionRecord,
 
 func (r *repo) RevokeSession(ctx context.Context, tokenHash string) error {
 	_, err := r.pool.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE token_hash = $1`, tokenHash)
-	return err
-}
-
-// RevokeAllSessionsForMember lets an admin force a member's active
-// sessions to end immediately -- the whole point of choosing a
-// server-side session over a stateless JWT (DESIGN.md 7.1).
-func (r *repo) RevokeAllSessionsForMember(ctx context.Context, memberID string) error {
-	_, err := r.pool.Exec(ctx,
-		`UPDATE sessions SET revoked_at = now() WHERE member_id = $1 AND revoked_at IS NULL`,
-		memberID,
-	)
 	return err
 }
