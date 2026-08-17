@@ -468,14 +468,21 @@
 /* ---- 内容区页脚（不随内容滚动） -------------------------------------- */
 
 .cn-foot {
-  flex: none; height: 38px; display: flex; align-items: center; gap: 12px;
+  flex: none; height: 38px; display: flex; align-items: center;
+  justify-content: space-between; gap: 16px;
   padding: 0 20px; border-top: 1px solid var(--line); background: var(--panel);
   font-size: 11.5px; color: var(--ink-3);
 }
-.cn-foot a { color: var(--ink-2); }
+.cn-foot-group { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cn-foot-links { gap: 14px; }
+.cn-foot-brand { font-weight: 560; color: var(--ink-2); }
+/* Tabular figures so the version does not shift the copyright beside it
+   as the build number grows. */
+.cn-foot-ver { font-variant-numeric: tabular-nums; }
+.cn-foot a { color: var(--ink-2); white-space: nowrap; }
+.cn-foot-repo { display: inline-flex; align-items: center; gap: 5px; }
 .cn-foot a:hover { color: var(--brand); text-decoration: underline; }
 .cn-foot-sep { color: var(--line-2); }
-.cn-foot-note { margin-left: auto; white-space: nowrap; }
 
 /* ---- 筛选行 ---------------------------------------------------------- */
 
@@ -865,8 +872,10 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
   .cn-copy { margin-left: 0; }
 
   /* 手机上页脚只留版本和仓库。数据延迟是环境信息，不值得为它多占一行。 */
-  .cn-foot { padding: 0 14px; }
-  .cn-foot-note { display: none; }
+  /* Narrow keeps what a bug report needs -- build and source -- and drops
+     the licence link, which is one tap away inside the repo anyway. */
+  .cn-foot { padding: 0 14px; gap: 10px; }
+  .cn-foot-links a:not(:last-child) { display: none; }
 
   .cn-login { padding: 16px; }
   .cn-login-card { width: 100%; max-width: 392px; padding: 24px 20px 20px; }

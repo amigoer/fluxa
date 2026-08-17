@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
 } from "react"
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
@@ -39,10 +38,12 @@ import { api } from "@/lib/api"
 import { Permission, useAuth } from "@/lib/auth"
 import { fmt, formatAgo } from "@/lib/format"
 import type { Member, Provider, ProviderHealth, QuotaRequest, SecurityEvent, VirtualKey } from "@/lib/types"
+import { GitHubIcon } from "@/components/shared/brand-icons"
 import { adminNav, employeeNav, filterNav, routeLabel } from "@/layouts/nav-config"
 
-const VERSION = "v1.0.0"
 const REPO_URL = "https://github.com/amigoer/fluxa"
+const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`
+const COPYRIGHT_HOLDER = "Amigoer"
 
 // Below this the sidebar stops being a rail beside the content and
 // becomes an overlay drawer over it. Kept in sync with the same query in
@@ -788,7 +789,7 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
             <Outlet />
           </div>
 
-          <ConsoleFooter note="数据延迟 < 1 分钟" />
+          <ConsoleFooter />
         </div>
 
         <TodoDrawer
@@ -803,19 +804,37 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
   )
 }
 
-// Version and source, and on a wide screen how fresh the numbers are.
-// The copyright line that used to sit between them is gone: this is a
-// self-hosted internal tool, and it spent a third of the footer
-// repeating the company name the sidebar already carries.
-export function ConsoleFooter({ note }: { note?: ReactNode }) {
+// What a self-hosted deployment's footer is actually for: which build is
+// running (the first thing a bug report needs), who holds the copyright,
+// and where the source and its licence are. It carries nothing that
+// belongs to a page -- the "数据延迟 < 1 分钟" note that used to sit here
+// was rendered over 成员与部门 and 操作审计 too, where there is no
+// aggregate to be stale, and nothing measured it in the first place.
+export function ConsoleFooter() {
   return (
-    <div className="cn-foot">
-      <span>Fluxa {VERSION}</span>
-      <span className="cn-foot-sep">·</span>
-      <a href={REPO_URL} target="_blank" rel="noreferrer">
-        项目仓库 <Icon name="external-link" size={11} style={{ verticalAlign: -1, display: "inline" }} />
-      </a>
-      {note && <span className="cn-foot-note">{note}</span>}
-    </div>
+    <footer className="cn-foot">
+      <div className="cn-foot-group">
+        <span className="cn-foot-brand">Fluxa</span>
+        <span className="cn-foot-ver">{__APP_VERSION__}</span>
+        <span className="cn-foot-sep">·</span>
+        <span>
+          &copy; {new Date().getFullYear()} {COPYRIGHT_HOLDER}
+        </span>
+      </div>
+
+      <div className="cn-foot-group cn-foot-links">
+        <a href={LICENSE_URL} target="_blank" rel="noreferrer">
+          MIT License
+        </a>
+        {/* The mark already says the link leaves for GitHub, so the
+            generic external-link arrow that used to follow it is gone --
+            two glyphs for one link in an 11.5px bar is a lot of chrome
+            for one destination. */}
+        <a className="cn-foot-repo" href={REPO_URL} target="_blank" rel="noreferrer">
+          <GitHubIcon style={{ width: 13, height: 13 }} />
+          项目仓库
+        </a>
+      </div>
+    </footer>
   )
 }
