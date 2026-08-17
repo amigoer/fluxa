@@ -151,7 +151,12 @@
 
 /* ---- content + right rail ------------------------------------------- */
 
-.cn-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+/* A flex column, not a plain block: pages that want to own the full
+   viewport height (Playground's chat, which has to put its composer at
+   the bottom) ask for it with flex:1 on .cn-page, and that only means
+   anything if this container is a flex parent. Ordinary pages set no
+   flex and stay content-sized, scrolling here as before. */
+.cn-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 /* 页面容器统一走 pages.css 的 .cn-page */
 
 .cn-head { display: flex; align-items: flex-end; gap: 14px; }
