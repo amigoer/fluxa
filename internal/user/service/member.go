@@ -14,6 +14,7 @@ type MemberService interface {
 	ApproveMember(ctx context.Context, id string) error
 	UpdateMemberDepartment(ctx context.Context, id string, departmentID *string) error
 	UpdateMemberRole(ctx context.Context, id, roleID string) error
+	UpdateMemberContact(ctx context.Context, id string, email, phone *string) error
 }
 
 func (s *service) ListMembers(ctx context.Context, orgID string, departmentID *string) ([]types.Member, error) {
@@ -36,4 +37,12 @@ func (s *service) UpdateMemberDepartment(ctx context.Context, id string, departm
 
 func (s *service) UpdateMemberRole(ctx context.Context, id, roleID string) error {
 	return s.repo.UpdateMemberRole(ctx, id, roleID)
+}
+
+// UpdateMemberContact repairs the address or number an identity source
+// never supplied. It is the way out for a member who would otherwise be
+// unreachable by every enabled login method (DESIGN.md 7.1: an identity
+// source can be switched off, and the people it created stay).
+func (s *service) UpdateMemberContact(ctx context.Context, id string, email, phone *string) error {
+	return s.repo.UpdateMemberContact(ctx, id, email, phone)
 }

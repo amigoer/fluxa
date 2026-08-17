@@ -472,6 +472,14 @@
 /* ---- 页头 ------------------------------------------------------------ */
 
 .cn-page { padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* An explanation that belongs to the whole form rather than one field. */
+.cn-form-note {
+  padding: 9px 11px; border-radius: 8px; background: var(--brand-soft);
+  font-size: 11.5px; line-height: 1.75; color: var(--ink-2);
+}
+.cn-form-note b { font-weight: 620; color: var(--ink); }
+.cn-form-note[data-tone="warn"] { background: var(--warn-soft); }
+.cn-form-note[data-tone="warn"] b { color: var(--warn); }
 .cn-page-head { display: flex; align-items: flex-end; gap: 14px; }
 .cn-page-title { margin: 0; font-size: 22px; font-weight: 660; letter-spacing: -0.028em; }
 .cn-page-sub { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }

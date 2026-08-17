@@ -26,6 +26,7 @@ var actions = map[string]string{
 	"POST /api/members/{id}/approve":        "member.approve",
 	"PATCH /api/members/{id}/department":    "member.department.update",
 	"PATCH /api/members/{id}/role":          "member.role.update",
+	"PATCH /api/members/{id}/contact":       "member.contact.update",
 	"POST /api/departments":                 "department.create",
 	"PATCH /api/departments/{id}/lead":      "department.lead.update",
 	"POST /api/roles":                       "role.create",

@@ -65,3 +65,30 @@ func (h *Handler) updateMemberRole(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, http.StatusOK, nil)
 }
+
+type updateContactRequest struct {
+	Email *string `json:"email"`
+	Phone *string `json:"phone"`
+}
+
+func (h *Handler) updateMemberContact(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req updateContactRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	// Blank means "clear it", not "the empty string is their address":
+	// storing "" would leave a member who looks contactable and is not.
+	if err := h.service.UpdateMemberContact(r.Context(), id, blankToNil(req.Email), blankToNil(req.Phone)); err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, nil)
+}
+
+func blankToNil(v *string) *string {
+	if v == nil || *v == "" {
+		return nil
+	}
+	return v
+}

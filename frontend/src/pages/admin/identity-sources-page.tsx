@@ -158,6 +158,15 @@ function IdentityCard({
           <Field label="回调路径" hint={`需要在${name}开放平台后台登记同样的地址。`}>
             <Input value={callback} onChange={(e) => setCallback(e.target.value)} />
           </Field>
+          {/* 措辞是警告而不是提示，因为代价不在当下：没有邮箱的成员现在
+              照常能用，等到这个身份源被停用那天才会集体失去登录途径，而那
+              时已经攒了一批。 */}
+          <div className="cn-form-note" data-tone="warn">
+            <b>请务必在{name}开放平台为该应用开通「获取用户邮箱信息」权限。</b>
+            成员的邮箱取自{name}返回的档案；取不到邮箱时账号仍会建立，但那个人
+            <b>只能靠{name}登录</b>——一旦停用{name}改走邮箱验证码，这些成员将无法登录，
+            只能由管理员在「成员与部门」里逐个补填邮箱。已建立的成员会在下次登录时自动补齐。
+          </div>
         </div>
       </Modal>
     </div>

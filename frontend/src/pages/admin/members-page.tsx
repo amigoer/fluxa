@@ -345,6 +345,7 @@ function EditMemberModal({
 }) {
   const [dept, setDept] = useState("")
   const [role, setRole] = useState("")
+  const [email, setEmail] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   // Seed from the member being opened rather than from state, so
@@ -352,6 +353,7 @@ function EditMemberModal({
   // values.
   const deptValue = dept || member?.DepartmentID || ""
   const roleValue = role || member?.RoleID || ""
+  const emailValue = email ?? member?.Email ?? ""
 
   const submit = async () => {
     if (!member) return
@@ -363,9 +365,13 @@ function EditMemberModal({
       if (roleValue !== member.RoleID) {
         await api.patch(`/api/members/${member.ID}/role`, { roleId: roleValue })
       }
+      if (emailValue !== (member.Email ?? "")) {
+        await api.patch(`/api/members/${member.ID}/contact`, { email: emailValue })
+      }
       toast.success("已保存")
       setDept("")
       setRole("")
+      setEmail(null)
       onDone()
       onClose()
     } catch {
@@ -379,10 +385,11 @@ function EditMemberModal({
     <Modal
       open={!!member}
       title={`编辑 ${member?.Name ?? ""}`}
-      sub="成员的部门决定额度池归属，角色决定权限"
+      sub="部门决定额度池归属，角色决定权限，邮箱决定这个人还能不能登录"
       onClose={() => {
         setDept("")
         setRole("")
+        setEmail(null)
         onClose()
       }}
       footer={
@@ -395,6 +402,20 @@ function EditMemberModal({
       }
     >
       <div className="cn-form">
+        <Field
+          label="邮箱"
+          hint={
+            member && !member.Email
+              ? "这个成员没有邮箱：身份源没返回过。一旦该身份源被停用，他将无法用任何方式登录。"
+              : "同时是登录标识：换成新地址后，验证码会发往新地址。"
+          }
+        >
+          <Input
+            value={emailValue}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="未填写"
+          />
+        </Field>
         <Field label="部门">
           <Select
             variant="input"
