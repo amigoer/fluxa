@@ -5,7 +5,8 @@
 //
 // It imports nothing else from this module, so audit/repo, audit/service
 // and audit/handler -- and the gateway, which records call logs as it
-// proxies -- can all depend on it without an import cycle.
+// proxies -- can all depend on it without an import cycle. One entity
+// per file, named to match the repo and service file that works with it.
 package types
 
 import "time"
@@ -30,12 +31,4 @@ type CallLog struct {
 	OutputTokens int
 	CostCents    int64
 	OccurredAt   time.Time
-}
-
-type OperationAuditLog struct {
-	ID            string
-	ActorMemberID string
-	Action        string
-	Detail        string
-	OccurredAt    time.Time
 }
