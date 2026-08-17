@@ -1,20 +1,15 @@
-// Identity provider configuration and the auth settings that decide which
-// login methods a deployment offers.
-
 package handler
 
 import (
 	"errors"
 	"net/http"
 
-	"github.com/amigoer/fluxa/internal/user/repo"
-	"github.com/amigoer/fluxa/internal/user/types"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/amigoer/fluxa/internal/platform/httpx"
-	"github.com/go-chi/chi/v5"
+	"github.com/amigoer/fluxa/internal/user/repo"
+	"github.com/amigoer/fluxa/internal/user/types"
 )
-
-// -- Identity configs & auth settings -------------------------------------
 
 func (h *Handler) getIdentityConfig(w http.ResponseWriter, r *http.Request) {
 	provider := types.IdentityProvider(chi.URLParam(r, "provider"))
@@ -45,23 +40,12 @@ func (h *Handler) putIdentityConfig(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, nil)
 }
 
-func (h *Handler) getAuthSettings(w http.ResponseWriter, r *http.Request) {
-	settings, err := h.service.GetAuthSettings(r.Context())
-	if err != nil {
-		httpx.InternalError(w, err)
-		return
+// maskSecret keeps enough of a stored credential for an admin to
+// recognise which one is saved, without shipping the secret itself to
+// the browser.
+func maskSecret(secret string) string {
+	if len(secret) <= 4 {
+		return "****"
 	}
-	httpx.JSON(w, http.StatusOK, settings)
-}
-
-func (h *Handler) putAuthSettings(w http.ResponseWriter, r *http.Request) {
-	var settings types.AuthSettings
-	if !decodeJSON(w, r, &settings) {
-		return
-	}
-	if err := h.service.UpdateAuthSettings(r.Context(), settings); err != nil {
-		httpx.InternalError(w, err)
-		return
-	}
-	httpx.JSON(w, http.StatusOK, nil)
+	return secret[:4] + "****"
 }

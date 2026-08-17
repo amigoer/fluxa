@@ -1,24 +1,14 @@
 package handler
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"net/http"
-
-	"github.com/amigoer/fluxa/internal/user/repo"
-	"github.com/amigoer/fluxa/internal/user/service"
-	"github.com/amigoer/fluxa/internal/user/session"
-	"github.com/amigoer/fluxa/internal/user/types"
-
 	"github.com/go-chi/chi/v5"
 
-	"github.com/amigoer/fluxa/internal/notify"
-	"github.com/amigoer/fluxa/internal/platform/httpx"
-	"github.com/amigoer/fluxa/internal/platform/i18n"
 	"github.com/amigoer/fluxa/internal/platform/ratelimit"
 	"github.com/amigoer/fluxa/internal/rbac"
 	"github.com/amigoer/fluxa/internal/user/identity"
+	"github.com/amigoer/fluxa/internal/user/repo"
+	"github.com/amigoer/fluxa/internal/user/service"
+	"github.com/amigoer/fluxa/internal/user/session"
 )
 
 // Handler wires the User module's HTTP surface: setup, login (Feishu +
@@ -26,6 +16,9 @@ import (
 // config management. Admin and employee views share these same
 // endpoints; rbac.Require on each route is what limits what a caller can
 // see or do (DESIGN.md 6.3: "不拆成两个独立的 App").
+//
+// The two route tables live here and nothing else does: each endpoint's
+// implementation sits in the file for its feature, next to this one.
 type Handler struct {
 	service  service.Service
 	repo     repo.Repo
@@ -104,163 +97,4 @@ func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
 	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Get("/api/notify-channels/{kind}", h.getNotifyChannel)
 	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Put("/api/notify-channels/{kind}", h.putNotifyChannel)
 	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Post("/api/notify-channels/{kind}/test", h.testNotifyChannel)
-}
-
-// -- Setup ----------------------------------------------------------------
-
-func (h *Handler) setupStatus(w http.ResponseWriter, r *http.Request) {
-	_, err := h.repo.GetOrganization(r.Context())
-	httpx.JSON(w, http.StatusOK, map[string]bool{"needsSetup": errors.Is(err, repo.ErrNotFound)})
-}
-
-// authMethods reports which login paths are actually usable right now,
-// so the login page can hide or grey out a method instead of sending
-// the caller into a dead end (e.g. a full-page redirect to Feishu OAuth
-// that isn't configured yet just 404s). Public: a caller who isn't
-// logged in yet is exactly who needs to know this before picking a
-// button.
-func (h *Handler) authMethods(w http.ResponseWriter, r *http.Request) {
-	feishu, err := h.service.GetIdentityConfig(r.Context(), types.IdentityProviderFeishu)
-	if err != nil && !errors.Is(err, repo.ErrNotFound) {
-		httpx.InternalError(w, err)
-		return
-	}
-
-	settings, err := h.service.GetAuthSettings(r.Context())
-	if err != nil {
-		httpx.InternalError(w, err)
-		return
-	}
-
-	// Being switched on is not the same as being usable: local accounts
-	// authenticate purely by OTP, so with no notify channel to carry the
-	// code there is nothing behind the button. Reporting the toggle alone
-	// re-created exactly the dead end this endpoint exists to prevent --
-	// the login page offered 手机号 / 邮箱登录 and 获取验证码 then failed.
-	local := settings.LocalAccountEnabled
-	if local {
-		deliverable, err := h.canDeliverOTP(r.Context())
-		if err != nil {
-			httpx.InternalError(w, err)
-			return
-		}
-		local = deliverable
-	}
-
-	httpx.JSON(w, http.StatusOK, map[string]bool{
-		"feishu": feishu.Enabled,
-		"local":  local,
-	})
-}
-
-// canDeliverOTP reports whether any channel is configured to carry a
-// one-time code right now. Either kind will do: the login form lets the
-// caller identify themselves by phone or by email.
-func (h *Handler) canDeliverOTP(ctx context.Context) (bool, error) {
-	for _, kind := range []types.NotifyChannelKind{types.NotifyChannelSMS, types.NotifyChannelEmail} {
-		channel, err := h.service.GetNotifyChannel(ctx, kind)
-		if errors.Is(err, repo.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return false, err
-		}
-		// Enabled is only a promise; rows written before the guard in
-		// putNotifyChannel existed can still be switched on with an empty
-		// config, so the credentials get checked here rather than trusted.
-		if channel.Enabled && notify.Configured(channel.Provider, channel.Config) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-type setupRequest struct {
-	OrgName    string `json:"orgName"`
-	AdminName  string `json:"adminName"`
-	AdminEmail string `json:"adminEmail"`
-}
-
-func (h *Handler) setup(w http.ResponseWriter, r *http.Request) {
-	if _, err := h.repo.GetOrganization(r.Context()); !errors.Is(err, repo.ErrNotFound) {
-		httpx.Error(w, http.StatusConflict, i18n.KeyValidationFailed, "organization already set up")
-		return
-	}
-
-	var req setupRequest
-	if !decodeJSON(w, r, &req) {
-		return
-	}
-
-	member, err := h.service.Bootstrap(r.Context(), req.OrgName, req.AdminName, req.AdminEmail)
-	if err != nil {
-		httpx.InternalError(w, err)
-		return
-	}
-
-	if err := h.sessions.Login(r.Context(), w, member.ID); err != nil {
-		httpx.InternalError(w, err)
-		return
-	}
-	httpx.JSON(w, http.StatusCreated, member)
-}
-
-func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
-	h.sessions.Logout(r.Context(), w, r)
-	httpx.JSON(w, http.StatusOK, nil)
-}
-
-func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
-	principal, _ := rbac.FromContext(r.Context())
-	member, err := h.repo.GetMember(r.Context(), principal.MemberID)
-	if err != nil {
-		httpx.InternalError(w, err)
-		return
-	}
-
-	role, err := h.repo.GetRoleByID(r.Context(), member.RoleID)
-	if err != nil {
-		httpx.InternalError(w, err)
-		return
-	}
-
-	departmentName := ""
-	if member.DepartmentID != nil {
-		if dept, err := h.repo.GetDepartment(r.Context(), *member.DepartmentID); err == nil {
-			departmentName = dept.Name
-		}
-	}
-
-	// The org name is display-only, but every authenticated screen shows
-	// it (the sidebar brand block), so it rides along with /api/me rather
-	// than costing a second round trip on every page load.
-	orgName := ""
-	if org, err := h.repo.GetOrganization(r.Context()); err == nil {
-		orgName = org.Name
-	}
-
-	httpx.JSON(w, http.StatusOK, map[string]any{
-		"member":         member,
-		"permissions":    principal.Permissions,
-		"roleName":       role.Name,
-		"departmentName": departmentName,
-		"orgName":        orgName,
-	})
-}
-
-// -- helpers --------------------------------------------------------------
-
-func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		httpx.Error(w, http.StatusBadRequest, i18n.KeyValidationFailed, err.Error())
-		return false
-	}
-	return true
-}
-
-func maskSecret(secret string) string {
-	if len(secret) <= 4 {
-		return "****"
-	}
-	return secret[:4] + "****"
 }
