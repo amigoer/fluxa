@@ -249,7 +249,8 @@ v1 目标是交付一个完整可用的系统：员工飞书登录即用，能�
 > 目录结构直接对照第 7 节的三个业务模块（User / Provider / Security），不多加模块；gateway（请求代理链路）、audit（审计）、notify（发信通道）、rbac（权限中间件）、platform（基础设施）是贯穿这三个模块的支撑层，不是独立的第四个业务模块。前后端各自成包但只交付一个产物，呼应第 5 节「前端打包进后端服务」的决定。
 
 - 每个业务模块内部统一四层：`types`（实体）→ `repo`（PostgreSQL 存取）→ `service`（业务逻辑）→ `handler`（HTTP 层），每层各自成包；管理员视图和员工自助视图复用同一套 handler，靠 `rbac` 中间件控制导航项和操作的可见性，不拆两套接口（呼应 6.3 信息架构「不拆成两个独立的 App」）。
-- `repo` 和 `service` 两层统一是「一个根接口 + 按功能拆的实现文件」：`repo.go` / `service.go` 里只有根接口（内嵌全部子接口）、唯一的实现结构体和构造函数，构造函数返回接口而不是结构体指针；其余每个文件承载一个功能，自带一个独立子接口和该接口的实现，文件名即子接口名。加一块功能是加一个文件，而不是往一个几百行的文件末尾再追加方法；模块之间、层之间依赖到的都是接口，测试可以直接替换实现。`handler` 层同样按功能分文件（`otp.go` / `members.go` / …），但不需要接口——它没有第二种实现。
+- 四层内部统一是「根文件只放装配，其余每个文件一个功能」：`repo.go` / `service.go` 里只有根接口（内嵌全部子接口）、唯一的实现结构体和构造函数，构造函数返回接口而不是结构体指针；`handler.go` 里只有 `Handler` 结构体、构造函数和路由表（`RegisterRoutes`），任何一个 endpoint 的实现都不写在这里。其余文件各承载一个功能：`repo` / `service` 里是一个独立子接口加它的实现，`handler` 里是那组 endpoint，`types` 里是那个实体。同一条约定也适用于非四层的包——`gateway/pipeline.go` 只有 `NewPipeline` 和路由表，`user/session/session.go` 只有 `Manager` 和构造函数。
+- 四层的文件名一一对应：`provider` 模块的 `types/model.go`、`repo/model.go`、`service/model.go`、`handler/model.go` 讲的是同一件事，认准一个文件名就能纵向读完一条链路。加一块功能是加一组文件，而不是往几百行的文件末尾追加方法；模块之间、层之间依赖到的都是接口，测试可以直接替换实现。`handler` 层不需要接口——它没有第二种实现。
 - `frontend/src/pages` 按 `admin/`（16 页）、`employee/`（4 页）拆分，一一对应 6.3 信息架构；`components/` 对应 6.3 收敛出的「七种页面类型」共享范式（表格页/仪表盘/两栏主从/链式配置/表单/对话测试/文档说明），不为每个页面单独起一套组件。
 - `frontend/` 构建产物最终用 `go:embed` 打进后端二进制（`web/embed.go`），对外只交付一个部署产物，不单独部署前端服务；`frontend/` 本身仍是可以独立跑 dev server 联调的普通 React 项目。
 - `migrations/` 按模块前缀命名（`user_*` / `provider_*` / `security_*`），用 golang-migrate 的纯 SQL up/down 文件；HTTP 路由用 chi，`handler` 包里都是标准 `http.Handler`，不依赖 chi 专有类型，换路由库的迁移成本很低。选型依据见第 5 节——路由匹配开销跟具体选哪个库无关（纳秒级，远小于上游 LLM 调用的毫秒~秒级延迟），真正影响网关转发性能的是流式响应 flush 和上游连接复用，这两点跟路由库无关，在 `gateway/pipeline.go` 和 `provider` 模块里落地，不会因为选了 chi 就打折扣。
@@ -260,112 +261,11 @@ fluxa/
 │   └── server/
 │       └── main.go              # 唯一可执行入口，组装三大模块 + 支撑层，用 chi 挂路由，启动 HTTP 服务
 ├── internal/
-│   ├── user/                    # 对应 7.1 User 模块
-│   │   ├── types/               # 组织/部门/成员/角色/权限点/身份源配置/本地账号 实体
-│   │   │   └── types.go
-│   │   ├── repo/                # repo.go 只放根 Repo 接口，内嵌下面每个文件各自的子接口
-│   │   │   ├── repo.go
-│   │   │   ├── organization.go
-│   │   │   ├── role.go
-│   │   │   ├── department.go
-│   │   │   ├── member.go
-│   │   │   ├── identity.go      # 外部身份绑定 + 身份源应用凭据
-│   │   │   ├── auth.go          # 登录策略（本地账号开关/是否需审批）
-│   │   │   ├── local_account.go
-│   │   │   ├── otp.go           # 验证码签发/限频/一次性消费，跨副本可靠的那一半
-│   │   │   ├── session.go
-│   │   │   └── notify.go        # 发信通道配置 + 投递日志
-│   │   ├── service/             # service.go 只放根 Service 接口，同样内嵌各文件的子接口
-│   │   │   ├── service.go
-│   │   │   ├── bootstrap.go     # 首启建组织 + 内置角色 + 第一个超管，只跑一次
-│   │   │   ├── principal.go     # 装配 rbac.Principal，Session 中间件每个请求调用
-│   │   │   ├── member.go
-│   │   │   ├── department.go
-│   │   │   ├── role.go          # 内置四角色的权限集定义也在这里，不另立一份会漂移的清单
-│   │   │   ├── identity.go
-│   │   │   ├── auth.go
-│   │   │   └── notify.go
-│   │   ├── handler/             # 管理员/员工共用，靠 rbac 中间件控权限
-│   │   │   ├── handler.go       # 路由注册 + 首启引导 + 登录态查询
-│   │   │   ├── otp.go           # 验证码登录/注册全流程
-│   │   │   ├── members.go       # 成员/部门/角色管理
-│   │   │   ├── identity_config.go
-│   │   │   ├── feishu.go        # 飞书扫码回调
-│   │   │   └── notify.go        # 发信通道配置，凭据只写不读（回显打码）
-│   │   ├── session/             # 服务端 Session（存 Postgres，不引入 Redis）+ 校验中间件，登录态在这里维持
-│   │   │   └── session.go
-│   │   └── identity/            # 身份源适配器，插件式接口，不写死在配置文件里
-│   │       ├── adapter.go       # 统一接口
-│   │       ├── feishu.go
-│   │       ├── wecom.go         # 企业微信，预留
-│   │       ├── dingtalk.go      # 钉钉，预留
-│   │       └── local.go         # 手机号/邮箱本地账号
-│   ├── provider/                # 对应 7.2 Provider 模块（含虚拟 Key/配额，呼应 7.2 关键实体列表）
-│   │   ├── types/               # Provider/模型/资费/入库记录/虚拟Key（存哈希）/部门总额度池 实体
-│   │   │   └── types.go         # 单独成包，好让 routing/health/keyauth 依赖它而不绕回父包成环
-│   │   ├── repo/
-│   │   │   ├── repo.go
-│   │   │   ├── provider.go
-│   │   │   ├── model.go
-│   │   │   ├── procurement.go
-│   │   │   ├── routing.go
-│   │   │   ├── virtual_key.go   # 扣费是一次 UPDATE 原子完成，顺带惰性滚动月度周期
-│   │   │   ├── quota_pool.go    # 部门池余额实时聚合，不存冗余字段
-│   │   │   ├── quota_request.go
-│   │   │   └── health.go
-│   │   ├── service/
-│   │   │   ├── service.go
-│   │   │   ├── runtime.go       # 把 health/keyauth/routing 三个有状态协作者交给网关热路径
-│   │   │   ├── provider.go
-│   │   │   ├── model.go
-│   │   │   ├── procurement.go
-│   │   │   ├── routing.go
-│   │   │   ├── virtual_key.go
-│   │   │   ├── quota_pool.go    # 直接分配那条路径
-│   │   │   └── quota_request.go # 申请—审批那条路径，两条最终都写同一行 virtual_keys
-│   │   ├── handler/
-│   │   │   └── handler.go
-│   │   ├── routing/             # 全局路由 + 个人路由匹配与 fallback 链决策（命名避开 chi 的 router，两者无关）
-│   │   │   └── resolver.go
-│   │   ├── health/              # 正常 → 熔断 → 半开 → 恢复 状态机
-│   │   │   └── breaker.go
-│   │   ├── keyauth/             # 虚拟 Key 校验：哈希比对 + 短 TTL 内存缓存，网关转发热路径用这个
-│   │   │   └── cache.go
-│   │   └── quota/               # 配额申请/审批、部门池二次分配；部门池余额实时聚合 + 短 TTL 缓存展示，不存冗余字段
-│   │       ├── approval.go
-│   │       ├── request.go       # 审批单状态机 + 结果落地（幂等：按 (通道,外部单号) 去重，比对决定时间丢弃陈旧结果）
-│   │       ├── reconcile.go     # 对账循环：定时扫超时未更新的待处理单逐个查单，推送只是加速不是前提
-│   │       └── channel/         # 审批通道适配器，形状对齐 user/identity/，加一家是加一个文件
-│   │           ├── channel.go   # 出站 Submit/Fetch/Cancel + 可选 Inbound（推送解析）+ 能力描述符
-│   │           ├── builtin.go   # 站内审批，默认通道；走同一个接口，避免外部通道成为无人走的腐烂分支
-│   │           ├── feishu.go    # v1 先接这个
-│   │           ├── wecom.go     # 企业微信，预留
-│   │           ├── dingtalk.go  # 钉钉，预留
-│   │           └── webhook.go   # 自建 OA 通用契约（HMAC 签名，推/拉两种回程二选一）
-│   ├── security/                # 对应 7.3 Security 模块
-│   │   ├── types/               # DLP 规则实体
-│   │   │   └── types.go
-│   │   ├── rules/               # 内置规则：身份证号(校验位)/手机号/银行卡号(Luhn)
-│   │   │   ├── id_card.go
-│   │   │   ├── bank_card.go
-│   │   │   └── phone.go
-│   │   ├── repo/
-│   │   │   ├── repo.go
-│   │   │   ├── rule.go
-│   │   │   └── event.go
-│   │   ├── service/
-│   │   │   ├── service.go
-│   │   │   ├── scan.go          # 识别 + 脱敏/拦截，只扫请求不扫响应
-│   │   │   ├── rule.go
-│   │   │   └── event.go         # 只记「哪条规则命中了」，命中的原值一律不落库
-│   │   └── handler/
-│   │       └── handler.go
-│   ├── gateway/                 # 支撑层：真正对外代理 LLM 请求的运行时链路
-│   │   ├── pipeline.go          # 鉴权（虚拟Key，走 keyauth 缓存）→ security 过滤（仅请求）→ routing 决策 → 调用 Provider（flush 转发流式响应）→ 记账 → 写审计
-│   │   └── upstream.go          # 上游调用与流式响应逐块透传，不缓冲整个响应体
 │   ├── audit/                   # 支撑层：调用日志 + 操作审计
-│   │   ├── types/
-│   │   │   └── types.go
+│   │   ├── handler/
+│   │   │   ├── handler.go
+│   │   │   ├── call_log.go
+│   │   │   └── operation_log.go
 │   │   ├── repo/
 │   │   │   ├── repo.go
 │   │   │   ├── call_log.go
@@ -373,26 +273,178 @@ fluxa/
 │   │   ├── service/
 │   │   │   ├── service.go
 │   │   │   ├── call_log.go
-│   │   │   ├── operation_log.go
-│   │   │   └── middleware.go    # 挂在管理 API 组上，成功的写操作自动落审计，不指望每个 handler 自觉去写
-│   │   └── handler/
-│   │       └── handler.go
+│   │   │   ├── middleware.go    # 挂在管理 API 组上，成功的写操作自动落审计，不指望每个 handler 自觉去写
+│   │   │   └── operation_log.go
+│   │   └── types/
+│   │       ├── call_log.go
+│   │       └── operation_log.go
+│   ├── gateway/                 # 支撑层：真正对外代理 LLM 请求的运行时链路
+│   │   ├── pipeline.go          # 鉴权（虚拟Key，走 keyauth 缓存）→ security 过滤（仅请求）→ routing 决策 → 调用 Provider（flush 转发流式响应）→ 记账 → 写审计
+│   │   ├── chat_completions.go
+│   │   ├── request.go
+│   │   └── upstream.go          # 上游调用与流式响应逐块透传，不缓冲整个响应体
 │   ├── notify/                  # 支撑层：短信/邮件可插拔发信通道，本地账号验证码用
-│   │   ├── channel.go           # 统一接口
+│   │   ├── mail/
+│   │   │   └── smtp.go
 │   │   ├── sms/
 │   │   │   └── aliyun.go
-│   │   └── mail/
-│   │       └── smtp.go
+│   │   └── channel.go           # 统一接口
+│   ├── platform/                # 支撑层：配置/数据库/日志/i18n 等基础设施
+│   │   ├── config/
+│   │   │   └── config.go
+│   │   ├── db/                  # pgx 连接池 + golang-migrate runner
+│   │   │   ├── db.go
+│   │   │   └── migrate.go
+│   │   ├── httpx/               # 统一 JSON 响应体与错误形状（错误带 i18n.Key，不写死文案）
+│   │   │   └── response.go
+│   │   ├── i18n/                # 文案走 key，预留多语言（呼应 6.4）
+│   │   │   └── i18n.go
+│   │   ├── logger/
+│   │   │   └── logger.go
+│   │   └── ratelimit/           # 进程内滑动窗口，验证码发送频率用，跨副本那半在 user/repo/otp.go
+│   │       └── window.go
+│   ├── provider/                # 对应 7.2 Provider 模块（含虚拟 Key/配额，呼应 7.2 关键实体列表）
+│   │   ├── handler/
+│   │   │   ├── handler.go
+│   │   │   ├── decode.go
+│   │   │   ├── health.go
+│   │   │   ├── model.go
+│   │   │   ├── procurement.go
+│   │   │   ├── provider.go
+│   │   │   ├── quota_pool.go
+│   │   │   ├── quota_request.go
+│   │   │   ├── routing.go
+│   │   │   └── virtual_key.go
+│   │   ├── health/              # 正常 → 熔断 → 半开 → 恢复 状态机
+│   │   │   └── breaker.go
+│   │   ├── keyauth/             # 虚拟 Key 校验：哈希比对 + 短 TTL 内存缓存，网关转发热路径用这个
+│   │   │   └── cache.go
+│   │   ├── quota/               # 配额申请/审批、部门池二次分配；部门池余额实时聚合 + 短 TTL 缓存展示，不存冗余字段
+│   │   │   ├── channel/         # 审批通道适配器，形状对齐 user/identity/，加一家是加一个文件
+│   │   │   │   ├── channel.go   # 出站 Submit/Fetch/Cancel + 可选 Inbound（推送解析）+ 能力描述符
+│   │   │   │   ├── builtin.go   # 站内审批，默认通道；走同一个接口，避免外部通道成为无人走的腐烂分支
+│   │   │   │   ├── feishu.go    # v1 先接这个
+│   │   │   │   ├── wecom.go     # 企业微信，预留
+│   │   │   │   ├── dingtalk.go  # 钉钉，预留
+│   │   │   │   └── webhook.go   # 自建 OA 通用契约（HMAC 签名，推/拉两种回程二选一）
+│   │   │   ├── approval.go
+│   │   │   ├── request.go       # 审批单状态机 + 结果落地（幂等：按 (通道,外部单号) 去重，比对决定时间丢弃陈旧结果）
+│   │   │   └── reconcile.go     # 对账循环：定时扫超时未更新的待处理单逐个查单，推送只是加速不是前提
+│   │   ├── repo/
+│   │   │   ├── repo.go
+│   │   │   ├── health.go
+│   │   │   ├── model.go
+│   │   │   ├── procurement.go
+│   │   │   ├── provider.go
+│   │   │   ├── quota_pool.go    # 部门池余额实时聚合，不存冗余字段
+│   │   │   ├── quota_request.go
+│   │   │   ├── routing.go
+│   │   │   └── virtual_key.go   # 扣费是一次 UPDATE 原子完成，顺带惰性滚动月度周期
+│   │   ├── routing/             # 全局路由 + 个人路由匹配与 fallback 链决策（命名避开 chi 的 router，两者无关）
+│   │   │   └── resolver.go
+│   │   ├── service/
+│   │   │   ├── service.go
+│   │   │   ├── model.go
+│   │   │   ├── procurement.go
+│   │   │   ├── provider.go
+│   │   │   ├── quota_pool.go    # 直接分配那条路径
+│   │   │   ├── quota_request.go # 申请—审批那条路径，两条最终都写同一行 virtual_keys
+│   │   │   ├── routing.go
+│   │   │   ├── runtime.go       # 把 health/keyauth/routing 三个有状态协作者交给网关热路径
+│   │   │   └── virtual_key.go
+│   │   └── types/               # Provider/模型/资费/入库记录/虚拟Key（存哈希）/部门总额度池 实体
+│   │       ├── health.go
+│   │       ├── model.go
+│   │       ├── procurement.go
+│   │       ├── provider.go
+│   │       ├── quota_request.go
+│   │       ├── routing.go
+│   │       └── virtual_key.go
 │   ├── rbac/                    # 支撑层：权限点判断中间件，贯穿所有 handler
 │   │   ├── middleware.go
 │   │   └── permission.go        # 权限点常量，user/service 里内置角色的授权对着它写
-│   └── platform/                # 支撑层：配置/数据库/日志/i18n 等基础设施
-│       ├── config/
-│       ├── db/                  # pgx 连接池 + golang-migrate runner
-│       ├── logger/
-│       ├── httpx/               # 统一 JSON 响应体与错误形状（错误带 i18n.Key，不写死文案）
-│       ├── ratelimit/           # 进程内滑动窗口，验证码发送频率用，跨副本那半在 user/repo/otp.go
-│       └── i18n/                # 文案走 key，预留多语言（呼应 6.4）
+│   ├── security/                # 对应 7.3 Security 模块
+│   │   ├── handler/
+│   │   │   ├── handler.go
+│   │   │   ├── decode.go
+│   │   │   ├── event.go
+│   │   │   └── rule.go
+│   │   ├── repo/
+│   │   │   ├── repo.go
+│   │   │   ├── event.go
+│   │   │   └── rule.go
+│   │   ├── rules/               # 内置规则：身份证号(校验位)/手机号/银行卡号(Luhn)
+│   │   │   ├── bank_card.go
+│   │   │   ├── id_card.go
+│   │   │   └── phone.go
+│   │   ├── service/
+│   │   │   ├── service.go
+│   │   │   ├── event.go         # 只记「哪条规则命中了」，命中的原值一律不落库
+│   │   │   ├── rule.go
+│   │   │   └── scan.go          # 识别 + 脱敏/拦截，只扫请求不扫响应
+│   │   └── types/               # DLP 规则实体
+│   │       ├── event.go
+│   │       └── rule.go
+│   └── user/                    # 对应 7.1 User 模块
+│       ├── handler/             # 管理员/员工共用，靠 rbac 中间件控权限
+│       │   ├── handler.go       # 路由注册 + 首启引导 + 登录态查询
+│       │   ├── auth.go
+│       │   ├── decode.go
+│       │   ├── department.go
+│       │   ├── feishu.go        # 飞书扫码回调
+│       │   ├── identity.go
+│       │   ├── login.go
+│       │   ├── me.go
+│       │   ├── member.go
+│       │   ├── notify.go        # 发信通道配置，凭据只写不读（回显打码）
+│       │   ├── otp.go           # 验证码登录/注册全流程
+│       │   ├── otp_delivery.go
+│       │   ├── otp_ratelimit.go
+│       │   ├── role.go
+│       │   └── setup.go
+│       ├── identity/            # 身份源适配器，插件式接口，不写死在配置文件里
+│       │   ├── adapter.go       # 统一接口
+│       │   ├── dingtalk.go      # 钉钉，预留
+│       │   ├── feishu.go
+│       │   ├── local.go         # 手机号/邮箱本地账号
+│       │   └── wecom.go         # 企业微信，预留
+│       ├── repo/                # repo.go 只放根 Repo 接口，内嵌下面每个文件各自的子接口
+│       │   ├── repo.go
+│       │   ├── session.go
+│       │   ├── auth.go          # 登录策略（本地账号开关/是否需审批）
+│       │   ├── department.go
+│       │   ├── identity.go      # 外部身份绑定 + 身份源应用凭据
+│       │   ├── local_account.go
+│       │   ├── member.go
+│       │   ├── notify.go        # 发信通道配置 + 投递日志
+│       │   ├── organization.go
+│       │   ├── otp.go           # 验证码签发/限频/一次性消费，跨副本可靠的那一半
+│       │   └── role.go
+│       ├── service/             # service.go 只放根 Service 接口，同样内嵌各文件的子接口
+│       │   ├── service.go
+│       │   ├── auth.go
+│       │   ├── bootstrap.go     # 首启建组织 + 内置角色 + 第一个超管，只跑一次
+│       │   ├── department.go
+│       │   ├── identity.go
+│       │   ├── member.go
+│       │   ├── notify.go
+│       │   ├── principal.go     # 装配 rbac.Principal，Session 中间件每个请求调用
+│       │   └── role.go          # 内置四角色的权限集定义也在这里，不另立一份会漂移的清单
+│       ├── session/             # 服务端 Session（存 Postgres，不引入 Redis）+ 校验中间件，登录态在这里维持
+│       │   ├── session.go
+│       │   ├── login.go
+│       │   ├── middleware.go
+│       │   └── token.go
+│       └── types/               # 组织/部门/成员/角色/权限点/身份源配置/本地账号 实体
+│           ├── auth.go
+│           ├── department.go
+│           ├── identity.go
+│           ├── local_account.go
+│           ├── member.go
+│           ├── notify.go
+│           ├── organization.go
+│           ├── otp.go
+│           └── role.go
 ├── migrations/                    # SQL migration，按模块前缀命名
 ├── web/
 │   └── embed.go                   # go:embed 打包 frontend/dist，单一部署产物
