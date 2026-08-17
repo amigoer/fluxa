@@ -9,6 +9,7 @@ export interface Member {
   Name: string
   Email: string | null
   Phone: string | null
+  AvatarURL: string | null
   Status: string
 }
 

@@ -85,6 +85,15 @@ func (a *FeishuAdapter) userAccessToken(ctx context.Context, appAccessToken, cod
 			OpenID string `json:"open_id"`
 			Name   string `json:"name"`
 			Email  string `json:"email"`
+			// Feishu returns the work address separately from the personal
+			// one, and it is the address an admin recognises a colleague by.
+			EnterpriseEmail string `json:"enterprise_email"`
+			// Four sizes come back; the 640px one is the largest, and the
+			// console renders avatars at 22-28px on ordinary displays and
+			// much larger on the identity menu, so it is the one that does
+			// not go soft anywhere.
+			AvatarBig string `json:"avatar_big"`
+			AvatarURL string `json:"avatar_url"`
 		} `json:"data"`
 	}
 	if err := a.doJSON(req, &out); err != nil {
@@ -94,10 +103,20 @@ func (a *FeishuAdapter) userAccessToken(ctx context.Context, appAccessToken, cod
 		return UserInfo{}, fmt.Errorf("feishu error %d: %s", out.Code, out.Msg)
 	}
 
+	email := out.Data.EnterpriseEmail
+	if email == "" {
+		email = out.Data.Email
+	}
+	avatar := out.Data.AvatarBig
+	if avatar == "" {
+		avatar = out.Data.AvatarURL
+	}
+
 	return UserInfo{
 		ExternalUserID: out.Data.OpenID,
 		Name:           out.Data.Name,
-		Email:          out.Data.Email,
+		Email:          email,
+		AvatarURL:      avatar,
 	}, nil
 }
 

@@ -74,6 +74,7 @@ func (h *Handler) RegisterPublicRoutes(r chi.Router) {
 func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
 	r.Post("/api/auth/logout", h.logout)
 	r.Get("/api/me", h.me)
+	r.Get("/api/auth/feishu/bind", h.feishuBind)
 
 	r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Get("/api/members", h.listMembers)
 	r.With(rbac.Require(rbac.PermissionOrgManageMembers)).Post("/api/members/{id}/approve", h.approveMember)

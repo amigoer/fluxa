@@ -21,12 +21,12 @@ type IdentityRepo interface {
 func (r *repo) FindMemberByExternalIdentity(ctx context.Context, provider types.IdentityProvider, externalUserID string) (types.Member, error) {
 	var m types.Member
 	err := r.pool.QueryRow(ctx, `
-		SELECT m.id, m.org_id, m.department_id, m.role_id, m.name, m.email, m.phone, m.status, m.created_at
+		SELECT m.id, m.org_id, m.department_id, m.role_id, m.name, m.email, m.phone, m.status, m.avatar_url, m.created_at
 		FROM members m
 		JOIN external_identities ei ON ei.member_id = m.id
 		WHERE ei.provider = $1 AND ei.external_user_id = $2`,
 		provider, externalUserID,
-	).Scan(&m.ID, &m.OrgID, &m.DepartmentID, &m.RoleID, &m.Name, &m.Email, &m.Phone, &m.Status, &m.CreatedAt)
+	).Scan(&m.ID, &m.OrgID, &m.DepartmentID, &m.RoleID, &m.Name, &m.Email, &m.Phone, &m.Status, &m.AvatarURL, &m.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return types.Member{}, ErrNotFound
 	}

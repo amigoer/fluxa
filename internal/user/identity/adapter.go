@@ -12,6 +12,12 @@ type UserInfo struct {
 	ExternalUserID string
 	Name           string
 	Email          string
+	// AvatarURL is the provider's own picture of this person, empty when
+	// the provider does not return one. It is stored as given rather than
+	// copied locally: it is already a public CDN URL at every provider
+	// here, and re-hosting it would mean owning refresh and cleanup for a
+	// decoration.
+	AvatarURL string
 }
 
 // Adapter exchanges an OAuth authorization code for the caller's

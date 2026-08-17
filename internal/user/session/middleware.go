@@ -11,6 +11,22 @@ import (
 	"github.com/amigoer/fluxa/internal/user/repo"
 )
 
+// CurrentMember reports who the request is already signed in as, for the
+// public routes that are not behind Middleware but still care. It answers
+// false for any reason a session is unusable rather than distinguishing
+// them: the callers here choose a path, they do not report an error.
+func (sm *Manager) CurrentMember(r *http.Request) (string, bool) {
+	cookie, err := r.Cookie(sm.cookieName)
+	if err != nil {
+		return "", false
+	}
+	session, err := sm.repo.GetSession(r.Context(), hashToken(cookie.Value))
+	if err != nil || session.RevokedAt != nil || time.Now().After(session.ExpiresAt) {
+		return "", false
+	}
+	return session.MemberID, true
+}
+
 // Middleware authenticates the request from its session cookie, loads
 // the member's rbac.Principal, and stores it on the context for
 // rbac.Require (and handlers) to read. Requests without a valid session

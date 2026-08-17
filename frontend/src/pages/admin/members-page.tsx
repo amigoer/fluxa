@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/console/button"
+import { Avatar } from "@/components/console/avatar"
 import { Icon } from "@/components/console/icon"
 import { Card, Field, Filters, Input, Modal, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState, Tag } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
@@ -213,9 +214,7 @@ export function MembersPage() {
                     <TableRow key={m.ID}>
                       <TableCell>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                          <span className="cn-av" style={{ width: 26, height: 26, fontSize: 11 }}>
-                            {m.Name.slice(0, 1)}
-                          </span>
+                          <Avatar name={m.Name} src={m.AvatarURL} size={26} />
                           <div>
                             <div style={{ fontWeight: 570 }}>{m.Name}</div>
                             <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 1 }}>

@@ -122,6 +122,13 @@
   font-size: 12px; font-weight: 650;
   display: inline-flex; align-items: center; justify-content: center;
   box-shadow: inset 0 0 0 1px rgba(47,95,234,.16);
+  overflow: hidden; position: relative;
+}
+/* Laid over the letter, cropped to the same circle. A source that never
+   loads paints nothing and the letter underneath stands. */
+.cn-av-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; border-radius: inherit;
 }
 
 /* ---- top bar -------------------------------------------------------- */

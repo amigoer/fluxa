@@ -31,6 +31,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { Avatar } from "@/components/console/avatar"
 import { Icon } from "@/components/console/icon"
 import { FluxaLogo } from "@/components/console/brand"
 import { useApiQuery } from "@/hooks/use-api-query"
@@ -595,7 +596,6 @@ function IdentityMenu() {
   const { member, roleName, departmentName, logout } = useAuth()
   const [open, setOpen] = useState(false)
 
-  const initial = member?.Name?.slice(0, 1) ?? "?"
 
   const signOut = async () => {
     await logout()
@@ -609,7 +609,7 @@ function IdentityMenu() {
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button className="cn-side-foot" aria-label="账号">
-          <span className="cn-av">{initial}</span>
+          <Avatar name={member?.Name ?? "?"} src={member?.AvatarURL} />
           <div className="cn-side-foot-text">
             <div className="cn-side-foot-name">{member?.Name}</div>
             <div className="cn-side-foot-role">{[roleName, departmentName].filter(Boolean).join(" · ")}</div>

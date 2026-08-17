@@ -25,6 +25,7 @@ export interface Member {
   Name: string
   Email: string | null
   Phone: string | null
+  AvatarURL: string | null
   Status: "active" | "pending_review" | "disabled"
 }
 

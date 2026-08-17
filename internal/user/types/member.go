@@ -18,6 +18,9 @@ type Member struct {
 	Name         string
 	Email        *string
 	Phone        *string
-	Status       MemberStatus
-	CreatedAt    time.Time
+	// AvatarURL is the identity source's picture of this member, nil for
+	// anyone who signed up locally and has no source to take one from.
+	AvatarURL *string
+	Status    MemberStatus
+	CreatedAt time.Time
 }
