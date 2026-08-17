@@ -340,7 +340,13 @@ interface Hit {
   to: string
 }
 
-function OmniSearch({ pages, logs }: { pages: { to: string; label: string }[]; logs: boolean }) {
+function OmniSearch({
+  pages,
+  logs,
+}: {
+  pages: { to: string; label: string; icon: string }[]
+  logs: boolean
+}) {
   const navigate = useNavigate()
   const { permissions } = useAuth()
   const [open, setOpen] = useState(false)
@@ -376,9 +382,13 @@ function OmniSearch({ pages, logs }: { pages: { to: string; label: string }[]; l
     if (hitPages.length > 0) {
       out.push({
         label: needle ? "页面" : "快速跳转",
+        // Each page carries the icon it wears in the sidebar. Stamping
+        // one generic glyph on all of them made the list unscannable --
+        // the icon column was eight copies of the same shape, so the
+        // only thing separating the rows was the label.
         items: hitPages.slice(0, needle ? 5 : 8).map((p) => ({
           id: `page:${p.to}`,
-          icon: "layout-grid",
+          icon: p.icon,
           label: p.label,
           to: p.to,
         })),
@@ -486,9 +496,11 @@ function OmniSearch({ pages, logs }: { pages: { to: string; label: string }[]; l
           <DialogContent
             showCloseButton={false}
             className={[
-              // Sits high rather than dead-centre: the list grows downward,
-              // and a vertically centred palette jumps as results arrive.
-              "top-[12%] translate-y-0 z-[60] flex flex-col gap-0 overflow-hidden p-0",
+              // Centred on both axes, and sized to its contents: a fixed
+              // height would hold the centre still while typing, but the
+              // shorter lists (an employee's four nav items, one match)
+              // would then sit above a large empty panel.
+              "z-[60] flex flex-col gap-0 overflow-hidden p-0",
               "w-[calc(100%-2rem)] sm:max-w-[560px]",
               "rounded-[14px] border-[var(--line)] bg-[var(--panel)]",
               "shadow-[0_1px_2px_rgba(22,35,58,.05),0_26px_60px_-26px_rgba(22,35,58,.42)]",
@@ -664,7 +676,10 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
     () => filterNav(isAdmin ? adminNav : employeeNav, permissions),
     [isAdmin, permissions],
   )
-  const pages = useMemo(() => nav.flatMap((g) => g.items.map((i) => ({ to: i.to, label: i.label }))), [nav])
+  const pages = useMemo(
+    () => nav.flatMap((g) => g.items.map((i) => ({ to: i.to, label: i.label, icon: i.icon }))),
+    [nav],
+  )
 
   const root = isAdmin ? "管理台" : "我的工作台"
   const current = routeLabel[location.pathname] ?? ""
