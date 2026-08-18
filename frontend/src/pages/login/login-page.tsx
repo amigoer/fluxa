@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { LoginShell } from "@/layouts/login-layout"
 import { Icon } from "@/components/console/icon"
-import { Brand, FluxaLogo } from "@/components/console/brand"
+import { Brand } from "@/components/console/brand"
 import { api, ApiError } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { Input } from "@/components/console/ui"
+import { AUTH_FIELD } from "./field"
 
 type View = "entry" | "login" | "register" | "pending"
 
@@ -128,7 +129,6 @@ export function LoginPage() {
       <LoginShell>
         <div>
           <div className="cn-auth-brand">
-            <FluxaLogo size={36} />
             <h1 className="cn-auth-title">注册成功，等待审批</h1>
             <p className="cn-auth-sub">管理员通过后，这个账号就能登录并发起调用</p>
           </div>
@@ -176,6 +176,7 @@ export function LoginPage() {
                 <label className="cn-form-label" htmlFor="login-name">姓名</label>
                 <Input
                   id="login-name"
+                  className={AUTH_FIELD}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="你的姓名"
@@ -187,6 +188,7 @@ export function LoginPage() {
               <label className="cn-form-label" htmlFor="login-id">{channel === "phone" ? "手机号" : "邮箱"}</label>
               <Input
                 id="login-id"
+                className={AUTH_FIELD}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder={channel === "phone" ? "138 0000 0000" : "name@example.com"}
@@ -198,6 +200,7 @@ export function LoginPage() {
               <div className="cn-code-input">
                 <Input
                   id="login-code"
+                  className={AUTH_FIELD}
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="6 位数字"
@@ -265,7 +268,6 @@ export function LoginPage() {
     <LoginShell>
       <div>
         <div className="cn-auth-brand">
-          <FluxaLogo size={36} />
           <h1 className="cn-auth-title">欢迎使用 Fluxa</h1>
           <p className="cn-auth-sub">企业内部 AI 资源分发管理系统</p>
         </div>

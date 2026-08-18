@@ -796,35 +796,67 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
 
 /* ---- 登录页：左表单 / 右展示 ---------------------------------------- */
 
-.cn-auth { flex-direction: row; background: var(--panel); gap: 0; }
-/* Scrolls itself rather than the page: a short viewport must not push
-   the showcase column out of alignment with the form. */
-.cn-auth-main {
-  flex: 1; min-width: 0; overflow-y: auto;
-  display: flex; align-items: center; justify-content: center; padding: 32px 24px;
+/* One column is the base case and two is the enhancement, not the other
+   way round: the showcase panel is decoration, so it arrives only once
+   there is room for it (1100px) and is simply absent below that rather
+   than being squeezed. */
+.cn-auth {
+  flex-direction: column; gap: 0;
+  align-items: center; justify-content: center;
+  background: var(--panel); overflow: hidden;
 }
-/* The column is a fixed measure rather than a share of the half, so the
-   form keeps the same line length whatever the window does. */
-.cn-auth-col { width: 100%; max-width: 340px; }
+.cn-auth-main {
+  flex: auto; align-self: stretch; min-width: 0; overflow-y: auto;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 48px 24px;
+}
+/* The mark is pinned to the top of this column and the form hangs a
+   fixed distance below it, with the pair centred as one block -- so the
+   logo travels with the form instead of sitting on the page edge. */
+.cn-auth-col {
+  flex: none; width: min(100%, 376px);
+  display: flex; flex-direction: column; align-items: stretch;
+}
+/* Sized against the 32px title standing under it, not against the
+   sidebar's inline lockup: the mark is alone on this screen, and at the
+   inline size it read as a bullet point rather than as the product. */
+.cn-auth-logo { flex: none; display: flex; align-items: center; height: 48px; }
+.cn-auth-page { flex: none; width: 100%; margin-top: 56px; }
 
 .cn-auth-brand { margin-bottom: 26px; }
-.cn-auth-title { font-size: 26px; font-weight: 680; letter-spacing: -0.03em; margin: 18px 0 0; }
-.cn-auth-sub { font-size: 13px; color: var(--ink-3); margin-top: 7px; }
+.cn-auth-title {
+  font-size: clamp(28px, 8vw, 40px); font-weight: 600;
+  letter-spacing: -0.022em; line-height: 1.18; margin: 0;
+  text-wrap: balance;
+}
+.cn-auth-sub { font-size: 15px; color: var(--ink-2); margin-top: 8px; line-height: 1.5; }
 
 .cn-login-btn {
   display: flex; align-items: center; justify-content: center; gap: 9px;
-  width: 100%; height: 44px; padding: 0 14px; border-radius: 9px;
+  width: 100%; height: 42px; padding: 0 14px; border-radius: 12px;
   border: 1px solid var(--line); background: var(--panel);
-  font-size: 13.5px; font-weight: 560; color: var(--ink);
+  font-size: 14px; font-weight: 510; color: var(--ink);
   box-shadow: 0 1px 1px rgba(22,35,58,.04);
 }
 .cn-login-btn:hover { border-color: #d3dae6; background: #fbfcfe; }
 .cn-login-btn-pri { background: var(--brand); border-color: var(--brand); color: #fff; }
 .cn-login-btn-pri:hover { background: #4f46e5; border-color: #4f46e5; }
 .cn-login-btns { display: flex; flex-direction: column; gap: 10px; }
-.cn-login-or { display: flex; align-items: center; gap: 12px; margin: 18px 0; font-size: 11.5px; color: var(--ink-3); }
-.cn-login-or::before, .cn-login-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.cn-login-foot { margin-top: 20px; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+/* A short rule centred under the buttons rather than one spanning the
+   whole measure: at 376px a full-width rule cuts the column in half and
+   reads as a section break instead of an aside. */
+.cn-login-or {
+  display: flex; align-items: center; justify-content: center;
+  width: 144px; margin: 20px auto; font-size: 13px; color: var(--ink-3);
+}
+.cn-login-or::before, .cn-login-or::after { content: ""; flex: 1; min-width: 10px; height: 1px; background: var(--line); }
+.cn-login-or::before { margin-right: 16px; }
+.cn-login-or::after { margin-left: 16px; }
+.cn-login-foot { margin-top: 24px; font-size: 12.5px; color: var(--ink-3); line-height: 1.7; text-align: center; }
+/* Plain button, so a .cn-* rule reaches it -- unlike the fields beside
+   it, whose geometry is Tailwind utilities set at the call site. */
+.cn-auth .cn-code-send { height: 42px; border-radius: 12px; font-size: 13px; }
 .cn-login-foot a { color: var(--brand); }
 .cn-login-back {
   display: inline-flex; align-items: center; gap: 5px; margin-bottom: 14px;
@@ -834,52 +866,336 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
 
 /* -- 右侧展示 -- */
 
-.cn-auth-side {
-  flex: none; width: 46%; max-width: 720px; padding: 14px 14px 14px 0;
-  display: flex;
-}
+/* Absent below the two-column breakpoint, where it would only steal
+   width from the form. Everything that gives it shape lives in the
+   1100px block at the bottom of this section. */
+.cn-auth-side { display: none; }
+
 .cn-auth-side-inner {
-  position: relative; overflow: hidden;
-  flex: 1; min-width: 0; border-radius: 16px; padding: 40px;
+  position: absolute; inset: 0; overflow: hidden; border-radius: inherit;
+  padding: clamp(28px, 3.4vw, 46px);
   display: flex; flex-direction: column; justify-content: flex-end;
   color: #fff;
-  /* Cobalt, deepened rather than brightened: this panel sits next to a
+  /* Stacking context so the ruled overlay can sit at z-index -1: above
+     this element's own gradient, beneath every bit of content. */
+  isolation: isolate;
+  /* The query container for everything inside -- the sticker sizes and
+     the caption both scale off the panel rather than off the viewport,
+     which is what keeps the composition intact when the window changes
+     shape underneath it. Safe to contain: inset:0 gives it a size that
+     never depends on its contents. */
+  container-type: size;
+  /* Indigo deepened rather than brightened: this panel sits next to a
      white form for as long as it takes to sign in, and a saturated field
-     that size is tiring. */
+     that size is tiring. The ramp is the family the rest of the console
+     derives from -- indigo 500 / 600 / 800 / 950, not hand-mixed
+     midpoints -- with light modelled over it: a tight specular high on
+     the right, an indigo-400 bloom so the mid-field has hue movement
+     rather than a straight interpolation, and a deep pool in the
+     bottom-left, which is where the caption has to stay legible. */
   background:
-    radial-gradient(120% 90% at 85% 8%, rgba(255,255,255,.16), transparent 62%),
-    linear-gradient(160deg, #6366f1 0%, #4338ca 52%, #1e1b4b 100%);
+    radial-gradient(60% 42% at 78% 4%, rgba(255,255,255,.20), transparent 70%),
+    radial-gradient(58% 50% at 99% 26%, rgba(129,140,248,.50), transparent 72%),
+    radial-gradient(96% 62% at 6% 104%, #1e1b4b, transparent 68%),
+    linear-gradient(158deg, #6366f1 0%, #4f46e5 30%, #3730a3 62%, #1e1b4b 100%);
 }
 
-/* Bled off the top-right corner rather than centred: a glyph placed in
-   the middle of the empty half would read as the subject, and it is a
-   watermark. */
-.cn-auth-mark { position: absolute; top: -46px; right: -54px; display: grid; pointer-events: none; }
-.cn-auth-mark > span { grid-area: 1 / 1; opacity: 0; transition: opacity .5s ease; color: rgba(255,255,255,.13); }
-.cn-auth-mark > span[data-on="true"] { opacity: 1; }
+/* A ruled field, ~5% white, for scale -- the gradient alone has nothing
+   in it to measure against and reads as a poster. Masked to the top so
+   it never runs under the caption, where a grid stops being a surface
+   and starts looking like a table. */
+.cn-auth-side-inner::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(90% 68% at 60% 2%, #000, transparent 80%);
+  mask-image: radial-gradient(90% 68% at 60% 2%, #000, transparent 80%);
+}
 
-.cn-auth-slides { position: relative; }
+/* -- 四屏画面 --
+   One drawing per slide rather than a single standing composition: the
+   panel rotates through four claims, and a picture that does not change
+   with them is decoration sitting next to an argument. Each slide draws
+   the thing it is actually claiming -- an allocation, a masked field, a
+   fallback chain, a ledger row -- so the picture is evidence rather than
+   an illustration.
+
+   They share one vocabulary, which is what keeps four drawings reading
+   as one system: white objects with soft shadows and a slight tilt,
+   lying on the indigo field. Only their contents differ. */
+
+.cn-auth-arts { position: absolute; inset: 0; display: grid; pointer-events: none; }
+.cn-auth-art {
+  grid-area: 1 / 1; position: relative;
+  opacity: 0; transition: opacity .45s ease;
+}
+.cn-auth-art[data-on="true"] { opacity: 1; }
+
+/* Anything that floats on the field. Position, size and tilt come from
+   each slide's own rules; this is the shared physics. */
+.cn-auth-float {
+  position: absolute;
+  background: #fff; color: var(--ink);
+  box-shadow:
+    0 8px 18px -7px rgba(18,16,54,.45),
+    0 2px 4px -1px rgba(18,16,54,.22),
+    inset 0 0 0 1px rgba(255,255,255,.9);
+}
+/* Only the slide on screen animates in, and it does so each time it
+   comes round -- the attribute flips off and on, which restarts it. */
+.cn-auth-art[data-on="true"] .cn-auth-float {
+  animation: cn-auth-float-in .7s cubic-bezier(.2,.7,.3,1) backwards;
+}
+.cn-auth-art[data-on="true"] .cn-auth-float:nth-child(1) { animation-delay: .06s; }
+.cn-auth-art[data-on="true"] .cn-auth-float:nth-child(2) { animation-delay: .14s; }
+.cn-auth-art[data-on="true"] .cn-auth-float:nth-child(3) { animation-delay: .22s; }
+.cn-auth-art[data-on="true"] .cn-auth-float:nth-child(4) { animation-delay: .30s; }
+.cn-auth-art[data-on="true"] .cn-auth-float:nth-child(5) { animation-delay: .38s; }
+.cn-auth-art[data-on="true"] .cn-auth-float:nth-child(6) { animation-delay: .46s; }
+
+@keyframes cn-auth-float-in {
+  from { opacity: 0; transform: translateY(14px) scale(.94); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A square tile carrying nothing but a vendor mark. currentColor is what
+   the OpenAI and Anthropic marks are drawn with, and the panel sets
+   color:#fff -- without the ink colour inherited from .cn-auth-float
+   those two would render white on a white tile and vanish. */
+/* 屏 1：统一接入 -- the providers themselves, tossed on the field as
+   loose tiles. A gateway's first claim is that all of this arrives
+   through one door, and the marks are that claim rather than a picture
+   of it: nothing else on this panel is as literally the product.
+
+   Not a grid -- a grid of vendor logos is a pricing page. Sizes and
+   angles vary so the group reads as a handful of things set down, with
+   the larger tiles nearer the middle so it has some depth. */
+.cn-auth-chip { display: grid; place-items: center; border-radius: 26%; }
+.cn-auth-art-gate > :nth-child(1) { left: 24%; top: 28%; width: 12cqmin;   height: 12cqmin;   rotate: -8deg; }
+.cn-auth-art-gate > :nth-child(2) { left: 45%; top: 19%; width: 10cqmin;   height: 10cqmin;   rotate: 7deg; }
+.cn-auth-art-gate > :nth-child(3) { left: 60%; top: 31%; width: 13cqmin;   height: 13cqmin;   rotate: -5deg; }
+.cn-auth-art-gate > :nth-child(4) { left: 78%; top: 22%; width: 10cqmin;   height: 10cqmin;   rotate: 12deg; }
+.cn-auth-art-gate > :nth-child(5) { left: 34%; top: 41%; width: 11cqmin;   height: 11cqmin;   rotate: 9deg; }
+.cn-auth-art-gate > :nth-child(6) { left: 57%; top: 49%; width: 9.5cqmin;  height: 9.5cqmin;  rotate: -7deg; }
+
+/* A card carrying a line or two of text. Type scales with the panel, so
+   the drawing holds together from the 1100px breakpoint up to a 4K
+   window instead of being tuned for one size. */
+.cn-auth-card {
+  /* A length, not a percentage: a percentage radius on a box this much
+     wider than it is tall resolves to an ellipse, and the cards came out
+     as warped lozenges. */
+  border-radius: clamp(8px, 1.5cqw, 15px);
+  padding: 2.6cqw 3cqw;
+  font-size: clamp(9.5px, 2.05cqw, 15px);
+  line-height: 1.35;
+  display: flex; flex-direction: column; gap: .62em;
+}
+.cn-auth-card-row { display: flex; align-items: center; gap: .7em; }
+.cn-auth-card-lab { color: var(--ink-3); font-size: .88em; flex: none; }
+.cn-auth-card-val { font-weight: 620; letter-spacing: -0.01em; }
+.cn-auth-card-mono { font-family: var(--mono); font-weight: 560; letter-spacing: -0.02em; }
+.cn-auth-card-spacer { margin-left: auto; }
+
+/* 屏 1：额度分发 -- a pool split into departments. The bar is the point:
+   an allocation is a share of something finite, and a number alone does
+   not say that. */
+.cn-auth-bar {
+  display: block; height: .5em; border-radius: 99px;
+  background: #e3e9f8; overflow: hidden;
+}
+.cn-auth-bar > i { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
+
+.cn-auth-art-quota > :nth-child(1) { left: 12%; top: 20%; width: 36cqmin; rotate: -4deg; }
+.cn-auth-art-quota > :nth-child(2) { left: 40%; top: 35%; width: 34cqmin; rotate: 3deg; }
+.cn-auth-art-quota > :nth-child(3) { left: 20%; top: 50%; width: 32cqmin; rotate: -2deg; }
+
+/* 屏 2：脱敏 -- the real shapes, with the middle taken out. Showing the
+   pattern rather than a padlock is the whole claim: these are the spans
+   that never reach the provider. */
+.cn-auth-redact {
+  display: inline-block; width: 3.1em; height: .72em;
+  border-radius: 2px; background: var(--ink);
+  vertical-align: -.02em; margin: 0 .16em;
+}
+.cn-auth-hit {
+  display: inline-flex; align-items: center; gap: .3em;
+  padding: .18em .5em; border-radius: 99px;
+  background: var(--bad-soft); color: var(--bad);
+  font-size: .82em; font-weight: 620; flex: none;
+}
+.cn-auth-art-dlp > :nth-child(1) { left: 10%; top: 20%; width: 40cqmin; rotate: -5deg; }
+/* Wider than its siblings: this is the row carrying the hit badge. */
+.cn-auth-art-dlp > :nth-child(2) { left: 24%; top: 35%; width: 54cqmin; rotate: 4deg; }
+.cn-auth-art-dlp > :nth-child(3) { left: 16%; top: 50%; width: 40cqmin; rotate: -2deg; }
+
+/* 屏 3：路由与熔断 -- the chain, drawn the way the routing page draws it
+   (DESIGN.md 6.3): target, then fallback, then the one that tripped.
+   Alone among the four this one is aligned rather than scattered, and
+   that difference is the content: the other three slides are loose
+   records, this is an ordered path, and a path that had been tossed
+   about would stop being one.
+   The rail runs the full height behind the cards, so it shows only in
+   the gaps between them -- which is the whole trick, and needs no extra
+   markup. */
+.cn-auth-chain {
+  position: absolute; left: 16%; top: 20%; width: 64cqmin;
+  display: flex; flex-direction: column; gap: 4.6cqmin;
+}
+.cn-auth-chain::before {
+  content: ""; position: absolute; z-index: 0;
+  left: 8cqmin; top: 4cqmin; bottom: 4cqmin; width: 2px;
+  background: repeating-linear-gradient(rgba(255,255,255,.62) 0 5px, transparent 5px 10px);
+}
+.cn-auth-node { position: relative; z-index: 1; }
+/* Overrides the absolute placement .cn-auth-float assumes: inside the
+   chain the cards are stacked by the flex column, not by coordinates. */
+.cn-auth-node > .cn-auth-card { position: relative; width: 100%; }
+.cn-auth-node[data-tripped="true"] .cn-auth-card-val { color: var(--ink-3); }
+.cn-auth-node[data-tripped="true"] .cn-auth-node-mark { opacity: .4; }
+.cn-auth-node-mark { width: 1.55em; height: 1.55em; flex: none; }
+/* Isolation is a warning state, not a failure -- the cooldown probes and
+   recovers on its own. The red badge is spoken for by the DLP hit on
+   slide 2, and two different events should not wear the same colour. */
+.cn-auth-trip {
+  display: inline-flex; align-items: center; gap: .3em;
+  padding: .18em .5em; border-radius: 99px;
+  background: var(--warn-soft); color: var(--warn);
+  font-size: .82em; font-weight: 620; flex: none;
+}
+
+/* 屏 4：调用日志 -- one ledger row per card, fanned like a stack of
+   slips. Who, which model, what it cost: the three columns the audit
+   page actually keeps. */
+.cn-auth-art-log > :nth-child(1) { left: 10%; top: 20%; width: 48cqmin; rotate: -3deg; }
+.cn-auth-art-log > :nth-child(2) { left: 26%; top: 34%; width: 52cqmin; rotate: 2deg; }
+.cn-auth-art-log > :nth-child(3) { left: 14%; top: 48%; width: 50cqmin; rotate: -1deg; }
+.cn-auth-cost { font-family: var(--mono); font-weight: 620; color: var(--brand); }
+
+/* Confetti: a few flat discs in the accent family, well behind the
+   objects, and the one layer that does not change between slides -- it
+   belongs to the field, not to any single claim. They exist to break the
+   gradient's emptiness at the edges, kept small and few, because past a
+   handful it looks like weather. */
+.cn-auth-dust { position: absolute; inset: 0; pointer-events: none; }
+.cn-auth-dust > i {
+  position: absolute; display: block; border-radius: 50%;
+}
+.cn-auth-dust > i:nth-child(1) { left: 62%; top: 15%; width: 11px; height: 11px; background: rgba(199,210,254,.5); }
+.cn-auth-dust > i:nth-child(2) { left: 80%; top: 24%; width: 7px;  height: 7px;  background: rgba(255,255,255,.4); }
+.cn-auth-dust > i:nth-child(3) { left: 72%; top: 40%; width: 13px; height: 13px; background: rgba(165,180,252,.32); }
+.cn-auth-dust > i:nth-child(4) { left: 88%; top: 52%; width: 8px;  height: 8px;  background: rgba(255,255,255,.28); }
+.cn-auth-dust > i:nth-child(5) { left: 6%;  top: 33%; width: 10px; height: 10px; background: rgba(199,210,254,.3); }
+.cn-auth-dust > i:nth-child(6) { left: 66%; top: 60%; width: 7px;  height: 7px;  background: rgba(255,255,255,.24); }
+
+
+/* -- 底部文案 -- */
+
 /* Every slide is laid on the same spot and the tallest sets the height,
-   so the dots below never move as the text changes length. */
-.cn-auth-slide { grid-area: 1 / 1; opacity: 0; transition: opacity .5s ease; }
-.cn-auth-slides { display: grid; }
-.cn-auth-slide[data-on="true"] { opacity: 1; }
+   so nothing below it moves as the text changes length. */
+.cn-auth-slides { position: relative; display: grid; }
+.cn-auth-slide { grid-area: 1 / 1; }
+/* The parts rise in sequence rather than the block cross-fading as one
+   flat plate. The delays hang off the on-state only, so the outgoing
+   slide leaves together and just the arriving one is staggered. */
+.cn-auth-slide > * {
+  opacity: 0; transform: translateY(11px);
+  transition: opacity .5s ease, transform .62s cubic-bezier(.22,.61,.36,1);
+}
+.cn-auth-slide[data-on="true"] > * { opacity: 1; transform: none; }
+.cn-auth-slide[data-on="true"] > :nth-child(2) { transition-delay: .07s; }
+.cn-auth-slide[data-on="true"] > :nth-child(3) { transition-delay: .14s; }
 .cn-auth-slide-ico {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 38px; height: 38px; border-radius: 11px; margin-bottom: 18px;
-  background: rgba(255,255,255,.15); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+  width: 38px; height: 38px; border-radius: 12px; margin-bottom: 18px;
+  background: rgba(255,255,255,.14);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.20), 0 6px 16px -8px rgba(30,27,75,.6);
 }
-.cn-auth-slide-title { margin: 0; font-size: 27px; font-weight: 660; letter-spacing: -0.03em; line-height: 1.35; }
-.cn-auth-slide-body { margin: 12px 0 0; font-size: 13.5px; line-height: 1.85; color: rgba(255,255,255,.76); max-width: 30em; }
+/* cqw here is a share of the panel's *content* box, padding already
+   subtracted -- which is the box the line actually has to fit in. */
+.cn-auth-slide-title {
+  margin: 0; font-size: clamp(22px, 3.1cqw + 8px, 34px); font-weight: 640;
+  letter-spacing: -0.028em; line-height: 1.3; max-width: 15em;
+  text-wrap: balance;
+  text-shadow: 0 1px 20px rgba(20,18,58,.35);
+}
+.cn-auth-slide-body {
+  margin: 12px 0 0; font-size: 13.5px; line-height: 1.8;
+  color: rgba(255,255,255,.8); max-width: 27em;
+  text-shadow: 0 1px 14px rgba(20,18,58,.3);
+}
 
-.cn-auth-dots { display: flex; gap: 7px; margin-top: 30px; }
-.cn-auth-dot { width: 22px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.28); }
-.cn-auth-dot[data-on="true"] { background: #fff; }
-.cn-auth-dot:hover { background: rgba(255,255,255,.6); }
+/* -- 分页 --
+   Overlaid on the art at the foot of the panel, centred, rather than
+   stacked under the caption: the caption is anchored bottom-left and a
+   row of bars directly beneath it read as a third line of text. */
+.cn-auth-dots {
+  position: absolute; z-index: 1; inset-block-end: 12px; inset-inline-start: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+}
+.cn-auth-dot {
+  position: relative; overflow: hidden;
+  width: 15px; height: 5px; border-radius: 40px;
+  background: rgba(255,255,255,.3);
+  transition: width .3s ease, background .3s ease;
+}
+.cn-auth-dot::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: rgba(255,255,255,.85); transform: scaleX(0); transform-origin: left;
+}
+.cn-auth-dot:hover { background: rgba(255,255,255,.5); }
+/* The active bar is wider and fills over its own dwell, so the rotation
+   reads as something with a clock behind it rather than a jump that
+   arrives unannounced. The duration comes from the component, so the
+   bar and the timer cannot drift apart. */
+.cn-auth-dot[data-on="true"] { width: 30px; }
+.cn-auth-dot[data-on="true"]::after {
+  animation: cn-auth-fill var(--cn-dwell, 6000ms) linear forwards;
+}
+@keyframes cn-auth-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .cn-auth-slide, .cn-auth-mark > span { transition: none; }
+  .cn-auth-slide > *, .cn-auth-dot { transition: none; }
+  .cn-auth-slide > * { transform: none; }
+  .cn-auth-art[data-on="true"] .cn-auth-float { animation: none; }
+  .cn-auth-art { transition: none; }
+  /* The panel does not rotate under reduced motion, so a bar that filled
+     once and stopped would be drawing progress that is not happening.
+     Solid marks the active slide instead. */
+  .cn-auth-dot[data-on="true"]::after { animation: none; transform: scaleX(1); }
 }
+
+/* -- 两栏 --
+   The split and the panel arrive together. The panel is a portrait card
+   sized off the viewport height at a fixed 9:10, vertically centred,
+   with the form column taking whatever is left and never dropping below
+   480px -- so the form's measure is what holds still while the window
+   moves, and the decoration is what gives way. */
+@media (min-width: 1100px) {
+  .cn-auth { flex-direction: row; align-items: center; gap: 4px; padding-inline-end: 12px; }
+  .cn-auth-main { flex: auto; min-width: 480px; padding: 0; }
+  .cn-auth-col { width: 382px; }
+  .cn-auth-page { margin-top: 44px; }
+  .cn-auth-title { font-size: 32px; line-height: 1.25; }
+  .cn-auth-sub { font-size: 15px; }
+  .cn-login-btn { height: 38px; }
+  .cn-auth .cn-code-send { height: 38px; }
+
+  .cn-auth-side {
+    display: block; position: relative; flex: none; align-self: center;
+    height: calc(100dvh - 24px);
+    /* 9:10 off the height, capped so the form column keeps its 480px
+       plus the 4px gap and the 12px gutter. Past that cap the card just
+       gets narrower than the ratio, which is the right trade -- the
+       artwork is drawn, so nothing in it gets cropped away. */
+    width: min(calc((100dvh - 24px) * 0.9), calc(100vw - 496px));
+    border-radius: 20px; overflow: hidden; isolation: isolate;
+  }
+}
+
 
 .cn-qr {
   width: 176px; height: 176px; margin: 4px auto 16px; border-radius: 12px;
@@ -893,6 +1209,8 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
 .cn-code-input .cn-input { flex: 1; }
 .cn-code-send {
   flex: none; height: 36px; padding: 0 12px; border-radius: 8px;
+  /* Overridden on the sign-in screen, where it stands beside a 42px
+     field -- see the .cn-auth override below. */
   border: 1px solid var(--line); font-size: 12.5px; font-weight: 560; color: var(--brand);
   background: var(--panel);
 }
@@ -988,8 +1306,7 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
   .cn-foot { padding: 0 14px; gap: 10px; }
   .cn-foot-links a:not(:last-child) { display: none; }
 
-  .cn-auth-side { display: none; }
-  .cn-auth-main { padding: 24px 16px; }
+  .cn-auth-main { padding: 40px 16px; }
 
   .cn-cfg-card { flex-wrap: wrap; }
   .cn-cfg-acts { width: 100%; justify-content: flex-end; }

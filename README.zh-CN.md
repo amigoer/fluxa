@@ -1,14 +1,33 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" width="76" height="76" alt="Fluxa">
+<img src="docs/assets/logo.svg" width="128" height="128" alt="Fluxa">
 
 # Fluxa
 
 **企业内部 AI 资源分发网关：统一采购 LLM 额度，分发给员工使用。**
 
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](go.mod) [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](docker-compose.yml) [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](frontend/package.json) [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](frontend/package.json) [![Self-hosted](https://img.shields.io/badge/deploy-single%20binary-6366F1)](#本地运行) [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 [English](README.md)
 
 </div>
+
+## 界面
+
+<img src="docs/assets/screenshots/quickstart.png" alt="快速接入：OpenAI 兼容端点、认证方式和可直接复制的示例">
+
+<p align="center"><em>把已有的 OpenAI 客户端指向 Fluxa 的 base_url，其余代码一行都不用改。</em></p>
+
+|  |  |
+|---|---|
+| <img src="docs/assets/screenshots/models.png" alt="模型与路由"> | <img src="docs/assets/screenshots/roles.png" alt="角色权限"> |
+| **模型与路由** — 每个模型的价格、上下文长度、发布状态，下面接企业的全局路由链。 | **角色权限** — 内置四个角色加自定义角色，落到每一个权限点。 |
+| <img src="docs/assets/screenshots/dlp.png" alt="DLP 规则"> | <img src="docs/assets/screenshots/providers.png" alt="供应商"> |
+| **DLP 规则** — 正则加真实校验位双重匹配，按优先级排序，可脱敏也可拦截。 | **供应商** — 上游凭证和实时健康状态，供应商出问题不用等人来报。 |
+
+<img src="docs/assets/screenshots/login.png" alt="登录页">
+
+<p align="center"><em>登录：有统一 IM 走飞书，没有的话用手机号 / 邮箱验证码兜底。</em></p>
 
 ## 这是什么
 

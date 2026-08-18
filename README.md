@@ -1,14 +1,33 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" width="76" height="76" alt="Fluxa">
+<img src="docs/assets/logo.svg" width="128" height="128" alt="Fluxa">
 
 # Fluxa
 
 **An internal AI gateway for companies that buy LLM access in bulk and hand it out to employees.**
 
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](go.mod) [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](docker-compose.yml) [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](frontend/package.json) [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](frontend/package.json) [![Self-hosted](https://img.shields.io/badge/deploy-single%20binary-6366F1)](#running-it-locally) [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 [简体中文](README.zh-CN.md)
 
 </div>
+
+## Screenshots
+
+<img src="docs/assets/screenshots/quickstart.png" alt="Quick start: the OpenAI-compatible endpoint, auth header, and copy-paste examples">
+
+<p align="center"><em>Point an existing OpenAI client at Fluxa's base URL and nothing else changes.</em></p>
+
+|  |  |
+|---|---|
+| <img src="docs/assets/screenshots/models.png" alt="Models and routing"> | <img src="docs/assets/screenshots/roles.png" alt="Role permissions"> |
+| **Models & routing** — per-model pricing and context window, published or draft, with the org's global routing chain underneath. | **Roles** — four built-in roles plus custom ones, resolved down to individual permission points. |
+| <img src="docs/assets/screenshots/dlp.png" alt="DLP rules"> | <img src="docs/assets/screenshots/providers.png" alt="Providers"> |
+| **DLP rules** — matched by regex *and* the real check digit, ordered by priority, redact or block. | **Providers** — upstream credentials and live health, so a failing provider is visible before anyone reports it. |
+
+<img src="docs/assets/screenshots/login.png" alt="Sign-in screen">
+
+<p align="center"><em>Sign-in: Feishu SSO, or a phone/email one-time code where there is no unified IM.</em></p>
 
 ## What it is
 

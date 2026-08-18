@@ -2,10 +2,10 @@ import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { LoginShell } from "@/layouts/login-layout"
-import { FluxaLogo } from "@/components/console/brand"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { Input } from "@/components/console/ui"
+import { AUTH_FIELD } from "./field"
 
 // First-run setup: creates the single organization this deployment
 // serves and its first super admin (DESIGN.md 9, one org per
@@ -63,7 +63,6 @@ export function SetupPage() {
     <LoginShell>
       <div>
         <div className="cn-auth-brand">
-          <FluxaLogo size={36} />
           <h1 className="cn-auth-title">初始化 Fluxa</h1>
           <p className="cn-auth-sub">首次部署，创建企业和第一个超管账号</p>
         </div>
@@ -74,6 +73,7 @@ export function SetupPage() {
               企业名称 <span>必填</span>
             </label>
             <Input
+              className={AUTH_FIELD}
               id="setup-org"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
@@ -86,6 +86,7 @@ export function SetupPage() {
               你的姓名 <span>必填</span>
             </label>
             <Input
+              className={AUTH_FIELD}
               id="setup-name"
               value={adminName}
               onChange={(e) => setAdminName(e.target.value)}
@@ -98,6 +99,7 @@ export function SetupPage() {
               邮箱 <span>必填</span>
             </label>
             <Input
+              className={AUTH_FIELD}
               id="setup-email"
               type="email"
               value={adminEmail}
