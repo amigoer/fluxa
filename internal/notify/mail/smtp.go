@@ -3,8 +3,10 @@ package mail
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"mime"
@@ -66,7 +68,7 @@ func NewSMTPSender() *SMTPSender {
 //   - The body is a real MIME message declaring UTF-8, and the subject and
 //     sender name go through RFC 2047. Without that a Chinese subject
 //     arrives as mojibake, and plenty of relays score the message as spam.
-func (s *SMTPSender) SendEmail(ctx context.Context, config map[string]any, recipient, subject, body string) error {
+func (s *SMTPSender) SendEmail(ctx context.Context, config map[string]any, recipient string, mail Mail) error {
 	host, _ := config["host"].(string)
 	port, _ := config["port"].(string)
 	username, _ := config["username"].(string)
@@ -113,7 +115,7 @@ func (s *SMTPSender) SendEmail(ctx context.Context, config map[string]any, recip
 	if err != nil {
 		return fmt.Errorf("mail: data: %w", err)
 	}
-	if _, err := w.Write([]byte(message(fromAddress, fromName, recipient, subject, body))); err != nil {
+	if _, err := w.Write([]byte(message(fromAddress, fromName, recipient, mail))); err != nil {
 		return fmt.Errorf("mail: write: %w", err)
 	}
 	if err := w.Close(); err != nil {
@@ -160,7 +162,11 @@ func dial(ctx context.Context, host, port string) (*smtp.Client, error) {
 	return client, nil
 }
 
-func message(fromAddress, fromName, recipient, subject, body string) string {
+// message builds the MIME document. With an HTML part it is a
+// multipart/alternative carrying both, text first: that order is the
+// spec's -- the last part is the client's preferred one -- and a client
+// that understands neither still shows something readable.
+func message(fromAddress, fromName, recipient string, mail Mail) string {
 	from := fromAddress
 	if fromName != "" {
 		from = fmt.Sprintf("%s <%s>", mime.QEncoding.Encode("UTF-8", fromName), fromAddress)
@@ -169,18 +175,47 @@ func message(fromAddress, fromName, recipient, subject, body string) string {
 	var b strings.Builder
 	b.WriteString("From: " + from + "\r\n")
 	b.WriteString("To: " + recipient + "\r\n")
-	b.WriteString("Subject: " + mime.QEncoding.Encode("UTF-8", subject) + "\r\n")
+	b.WriteString("Subject: " + mime.QEncoding.Encode("UTF-8", mail.Subject) + "\r\n")
 	b.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + "\r\n")
 	b.WriteString("MIME-Version: 1.0\r\n")
-	b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
-	b.WriteString("Content-Transfer-Encoding: 8bit\r\n")
+
+	if mail.HTML == "" {
+		b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+		b.WriteString("Content-Transfer-Encoding: 8bit\r\n")
+		b.WriteString("\r\n")
+		// Written raw: the writer from Client.Data is a textproto.DotWriter,
+		// which already escapes a leading "." and terminates the block. Doing
+		// it here too would put the second dot on the wire for real.
+		b.WriteString(mail.Text)
+		b.WriteString("\r\n")
+		return b.String()
+	}
+
+	boundary := boundaryFor(mail)
+	b.WriteString("Content-Type: multipart/alternative; boundary=\"" + boundary + "\"\r\n")
 	b.WriteString("\r\n")
-	// Written raw: the writer from Client.Data is a textproto.DotWriter,
-	// which already escapes a leading "." and terminates the block. Doing
-	// it here too would put the second dot on the wire for real.
-	b.WriteString(body)
-	b.WriteString("\r\n")
+	for _, part := range []struct{ ctype, body string }{
+		{"text/plain; charset=UTF-8", mail.Text},
+		{"text/html; charset=UTF-8", mail.HTML},
+	} {
+		b.WriteString("--" + boundary + "\r\n")
+		b.WriteString("Content-Type: " + part.ctype + "\r\n")
+		b.WriteString("Content-Transfer-Encoding: 8bit\r\n")
+		b.WriteString("\r\n")
+		b.WriteString(part.body)
+		b.WriteString("\r\n")
+	}
+	b.WriteString("--" + boundary + "--\r\n")
 	return b.String()
+}
+
+// boundaryFor derives a delimiter that cannot occur inside either part,
+// which is the one thing a boundary must guarantee. Random would do as
+// well, but deriving it keeps the message byte-identical for the same
+// input and so keeps the tests meaningful.
+func boundaryFor(mail Mail) string {
+	sum := sha256.Sum256([]byte(mail.Text + mail.HTML))
+	return "fluxa-" + hex.EncodeToString(sum[:8])
 }
 
 // loginAuth implements the non-standard but widely deployed AUTH LOGIN.

@@ -21,13 +21,18 @@ type Sender interface {
 	Send(ctx context.Context, config map[string]any, recipient, message string) error
 }
 
+// Mail is one message's content. Aliased rather than redeclared so the
+// senders and their callers name the same type without this package's
+// dependents having to import the transport underneath it.
+type Mail = mail.Mail
+
 // EmailSender is the same contract plus a subject, which SMS has no
 // concept of. The two are separate interfaces so a channel test and a
 // verification code can arrive under different subject lines -- with one
 // shared signature every mail this system sends had to claim to be a
 // verification code.
 type EmailSender interface {
-	SendEmail(ctx context.Context, config map[string]any, recipient, subject, body string) error
+	SendEmail(ctx context.Context, config map[string]any, recipient string, m Mail) error
 }
 
 // requiredConfig lists the fields each vendor cannot send without. It
@@ -76,12 +81,12 @@ func SendSMS(ctx context.Context, provider string, config map[string]any, recipi
 	return sender.Send(ctx, config, recipient, message)
 }
 
-// SendEmail delivers body to an email address through the named email
-// vendor, under subject.
-func SendEmail(ctx context.Context, provider string, config map[string]any, recipient, subject, body string) error {
+// SendEmail delivers mail to an email address through the named email
+// vendor.
+func SendEmail(ctx context.Context, provider string, config map[string]any, recipient string, m Mail) error {
 	sender, ok := emailSenders[provider]
 	if !ok {
 		return fmt.Errorf("notify: unknown email provider %q", provider)
 	}
-	return sender.SendEmail(ctx, config, recipient, subject, body)
+	return sender.SendEmail(ctx, config, recipient, m)
 }

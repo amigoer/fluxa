@@ -12,7 +12,8 @@ import (
 // send drives the real sender against a fake relay.
 func send(t *testing.T, r *relay) error {
 	t.Helper()
-	return NewSMTPSender().SendEmail(context.Background(), r.config(), "user@example.com", "Fluxa 测试邮件", "正文")
+	return NewSMTPSender().SendEmail(context.Background(), r.config(), "user@example.com",
+		Mail{Subject: "Fluxa 测试邮件", Text: "正文"})
 }
 
 func TestSendEmailOverImplicitTLS(t *testing.T) {
@@ -127,7 +128,7 @@ func TestSendEmailGivesUpOnASilentRelay(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- NewSMTPSender().SendEmail(context.Background(), config, "user@example.com", "s", "b")
+		done <- NewSMTPSender().SendEmail(context.Background(), config, "user@example.com", Mail{Subject: "s", Text: "b"})
 	}()
 
 	select {

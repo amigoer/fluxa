@@ -64,7 +64,7 @@ func (h *Handler) deliverOTP(ctx context.Context, identifier, code string, purpo
 	if kind == types.NotifyChannelSMS {
 		err = notify.SendSMS(ctx, channel.Provider, channel.Config, identifier, code)
 	} else {
-		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, "Fluxa 验证码", body)
+		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, notify.Mail{Subject: "Fluxa 验证码", Text: body})
 	}
 	if err != nil {
 		// Recorded before returning: "我没收到验证码" is otherwise
