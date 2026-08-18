@@ -55,4 +55,17 @@ export const api = {
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  // For the one endpoint that answers with a document rather than data:
+  // the mail preview returns the template's own HTML, because the point
+  // is to see exactly what the mail client will be handed.
+  postText: async (path: string, body?: unknown) => {
+    const res = await fetch(path, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    if (!res.ok) throw new ApiError(res.status, "common.internal_error")
+    return res.text()
+  },
 }

@@ -99,4 +99,7 @@ func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
 	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Get("/api/notify-channels/{kind}", h.getNotifyChannel)
 	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Put("/api/notify-channels/{kind}", h.putNotifyChannel)
 	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Post("/api/notify-channels/{kind}/test", h.testNotifyChannel)
+	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Get("/api/mail-settings", h.getMailSettings)
+	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Put("/api/mail-settings", h.putMailSettings)
+	r.With(rbac.Require(rbac.PermissionOrgManageNotifyChannels)).Post("/api/mail-settings/preview", h.previewMailTemplate)
 }

@@ -19,6 +19,7 @@ type Repo interface {
 	MemberRepo
 	IdentityRepo
 	AuthSettingsRepo
+	MailSettingsRepo
 	LocalAccountRepo
 	OTPRepo
 	SessionRepo

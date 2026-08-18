@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { Button } from "@/components/console/button"
 import { Icon } from "@/components/console/icon"
@@ -76,6 +77,7 @@ export function NotifyChannelsPage() {
 type ChannelSpec = (typeof CHANNELS)[number]
 
 function ChannelCard({ spec }: { spec: ChannelSpec }) {
+  const navigate = useNavigate()
   const { member } = useAuth()
   const [channel, setChannel] = useState<NotifyChannel | null>(null)
   const [sentThisMonth, setSentThisMonth] = useState(0)
@@ -167,6 +169,18 @@ function ChannelCard({ spec }: { spec: ChannelSpec }) {
           {/* Email only for now -- there is no test path behind the SMS
               channel yet, and a button that cannot do anything is worse
               than one that is not there. */}
+          {/* The wording lives on its own page rather than in this card:
+              it is not a credential, it is longer than anything else here,
+              and it needs a preview beside it that this card has no room
+              for. The SMS body has no equivalent -- that template is
+              registered and approved at the vendor, and nothing we put in
+              a form here would reach the message. */}
+          {spec.kind === "email" && (
+            <Button onClick={() => navigate("/admin/mail-template")}>
+              <Icon name="mail" size={14} />
+              邮件模板
+            </Button>
+          )}
           {spec.kind === "email" && (
             <Button
               disabled={!configured}

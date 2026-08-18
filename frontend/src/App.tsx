@@ -18,6 +18,7 @@ import { MembersPage } from "@/pages/admin/members-page"
 import { RolesPage } from "@/pages/admin/roles-page"
 import { KeysPage } from "@/pages/admin/keys-page"
 import { IdentitySourcesPage } from "@/pages/admin/identity-sources-page"
+import { MailTemplatePage } from "@/pages/admin/mail-template-page"
 import { NotifyChannelsPage } from "@/pages/admin/notify-channels-page"
 import { DlpRulesPage } from "@/pages/admin/dlp-rules-page"
 import { SecurityEventsPage } from "@/pages/admin/security-events-page"
@@ -63,6 +64,7 @@ function AppRoutes() {
         <Route path="keys" element={<KeysPage />} />
         <Route path="identity-sources" element={<IdentitySourcesPage />} />
         <Route path="notify-channels" element={<NotifyChannelsPage />} />
+        <Route path="mail-template" element={<MailTemplatePage />} />
         <Route path="dlp-rules" element={<DlpRulesPage />} />
         <Route path="security-events" element={<SecurityEventsPage />} />
         <Route path="call-logs" element={<CallLogsPage />} />

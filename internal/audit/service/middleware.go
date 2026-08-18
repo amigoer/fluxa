@@ -35,6 +35,7 @@ var actions = map[string]string{
 	"PUT /api/auth-settings":                "auth_settings.update",
 	"PUT /api/notify-channels/{kind}":       "notify_channel.update",
 	"POST /api/notify-channels/{kind}/test": "notify_channel.test",
+	"PUT /api/mail-settings":                "mail_settings.update",
 
 	// 资源管理
 	"POST /api/providers":                            "provider.create",
@@ -61,6 +62,10 @@ var actions = map[string]string{
 // and letting it through would bury the real entries.
 var skip = map[string]bool{
 	"POST /api/auth/logout": true,
+	// A POST because it carries unsaved values to render, not because it
+	// changes anything. Recording it would fill the trail with an entry
+	// per keystroke in the template editor.
+	"POST /api/mail-settings/preview": true,
 }
 
 // MutationRecorder is the middleware half of the operation audit trail:

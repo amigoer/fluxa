@@ -175,9 +175,7 @@ func (h *Handler) testNotifyChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body := "这是一封来自 Fluxa 的测试邮件。\r\n\r\n" +
-		"收到它说明发信通道配置正确，本地账号的注册和登录验证码可以正常送达。"
-	if err := notify.SendEmail(r.Context(), channel.Provider, channel.Config, recipient, notify.Mail{Subject: "Fluxa 测试邮件", Text: body}); err != nil {
+	if err := notify.SendEmail(r.Context(), channel.Provider, channel.Config, recipient, notify.TestMail(h.service.MailBrand(r.Context()))); err != nil {
 		_ = h.repo.LogNotifyFailed(r.Context(), kind, recipient, notifyPurposeTest, err)
 		// The upstream message is the entire value of this button:
 		// "authentication failed" and "connection timed out" need

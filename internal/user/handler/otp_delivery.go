@@ -58,13 +58,14 @@ func (h *Handler) deliverOTP(ctx context.Context, identifier, code string, purpo
 		return fmt.Errorf("%w: %s is enabled but not configured", errNoNotifyChannel, kind)
 	}
 
-	// SMS carries the bare code because the vendor's template supplies the
-	// wording; email carries the whole sentence, in the console's language.
-	body := fmt.Sprintf("你的 Fluxa 验证码是 %s，5 分钟内有效。\r\n\r\n如果这不是你本人的操作，忽略这封邮件即可。", code)
+	// SMS carries the bare code and nothing else: the wording lives in the
+	// template the vendor registered and approved, and anything we sent
+	// alongside it would be discarded. Mail is ours end to end, so it goes
+	// as the full branded message.
 	if kind == types.NotifyChannelSMS {
 		err = notify.SendSMS(ctx, channel.Provider, channel.Config, identifier, code)
 	} else {
-		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, notify.Mail{Subject: "Fluxa 验证码", Text: body})
+		err = notify.SendEmail(ctx, channel.Provider, channel.Config, identifier, notify.OTPMail(code, otpTTL, h.service.MailBrand(ctx)))
 	}
 	if err != nil {
 		// Recorded before returning: "我没收到验证码" is otherwise

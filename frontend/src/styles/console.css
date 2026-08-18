@@ -504,6 +504,19 @@
 .cn-foot a:hover { color: var(--brand); text-decoration: underline; }
 .cn-foot-sep { color: var(--line-2); }
 
+/* ---- 邮件模板：左表单 / 右预览 ------------------------------------- */
+
+.cn-mailtpl { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 14px; align-items: start; }
+/* A white ground behind the frame, because the mail draws its own page
+   background and would otherwise sit on the card with no edge. */
+.cn-mailtpl-frame {
+  width: 100%; height: 560px; border: 1px solid var(--line);
+  border-radius: 8px; background: #fff; display: block;
+}
+@media (max-width: 1100px) {
+  .cn-mailtpl { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ---- 筛选行 ---------------------------------------------------------- */
 
 .cn-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

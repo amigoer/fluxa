@@ -16,6 +16,7 @@ type Service interface {
 	RoleService
 	IdentityService
 	AuthSettingsService
+	MailSettingsService
 	NotifyService
 }
 
