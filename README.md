@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/logo.svg" width="76" height="76" alt="Fluxa">
+
 # Fluxa
 
 **An internal AI gateway for companies that buy LLM access in bulk and hand it out to employees.**

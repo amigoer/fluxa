@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/logo.svg" width="76" height="76" alt="Fluxa">
+
 # Fluxa
 
 **企业内部 AI 资源分发网关：统一采购 LLM 额度，分发给员工使用。**

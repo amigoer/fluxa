@@ -42,7 +42,16 @@ export function Brand({ kind, size = 14, style }: { kind?: string | null; size?:
   return <Mark style={base} />
 }
 
-// The Fluxa mark: geometric F in a rounded square (DESIGN.md 6.2).
+// The Fluxa mark: a jellyfish on a rounded plate (DESIGN.md 6.2).
+//
+// Drawn as one SVG rather than a CSS plate with a glyph inside it, so the
+// plate and the creature scale together and the whole thing can be handed
+// to a favicon or a README at any size without re-deriving the geometry.
+//
+// The composition is the designer's own and is deliberately not centred:
+// the bell sits high and the tentacles trail past the middle, which is
+// what keeps it reading as drifting rather than as a logo pinned to a
+// grid. Re-centring it would flatten exactly that.
 export function FluxaLogo({
   size = 26,
   radius = 7,
@@ -55,23 +64,31 @@ export function FluxaLogo({
   fg?: string
 }) {
   return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius,
-        background: bg,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flex: "none",
-      }}
+    <svg
+      viewBox="0 0 120 120"
+      width={size}
+      height={size}
+      style={{ display: "block", flex: "none" }}
+      aria-hidden="true"
     >
-      <svg viewBox="0 0 24 24" fill={fg} width={size * 0.58} height={size * 0.58} aria-hidden="true">
-        <rect x="7" y="5" width="2.6" height="14" rx="1" />
-        <rect x="7" y="5" width="10" height="2.6" rx="1" />
-        <rect x="7" y="11.2" width="7.5" height="2.6" rx="1" />
-      </svg>
-    </span>
+      {/* The prop is in rendered pixels, the canvas is 120 wide, so the
+          corner keeps the same visual radius at every size. */}
+      <rect width="120" height="120" rx={(radius * 120) / size} fill={bg} />
+      <g transform="rotate(-4 60 58) scale(0.62) translate(37 37)">
+        <path
+          fill={fg}
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M13 52C13 26 34 6 60 6C86 6 107 26 107 52C99 62 90 48 82 54C75 59 67 47 60 53C53 59 45 47 38 54C30 60 21 62 13 52ZM45 29a5 5 0 1 0 .1 0zM75 29a5 5 0 1 0 .1 0z"
+        />
+        <g stroke={fg} strokeWidth="7" strokeLinecap="round" fill="none">
+          <path d="M26 60C23 76 15 81 19 97" />
+          <path d="M43 62C40 82 32 92 39 108" />
+          <path d="M60 63C56 86 66 96 57 117" />
+          <path d="M77 62C80 82 89 90 81 105" />
+          <path d="M94 60C97 74 105 78 100 93" />
+        </g>
+      </g>
+    </svg>
   )
 }
