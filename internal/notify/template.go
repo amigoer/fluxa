@@ -25,7 +25,7 @@ import (
 // brand-coloured rule instead -- a border is the one graphic every client
 // draws.
 const (
-	brandColor  = "#2f5fea"
+	brandColor  = "#6366f1"
 	inkColor    = "#16233a"
 	mutedColor  = "#6b7891"
 	groundColor = "#f4f6fa"

@@ -6,8 +6,8 @@
 // custom properties can't reach.
 export const tokens = {
   light: {
-    accent: "#2F5FEA",
-    accentSoft: "#E9EEFF",
+    accent: "#6366F1",
+    accentSoft: "#EEF2FF",
     background: "#FFFFFF",
     sideBg: "#F7F8FA",
     surface: "#FFFFFF",
@@ -22,8 +22,8 @@ export const tokens = {
     badSoft: "#FBE6E6",
   },
   dark: {
-    accent: "#4B7CFF",
-    accentSoft: "#16233F",
+    accent: "#818CF8",
+    accentSoft: "#1E1B4B",
     background: "#0A0B0D",
     sideBg: "#0E0F12",
     surface: "#16171B",

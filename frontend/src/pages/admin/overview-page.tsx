@@ -34,7 +34,7 @@ import type {
 // 2/1/1, 2/2), so the vertical rules line up by construction instead of
 // by three separately-tuned ratios.
 
-const SHARE_COLORS = ["#2f5fea", "#5b8cff", "#8b5cf6", "#f59e0b", "#10b981", "#94a3b8"]
+const SHARE_COLORS = ["#6366f1", "#5b8cff", "#8b5cf6", "#f59e0b", "#10b981", "#94a3b8"]
 
 const RANGES = [
   { key: 7, label: "7 天" },
@@ -561,8 +561,8 @@ function TrendCard({
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
           <defs>
             <linearGradient id={`cn${id}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2f5fea" stopOpacity=".22" />
-              <stop offset="100%" stopColor="#2f5fea" stopOpacity=".01" />
+              <stop offset="0%" stopColor="#6366f1" stopOpacity=".22" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity=".01" />
             </linearGradient>
           </defs>
           {[0, 0.25, 0.5, 0.75, 1].map((f) => (
@@ -584,7 +584,7 @@ function TrendCard({
             strokeDasharray="4 4"
           />
           <path d={`${smoothPathScaled(values, max, W, H, 8)} L${W} ${H} L0 ${H} Z`} fill={`url(#cn${id})`} />
-          <path d={smoothPathScaled(values, max, W, H, 8)} fill="none" stroke="#2f5fea" strokeWidth="2" />
+          <path d={smoothPathScaled(values, max, W, H, 8)} fill="none" stroke="#6366f1" strokeWidth="2" />
         </svg>
         <div className="cn-xaxis">
           {marks.map((i, n) => (

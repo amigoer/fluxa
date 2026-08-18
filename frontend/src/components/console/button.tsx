@@ -35,7 +35,7 @@ const TONE = {
   primary:
     "h-[34px] gap-[6px] rounded-[8px] px-[13px] has-[>svg]:px-[13px] text-[12.5px] font-[560] " +
     "border border-[var(--brand)] bg-[var(--brand)] text-white shadow-[0_1px_1px_rgba(22,35,58,.04)] " +
-    "hover:bg-[#2750cf] hover:border-[#2750cf] " +
+    "hover:bg-[#4f46e5] hover:border-[#4f46e5] " +
     "disabled:opacity-55 disabled:hover:bg-[var(--brand)] disabled:hover:border-[var(--brand)]",
   mini:
     "h-[27px] gap-0 rounded-[7px] px-[10px] has-[>svg]:px-[10px] text-[11.5px] font-[570] shadow-none " +

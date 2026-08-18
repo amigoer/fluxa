@@ -15,8 +15,8 @@
   --ink-3: #8b97ab;
   --line: #e5e9f0;
   --line-2: #eef1f6;
-  --brand: #2f5fea;
-  --brand-soft: #ebefff;
+  --brand: #6366f1;
+  --brand-soft: #eef2ff;
   --ok: #12805c;
   --ok-soft: #e3f5ee;
   --warn: #9a5e23;
@@ -121,7 +121,7 @@
   background: var(--brand-soft); color: var(--brand);
   font-size: 12px; font-weight: 650;
   display: inline-flex; align-items: center; justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(47,95,234,.16);
+  box-shadow: inset 0 0 0 1px rgba(99,102,241,.16);
   overflow: hidden; position: relative;
 }
 /* Laid over the letter, cropped to the same circle. A source that never
@@ -182,7 +182,7 @@
 }
 .cn-btn:hover { border-color: #d3dae6; }
 .cn-btn-pri { background: var(--brand); border-color: var(--brand); color: #fff; }
-.cn-btn-pri:hover { background: #2750cf; border-color: #2750cf; }
+.cn-btn-pri:hover { background: #4f46e5; border-color: #4f46e5; }
 
 /* ---- cards ---------------------------------------------------------- */
 
@@ -651,7 +651,7 @@
   background: var(--panel); font-size: 13px; color: var(--ink); width: 100%;
   box-shadow: 0 1px 1px rgba(22,35,58,.03);
 }
-.cn-input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(47,95,234,.14); }
+.cn-input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(99,102,241,.14); }
 textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: vertical; }
 .cn-input-hint { font-size: 11.5px; color: var(--ink-3); }
 .cn-form-foot { display: flex; gap: 8px; padding-top: 3px; }
@@ -688,7 +688,7 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
   background: var(--brand); color: #fff;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.cn-send:hover { background: #2750cf; }
+.cn-send:hover { background: #4f46e5; }
 
 .cn-diag { display: flex; flex-direction: column; }
 .cn-diag-row {
@@ -820,7 +820,7 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
 }
 .cn-login-btn:hover { border-color: #d3dae6; background: #fbfcfe; }
 .cn-login-btn-pri { background: var(--brand); border-color: var(--brand); color: #fff; }
-.cn-login-btn-pri:hover { background: #2750cf; border-color: #2750cf; }
+.cn-login-btn-pri:hover { background: #4f46e5; border-color: #4f46e5; }
 .cn-login-btns { display: flex; flex-direction: column; gap: 10px; }
 .cn-login-or { display: flex; align-items: center; gap: 12px; margin: 18px 0; font-size: 11.5px; color: var(--ink-3); }
 .cn-login-or::before, .cn-login-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
@@ -848,7 +848,7 @@ textarea.cn-input { height: auto; padding: 10px 11px; line-height: 1.7; resize: 
      that size is tiring. */
   background:
     radial-gradient(120% 90% at 85% 8%, rgba(255,255,255,.16), transparent 62%),
-    linear-gradient(160deg, #2f5fea 0%, #2547b4 52%, #16265c 100%);
+    linear-gradient(160deg, #6366f1 0%, #4338ca 52%, #1e1b4b 100%);
 }
 
 /* Bled off the top-right corner rather than centred: a glyph placed in

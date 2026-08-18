@@ -139,7 +139,7 @@ export function Field({
 
 // ---- small charts ----------------------------------------------------
 
-export function Spark({ values, color = "#2f5fea" }: { values: number[]; color?: string }) {
+export function Spark({ values, color = "#6366f1" }: { values: number[]; color?: string }) {
   const id = useId()
   const w = 96
   const h = 40
@@ -170,7 +170,7 @@ export function Gauge({ pct, size = 76 }: { pct: number; size?: number }) {
         cy="38"
         r={r}
         fill="none"
-        stroke="#2f5fea"
+        stroke="#6366f1"
         strokeWidth="9"
         strokeLinecap="round"
         strokeDasharray={`${(clamped / 100) * c} ${c}`}

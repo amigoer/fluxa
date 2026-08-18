@@ -128,7 +128,7 @@ export function LoginPage() {
       <LoginShell>
         <div>
           <div className="cn-auth-brand">
-            <FluxaLogo size={38} radius={11} />
+            <FluxaLogo size={36} />
             <h1 className="cn-auth-title">注册成功，等待审批</h1>
             <p className="cn-auth-sub">管理员通过后，这个账号就能登录并发起调用</p>
           </div>
@@ -265,7 +265,7 @@ export function LoginPage() {
     <LoginShell>
       <div>
         <div className="cn-auth-brand">
-          <FluxaLogo size={38} radius={11} />
+          <FluxaLogo size={36} />
           <h1 className="cn-auth-title">欢迎使用 Fluxa</h1>
           <p className="cn-auth-sub">企业内部 AI 资源分发管理系统</p>
         </div>

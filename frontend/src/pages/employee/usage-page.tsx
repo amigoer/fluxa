@@ -244,8 +244,8 @@ function TrendCard({ days, trend }: { days: number; trend: { day: Date; total: n
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
           <defs>
             <linearGradient id={`my${id}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2f5fea" stopOpacity=".22" />
-              <stop offset="100%" stopColor="#2f5fea" stopOpacity=".01" />
+              <stop offset="0%" stopColor="#6366f1" stopOpacity=".22" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity=".01" />
             </linearGradient>
           </defs>
           {[0, 0.5, 1].map((f) => (
@@ -260,7 +260,7 @@ function TrendCard({ days, trend }: { days: number; trend: { day: Date; total: n
             />
           ))}
           <path d={`${smoothPathScaled(values, max, W, H, 8)} L${W} ${H} L0 ${H} Z`} fill={`url(#my${id})`} />
-          <path d={smoothPathScaled(values, max, W, H, 8)} fill="none" stroke="#2f5fea" strokeWidth="2" />
+          <path d={smoothPathScaled(values, max, W, H, 8)} fill="none" stroke="#6366f1" strokeWidth="2" />
         </svg>
         <div className="cn-xaxis">
           {[0, Math.floor(days / 3), Math.floor((days * 2) / 3), days - 1].map((i, n, arr) => (

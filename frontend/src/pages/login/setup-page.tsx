@@ -63,7 +63,7 @@ export function SetupPage() {
     <LoginShell>
       <div>
         <div className="cn-auth-brand">
-          <FluxaLogo size={38} radius={11} />
+          <FluxaLogo size={36} />
           <h1 className="cn-auth-title">初始化 Fluxa</h1>
           <p className="cn-auth-sub">首次部署，创建企业和第一个超管账号</p>
         </div>

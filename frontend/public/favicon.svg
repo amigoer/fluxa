@@ -1,8 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-  <rect width="120" height="120" rx="28" fill="#2F5FEA"/>
-  <g transform="rotate(-4 60 58) scale(0.62) translate(37 37)">
-    <path fill="#fff" fill-rule="evenodd" clip-rule="evenodd" d="M13 52C13 26 34 6 60 6C86 6 107 26 107 52C99 62 90 48 82 54C75 59 67 47 60 53C53 59 45 47 38 54C30 60 21 62 13 52ZM45 29a5 5 0 1 0 .1 0zM75 29a5 5 0 1 0 .1 0z"/>
-    <g stroke="#fff" stroke-width="7" stroke-linecap="round" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="21.4 22 78 78">
+  <g transform="rotate(-4 60 58) scale(0.62) translate(37 37)" fill="#6366F1">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M13 52C13 26 34 6 60 6C86 6 107 26 107 52C99 62 90 48 82 54C75 59 67 47 60 53C53 59 45 47 38 54C30 60 21 62 13 52ZM45 29a5 5 0 1 0 .1 0zM75 29a5 5 0 1 0 .1 0z"/>
+    <g stroke="#6366F1" stroke-width="7" stroke-linecap="round" fill="none">
       <path d="M26 60C23 76 15 81 19 97"/>
       <path d="M43 62C40 82 32 92 39 108"/>
       <path d="M60 63C56 86 66 96 57 117"/>

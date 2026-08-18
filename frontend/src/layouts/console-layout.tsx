@@ -711,7 +711,7 @@ export function ConsoleLayout({ persona }: { persona: "admin" | "employee" }) {
       >
         <div className="cn-side">
           <div className="cn-brand">
-            <FluxaLogo size={30} radius={8} bg="var(--brand)" />
+            <FluxaLogo size={28} />
             <div className="cn-brand-text">
               <div className="cn-brand-name">Fluxa</div>
               <div className="cn-brand-sub">{orgName || "企业 AI 网关"}</div>
