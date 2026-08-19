@@ -3,7 +3,7 @@ import { Icon } from "@/components/console/icon"
 import { Brand } from "@/components/console/brand"
 import { Card, Filters, PageHead, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableState } from "@/components/console/ui"
 import { useApiQuery } from "@/hooks/use-api-query"
-import { fmt } from "@/lib/format"
+import { fmtPrice } from "@/lib/format"
 import type { Model } from "@/lib/types"
 
 // 资费一览 -- read-only list page. Only published models appear here,
@@ -61,10 +61,10 @@ export function PricingPage() {
                 </TableCell>
                 <TableCell className="cn-mono-cell">{m.ModelIdentifier}</TableCell>
                 <TableCell className="text-right cn-mono" style={{ fontWeight: 560 }}>
-                  {fmt(m.InputPriceCentsPer1M)}
+                  {fmtPrice(m.InputPriceCentsPer1M)}
                 </TableCell>
                 <TableCell className="text-right cn-mono" style={{ fontWeight: 560 }}>
-                  {fmt(m.OutputPriceCentsPer1M)}
+                  {fmtPrice(m.OutputPriceCentsPer1M)}
                 </TableCell>
                 <TableCell className="text-right cn-mono" style={{ color: "var(--ink-2)" }}>
                   {(m.ContextWindow / 1000).toFixed(0)}K

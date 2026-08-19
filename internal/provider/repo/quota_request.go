@@ -25,10 +25,10 @@ type QuotaRequestRepo interface {
 
 func (r *repo) CreateQuotaRequest(ctx context.Context, q types.QuotaRequest) (types.QuotaRequest, error) {
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO quota_requests (requested_by_member_id, model_id, amount_cents, reason)
+		INSERT INTO quota_requests (requested_by_member_id, model_id, amount_micro_cents, reason)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, status, created_at`,
-		q.RequestedByMemberID, q.ModelID, q.AmountCents, q.Reason,
+		q.RequestedByMemberID, q.ModelID, q.AmountMicroCents, q.Reason,
 	).Scan(&q.ID, &q.Status, &q.CreatedAt)
 	return q, err
 }
@@ -36,9 +36,9 @@ func (r *repo) CreateQuotaRequest(ctx context.Context, q types.QuotaRequest) (ty
 func (r *repo) GetQuotaRequest(ctx context.Context, id string) (types.QuotaRequest, error) {
 	var q types.QuotaRequest
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, requested_by_member_id, model_id, amount_cents, reason, status, decided_by_member_id, decided_at, created_at
+		SELECT id, requested_by_member_id, model_id, amount_micro_cents, reason, status, decided_by_member_id, decided_at, created_at
 		FROM quota_requests WHERE id = $1`, id,
-	).Scan(&q.ID, &q.RequestedByMemberID, &q.ModelID, &q.AmountCents, &q.Reason, &q.Status, &q.DecidedByMemberID, &q.DecidedAt, &q.CreatedAt)
+	).Scan(&q.ID, &q.RequestedByMemberID, &q.ModelID, &q.AmountMicroCents, &q.Reason, &q.Status, &q.DecidedByMemberID, &q.DecidedAt, &q.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return types.QuotaRequest{}, ErrNotFound
 	}
@@ -62,7 +62,7 @@ func (r *repo) ListAllPendingQuotaRequests(ctx context.Context) ([]types.QuotaRe
 
 func (r *repo) queryQuotaRequests(ctx context.Context, where string, args ...any) ([]types.QuotaRequest, error) {
 	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT id, requested_by_member_id, model_id, amount_cents, reason, status, decided_by_member_id, decided_at, created_at
+		SELECT id, requested_by_member_id, model_id, amount_micro_cents, reason, status, decided_by_member_id, decided_at, created_at
 		FROM quota_requests %s ORDER BY created_at DESC`, where), args...)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (r *repo) queryQuotaRequests(ctx context.Context, where string, args ...any
 	var out []types.QuotaRequest
 	for rows.Next() {
 		var q types.QuotaRequest
-		if err := rows.Scan(&q.ID, &q.RequestedByMemberID, &q.ModelID, &q.AmountCents, &q.Reason, &q.Status, &q.DecidedByMemberID, &q.DecidedAt, &q.CreatedAt); err != nil {
+		if err := rows.Scan(&q.ID, &q.RequestedByMemberID, &q.ModelID, &q.AmountMicroCents, &q.Reason, &q.Status, &q.DecidedByMemberID, &q.DecidedAt, &q.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, q)

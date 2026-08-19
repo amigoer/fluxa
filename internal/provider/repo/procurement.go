@@ -15,17 +15,17 @@ type ProcurementRepo interface {
 
 func (r *repo) RecordProcurement(ctx context.Context, rec types.ProcurementRecord) (types.ProcurementRecord, error) {
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO procurement_records (provider_id, amount_cents, note, recorded_by_member_id)
+		INSERT INTO procurement_records (provider_id, amount_micro_cents, note, recorded_by_member_id)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, recorded_at`,
-		rec.ProviderID, rec.AmountCents, rec.Note, rec.RecordedByMemberID,
+		rec.ProviderID, rec.AmountMicroCents, rec.Note, rec.RecordedByMemberID,
 	).Scan(&rec.ID, &rec.RecordedAt)
 	return rec, err
 }
 
 func (r *repo) ListProcurementRecords(ctx context.Context, orgID string) ([]types.ProcurementRecord, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT pr.id, pr.provider_id, pr.amount_cents, pr.note, pr.recorded_by_member_id, pr.recorded_at
+		SELECT pr.id, pr.provider_id, pr.amount_micro_cents, pr.note, pr.recorded_by_member_id, pr.recorded_at
 		FROM procurement_records pr
 		JOIN providers p ON p.id = pr.provider_id
 		WHERE p.org_id = $1
@@ -38,7 +38,7 @@ func (r *repo) ListProcurementRecords(ctx context.Context, orgID string) ([]type
 	var out []types.ProcurementRecord
 	for rows.Next() {
 		var rec types.ProcurementRecord
-		if err := rows.Scan(&rec.ID, &rec.ProviderID, &rec.AmountCents, &rec.Note, &rec.RecordedByMemberID, &rec.RecordedAt); err != nil {
+		if err := rows.Scan(&rec.ID, &rec.ProviderID, &rec.AmountMicroCents, &rec.Note, &rec.RecordedByMemberID, &rec.RecordedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, rec)

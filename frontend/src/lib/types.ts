@@ -76,7 +76,7 @@ export interface Model {
 export interface ProcurementRecord {
   ID: string
   ProviderID: string
-  AmountCents: number
+  AmountMicroCents: number
   Note: string
   RecordedByMemberID: string
   RecordedAt: string
@@ -89,7 +89,7 @@ export interface RoutingRule {
   ConditionLabel: string
   TargetModelID: string
   FallbackModelID: string | null
-  CostCeilingCents: number | null
+  CostCeilingMicroCents: number | null
 }
 
 export interface VirtualKey {
@@ -100,8 +100,12 @@ export interface VirtualKey {
   OwnerMemberID: string | null
   OwnerDepartmentID: string | null
   ModelScope: string[] | null
-  BudgetCents: number
-  SpentCents: number
+  BudgetMicroCents: number
+  SpentMicroCents: number
+  /** Promised to calls that are still in flight; available budget is
+   *  Budget - Spent - Reserved. Transient, so the console shows spend
+   *  against budget rather than subtracting it. */
+  ReservedMicroCents: number
   Status: "active" | "revoked"
   CreatedAt: string
 }
@@ -120,7 +124,7 @@ export interface QuotaRequest {
   ID: string
   RequestedByMemberID: string
   ModelID: string | null
-  AmountCents: number
+  AmountMicroCents: number
   Reason: string
   Status: "pending" | "approved" | "rejected"
   CreatedAt: string
@@ -163,7 +167,7 @@ export interface CallLog {
   LatencyMS: number
   InputTokens: number
   OutputTokens: number
-  CostCents: number
+  CostMicroCents: number
   OccurredAt: string
 }
 

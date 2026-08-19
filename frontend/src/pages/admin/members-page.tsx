@@ -7,7 +7,7 @@ import { Card, Field, Filters, Input, Modal, PageHead, Select, Table, TableBody,
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
-import { fmt, formatAgo } from "@/lib/format"
+import { fmt, formatAgo, yuanToMicroCents } from "@/lib/format"
 import type { CallLog, Department, Member, QuotaBalance, Role } from "@/lib/types"
 
 // 成员与部门 -- the master/detail page type: departments on the left,
@@ -52,7 +52,7 @@ export function MembersPage() {
     const out = new Map<string, { spend: number; last: string }>()
     for (const c of calls ?? []) {
       const cur = out.get(c.MemberID) ?? { spend: 0, last: "" }
-      if (new Date(c.OccurredAt) >= monthStart) cur.spend += c.CostCents
+      if (new Date(c.OccurredAt) >= monthStart) cur.spend += c.CostMicroCents
       if (!cur.last || new Date(c.OccurredAt) > new Date(cur.last)) cur.last = c.OccurredAt
       out.set(c.MemberID, cur)
     }
@@ -467,7 +467,7 @@ function AdjustPoolModal({
     }
     setBusy(true)
     try {
-      await api.put(`/api/department-quota-pools/${department.ID}`, { totalCents: Math.round(yuan * 100) })
+      await api.put(`/api/department-quota-pools/${department.ID}`, { totalMicroCents: yuanToMicroCents(yuan) })
       toast.success("已更新额度池")
       setTotal("")
       onDone()

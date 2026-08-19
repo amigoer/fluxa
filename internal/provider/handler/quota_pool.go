@@ -29,7 +29,7 @@ func (h *Handler) getDepartmentQuotaPool(w http.ResponseWriter, r *http.Request)
 }
 
 type setQuotaPoolRequest struct {
-	TotalCents int64 `json:"totalCents"`
+	TotalMicroCents int64 `json:"totalMicroCents"`
 }
 
 func (h *Handler) setDepartmentQuotaPool(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +38,7 @@ func (h *Handler) setDepartmentQuotaPool(w http.ResponseWriter, r *http.Request)
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if err := h.service.SetDepartmentQuotaPool(r.Context(), departmentID, req.TotalCents); err != nil {
+	if err := h.service.SetDepartmentQuotaPool(r.Context(), departmentID, req.TotalMicroCents); err != nil {
 		httpx.InternalError(w, err)
 		return
 	}

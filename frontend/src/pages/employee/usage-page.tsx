@@ -36,12 +36,12 @@ export function UsagePage() {
   const myKeys = (keys ?? []).filter(
     (k) => k.Status === "active" && k.OwnerType === "member" && k.OwnerMemberID === member?.ID,
   )
-  const quota = myKeys.reduce((s, k) => s + k.BudgetCents, 0)
-  const used = myKeys.reduce((s, k) => s + k.SpentCents, 0)
+  const quota = myKeys.reduce((s, k) => s + k.BudgetMicroCents, 0)
+  const used = myKeys.reduce((s, k) => s + k.SpentMicroCents, 0)
   const rate = quota > 0 ? (used / quota) * 100 : 0
 
   const monthCalls = rows.filter((c) => new Date(c.OccurredAt) >= monthStart)
-  const monthSpend = monthCalls.reduce((s, c) => s + c.CostCents, 0)
+  const monthSpend = monthCalls.reduce((s, c) => s + c.CostMicroCents, 0)
   const avgLatency = monthCalls.length
     ? Math.round(monthCalls.reduce((s, c) => s + c.LatencyMS, 0) / monthCalls.length)
     : 0
@@ -53,7 +53,7 @@ export function UsagePage() {
   }, [rows])
 
   const trend = useMemo(
-    () => dailyBuckets(rows, days, (c) => c.OccurredAt, (c) => c.CostCents),
+    () => dailyBuckets(rows, days, (c) => c.OccurredAt, (c) => c.CostMicroCents),
     [rows, days],
   )
 
@@ -61,7 +61,7 @@ export function UsagePage() {
     const acc = new Map<string, { spend: number; calls: number }>()
     for (const c of monthCalls) {
       const cur = acc.get(c.ModelID) ?? { spend: 0, calls: 0 }
-      cur.spend += c.CostCents
+      cur.spend += c.CostMicroCents
       cur.calls += 1
       acc.set(c.ModelID, cur)
     }
@@ -150,7 +150,7 @@ export function UsagePage() {
           </div>
           <div className="cn-kpi-foot">
             {pending[0]
-              ? `${formatDate(pending[0].CreatedAt)} 提交 ${fmt(pending[0].AmountCents)}`
+              ? `${formatDate(pending[0].CreatedAt)} 提交 ${fmt(pending[0].AmountMicroCents)}`
               : "没有待处理的申请"}
           </div>
           <button className="cn-kpi-action" onClick={() => navigate("/app/quota-requests")}>

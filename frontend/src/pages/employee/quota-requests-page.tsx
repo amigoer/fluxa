@@ -6,7 +6,7 @@ import { Card, Empty, Input, PageHead, Tag, Textarea } from "@/components/consol
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { fmt, formatAgo } from "@/lib/format"
+import { fmt, formatAgo, yuanToMicroCents } from "@/lib/format"
 import type { QuotaRequest, VirtualKey } from "@/lib/types"
 
 // 配额申请 -- the form page type. Left: the request. Right: what happened
@@ -32,8 +32,8 @@ export function QuotaRequestsPage() {
   const mine = (keys ?? []).filter(
     (k) => k.Status === "active" && k.OwnerType === "member" && k.OwnerMemberID === member?.ID,
   )
-  const quota = mine.reduce((s, k) => s + k.BudgetCents, 0)
-  const used = mine.reduce((s, k) => s + k.SpentCents, 0)
+  const quota = mine.reduce((s, k) => s + k.BudgetMicroCents, 0)
+  const used = mine.reduce((s, k) => s + k.SpentMicroCents, 0)
   const rate = quota > 0 ? (used / quota) * 100 : 0
 
   const submit = async () => {
@@ -50,7 +50,7 @@ export function QuotaRequestsPage() {
     try {
       await api.post("/api/quota-requests", {
         ModelID: null,
-        AmountCents: Math.round(yuan * 100),
+        AmountMicroCents: yuanToMicroCents(yuan),
         Reason: reason.trim(),
       })
       toast.success("已提交申请，等待审批")
@@ -145,7 +145,7 @@ export function QuotaRequestsPage() {
                   <div key={r.ID} className="cn-todo-item">
                     <div className="cn-todo-top">
                       <span className="cn-todo-title" style={{ fontFamily: "var(--mono)", fontSize: 13.5 }}>
-                        {fmt(r.AmountCents)}
+                        {fmt(r.AmountMicroCents)}
                       </span>
                       <Tag tone={st.tone}>{st.label}</Tag>
                       <span className="cn-todo-time">{formatAgo(r.CreatedAt)}</span>

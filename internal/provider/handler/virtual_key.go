@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/amigoer/fluxa/internal/platform/httpx"
 	"github.com/amigoer/fluxa/internal/platform/i18n"
+	"github.com/amigoer/fluxa/internal/provider/repo"
 	"github.com/amigoer/fluxa/internal/provider/types"
 	"github.com/amigoer/fluxa/internal/rbac"
 )
@@ -68,7 +70,10 @@ func (h *Handler) revokeVirtualKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.service.RevokeVirtualKey(r.Context(), id); err != nil {
+	if err := h.service.RevokeVirtualKey(r.Context(), id); errors.Is(err, repo.ErrNotFound) {
+		httpx.Error(w, http.StatusNotFound, i18n.KeyNotFound, "")
+		return
+	} else if err != nil {
 		httpx.InternalError(w, err)
 		return
 	}

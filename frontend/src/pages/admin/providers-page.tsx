@@ -8,6 +8,7 @@ import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
 import { fmt, fmtNum } from "@/lib/format"
+import { tError } from "@/lib/i18n"
 import type { CallLog, Provider, ProviderHealth } from "@/lib/types"
 
 // 供应商 -- the list page type. Circuit state comes from the gateway's own
@@ -17,14 +18,50 @@ import type { CallLog, Provider, ProviderHealth } from "@/lib/types"
 const HEALTH_LABEL = { normal: "正常", half_open: "半开", circuit_open: "熔断" } as const
 const HEALTH_TONE = { normal: "ok", half_open: "warn", circuit_open: "bad" } as const
 
+// The five the gateway can actually forward to. The server refuses
+// anything else at /api/providers with a 400, and keeping the two lists
+// in step is what stops an admin saving a provider that looks configured
+// and healthy on this page and then fails every call at runtime.
+//
+// 阿里云百炼 and the other domestic vendors are reached through
+// openai_compatible: they serve the OpenAI wire format, so they need a
+// base URL rather than an adapter of their own.
 const KINDS = [
   { value: "openai_compatible", label: "OpenAI 兼容" },
   { value: "anthropic", label: "Anthropic" },
   { value: "azure_openai", label: "Azure OpenAI" },
   { value: "gemini", label: "Google Gemini" },
   { value: "bedrock", label: "AWS Bedrock" },
-  { value: "alibaba", label: "阿里云百炼" },
 ]
+
+type CredentialField = { key: string; label: string; secret?: boolean; optional?: boolean; hint?: string; placeholder?: string }
+
+// Each vendor authenticates differently, so the form asks for what that
+// vendor needs rather than one API-key box that is wrong for two of the
+// five. The keys match what the gateway reads out of provider config.
+const CREDENTIAL_FIELDS: Record<string, CredentialField[]> = {
+  openai_compatible: [{ key: "api_key", label: "API Key", secret: true, placeholder: "sk-…" }],
+  anthropic: [{ key: "api_key", label: "API Key", secret: true, placeholder: "sk-ant-…" }],
+  azure_openai: [
+    { key: "api_key", label: "API Key", secret: true },
+    { key: "api_version", label: "API 版本", optional: true, hint: "留空使用默认版本。", placeholder: "2024-10-21" },
+  ],
+  gemini: [{ key: "api_key", label: "API Key", secret: true, placeholder: "AIza…" }],
+  bedrock: [
+    { key: "region", label: "区域", placeholder: "us-east-1", hint: "Bedrock 的调用地址按区域区分。" },
+    { key: "access_key_id", label: "Access Key ID", secret: true },
+    { key: "secret_access_key", label: "Secret Access Key", secret: true },
+    { key: "session_token", label: "Session Token", secret: true, optional: true, hint: "仅使用临时凭证时需要。" },
+  ],
+}
+
+const BASE_URL_PLACEHOLDER: Record<string, string> = {
+  openai_compatible: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com",
+  azure_openai: "https://my-resource.openai.azure.com",
+  gemini: "https://generativelanguage.googleapis.com",
+  bedrock: "https://bedrock-runtime.us-east-1.amazonaws.com",
+}
 
 export function ProvidersPage() {
   const providers = useApiQuery<Provider[]>("/api/providers")
@@ -53,7 +90,7 @@ export function ProvidersPage() {
     for (const c of calls ?? []) {
       if (new Date(c.OccurredAt) < monthStart) continue
       const cur = acc.get(c.ProviderID) ?? { spend: 0, calls: 0, failed: 0, lat: [] }
-      cur.spend += c.CostCents
+      cur.spend += c.CostMicroCents
       cur.calls += 1
       if (c.Status === "failed") cur.failed += 1
       cur.lat.push(c.LatencyMS)
@@ -213,30 +250,37 @@ function CreateProviderModal({
   const [name, setName] = useState("")
   const [kind, setKind] = useState(KINDS[0].value)
   const [baseUrl, setBaseUrl] = useState("")
-  const [apiKey, setApiKey] = useState("")
+  const [credentials, setCredentials] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
 
+  const fields = CREDENTIAL_FIELDS[kind] ?? []
+  const complete = name.trim() !== "" && fields.every((f) => f.optional || (credentials[f.key] ?? "").trim() !== "")
+
   const submit = async () => {
-    if (!name || !apiKey) {
-      toast.error("请填写名称和 API Key")
+    if (!complete) {
+      toast.error("请填写名称和该供应商必需的凭证")
       return
     }
     setBusy(true)
     try {
-      await api.post("/api/providers", {
-        Name: name,
-        Kind: kind,
-        Config: { base_url: baseUrl, api_key: apiKey },
-        Status: "active",
-      })
+      const config: Record<string, string> = {}
+      if (baseUrl.trim()) config.base_url = baseUrl.trim()
+      for (const f of fields) {
+        const v = (credentials[f.key] ?? "").trim()
+        if (v) config[f.key] = v
+      }
+      await api.post("/api/providers", { Name: name, Kind: kind, Config: config, Status: "active" })
       toast.success("已接入供应商")
       setName("")
       setBaseUrl("")
-      setApiKey("")
+      setCredentials({})
       onDone()
       onClose()
-    } catch {
-      toast.error("接入失败，请检查凭证")
+    } catch (err) {
+      // The server usually has a specific reason -- an unsupported kind,
+      // a validation failure -- and "请检查凭证" sends the admin to look
+      // at the one field that was fine.
+      toast.error(tError(err, "接入失败，请检查凭证"))
     } finally {
       setBusy(false)
     }
@@ -277,17 +321,24 @@ function CreateProviderModal({
           <Input
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="https://api.openai.com/v1"
+            placeholder={BASE_URL_PLACEHOLDER[kind] ?? ""}
           />
         </Field>
-        <Field label="API Key" optional="必填" hint="只写不读：保存后无法再取回明文。">
-          <Input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-…"
-          />
-        </Field>
+        {fields.map((f) => (
+          <Field
+            key={f.key}
+            label={f.label}
+            optional={f.optional ? undefined : "必填"}
+            hint={f.hint ?? (f.secret ? "只写不读：保存后无法再取回明文。" : undefined)}
+          >
+            <Input
+              type={f.secret ? "password" : "text"}
+              value={credentials[f.key] ?? ""}
+              onChange={(e) => setCredentials((c) => ({ ...c, [f.key]: e.target.value }))}
+              placeholder={f.placeholder ?? ""}
+            />
+          </Field>
+        ))}
       </div>
     </Modal>
   )

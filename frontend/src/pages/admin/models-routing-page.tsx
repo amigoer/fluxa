@@ -7,7 +7,7 @@ import { Card, Empty, Field, Filters, Input, Modal, PageHead, Select, Table, Tab
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
-import { fmt } from "@/lib/format"
+import { fmt, fmtPrice, yuanToMicroCents } from "@/lib/format"
 import type { Model, Provider, RoutingRule } from "@/lib/types"
 
 // 模型与路由 -- list page plus the chain page type. Only published models
@@ -120,8 +120,8 @@ export function ModelsRoutingPage() {
                       {m.Status === "published" ? "已发布" : "草稿"}
                     </Tag>
                   </TableCell>
-                  <TableCell className="text-right cn-mono">{fmt(m.InputPriceCentsPer1M)}</TableCell>
-                  <TableCell className="text-right cn-mono">{fmt(m.OutputPriceCentsPer1M)}</TableCell>
+                  <TableCell className="text-right cn-mono">{fmtPrice(m.InputPriceCentsPer1M)}</TableCell>
+                  <TableCell className="text-right cn-mono">{fmtPrice(m.OutputPriceCentsPer1M)}</TableCell>
                   <TableCell className="text-right cn-mono" style={{ color: "var(--ink-2)" }}>
                     {(m.ContextWindow / 1000).toFixed(0)}K
                   </TableCell>
@@ -162,9 +162,9 @@ export function ModelsRoutingPage() {
                     <div className="cn-chain-label">目标模型</div>
                     <div className="cn-chain-value">
                       {modelById.get(r.TargetModelID)?.Name ?? "—"}
-                      {r.CostCeilingCents && (
+                      {r.CostCeilingMicroCents && (
                         <span className="cn-chain-ceiling">
-                          <Icon name="wallet" size={10} />≤ {fmt(r.CostCeilingCents)}/次
+                          <Icon name="wallet" size={10} />≤ {fmt(r.CostCeilingMicroCents)}/次
                         </span>
                       )}
                     </div>
@@ -349,7 +349,7 @@ function AddRuleModal({
         ConditionLabel: label,
         TargetModelID: target,
         FallbackModelID: fallback || null,
-        CostCeilingCents: ceiling ? Math.round(Number(ceiling) * 100) : null,
+        CostCeilingMicroCents: ceiling ? yuanToMicroCents(Number(ceiling)) : null,
       })
       toast.success("已新增路由规则")
       setLabel("")

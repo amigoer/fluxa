@@ -82,14 +82,14 @@ func (s *service) grantQuota(ctx context.Context, req types.QuotaRequest) error 
 	}
 	if len(existing) > 0 {
 		key := existing[0]
-		return s.repo.UpdateVirtualKeyBudget(ctx, key.ID, key.BudgetCents+req.AmountCents)
+		return s.repo.UpdateVirtualKeyBudget(ctx, key.ID, key.BudgetMicroCents+req.AmountMicroCents)
 	}
 
 	_, _, err = s.CreateVirtualKey(ctx, types.VirtualKey{
-		Name:          "个人额度",
-		OwnerType:     types.VirtualKeyOwnerMember,
-		OwnerMemberID: &req.RequestedByMemberID,
-		BudgetCents:   req.AmountCents,
+		Name:             "个人额度",
+		OwnerType:        types.VirtualKeyOwnerMember,
+		OwnerMemberID:    &req.RequestedByMemberID,
+		BudgetMicroCents: req.AmountMicroCents,
 	})
 	return err
 }

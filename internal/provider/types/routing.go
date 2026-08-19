@@ -13,16 +13,16 @@ const (
 // it fails (or its provider is circuit-open) fall through to
 // FallbackModelID. Global rules are admin-owned baseline routing;
 // personal rules are an employee's own configuration layered on top
-// (DESIGN.md 7.2). CostCeilingCents, when set, caps how much the chain
+// (DESIGN.md 7.2). CostCeilingMicroCents, when set, caps how much the chain
 // is allowed to spend attempting fallbacks for a single request.
 type RoutingRule struct {
-	ID               string
-	Scope            RoutingScope
-	OwnerMemberID    *string
-	ConditionLabel   string
-	TargetModelID    string
-	FallbackModelID  *string
-	CostCeilingCents *int64
-	SortOrder        int
-	CreatedAt        time.Time
+	ID                    string
+	Scope                 RoutingScope
+	OwnerMemberID         *string
+	ConditionLabel        string
+	TargetModelID         string
+	FallbackModelID       *string
+	CostCeilingMicroCents *int64
+	SortOrder             int
+	CreatedAt             time.Time
 }

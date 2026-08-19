@@ -20,6 +20,7 @@ import (
 	"github.com/amigoer/fluxa/internal/platform/config"
 	"github.com/amigoer/fluxa/internal/platform/db"
 	"github.com/amigoer/fluxa/internal/platform/logger"
+	providerservice "github.com/amigoer/fluxa/internal/provider/service"
 	"github.com/amigoer/fluxa/web"
 )
 
@@ -51,10 +52,14 @@ func run(log *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	router, err := newRouter(cfg, pool, log)
+	router, providerService, err := newRouter(cfg, pool, log)
 	if err != nil {
 		return err
 	}
+
+	sweeperCtx, stopSweeper := context.WithCancel(ctx)
+	defer stopSweeper()
+	go sweepQuotaReservations(sweeperCtx, providerService, log)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -90,25 +95,63 @@ func run(log *slog.Logger) error {
 // embedded frontend is mounted last, as the catch-all for anything that
 // isn't an /api or /v1 route, so client-side routes like
 // /admin/overview fall through to index.html instead of 404ing.
-func newRouter(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.Handler, error) {
+func newRouter(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.Handler, providerservice.Service, error) {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Recoverer)
-	r.Use(chimiddleware.Timeout(60 * time.Second))
+	// No blanket request timeout here on purpose. A 60s ceiling over
+	// every route also covered /v1, where a single completion running
+	// for minutes is the normal case, not a hung request -- long
+	// documents, reasoning models and agent loops all sat well past it
+	// and had their upstream call cancelled mid-stream. Each route group
+	// now sets the timeout that suits it; see wireRoutes.
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	wireRoutes(r, cfg, pool, log)
+	providerService := wireRoutes(r, cfg, pool, log)
 
 	frontend, err := web.Handler()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	r.NotFound(frontend.ServeHTTP)
 
-	return r, nil
+	return r, providerService, nil
+}
+
+// reservationSweepInterval is how often abandoned quota reservations are
+// released. It only has to be well under the reservation TTL: the sweep
+// is the backstop for a call that died without settling, and until it
+// runs that call's budget stays promised to nothing.
+const reservationSweepInterval = time.Minute
+
+// sweepQuotaReservations releases budget promised to calls that never
+// settled -- a process killed mid-flight, a panic that unwound past the
+// deferred release. Without it a crash permanently shrinks the key's
+// usable budget, so this is part of the reservation scheme working, not
+// a cleanup nicety.
+func sweepQuotaReservations(ctx context.Context, providers providerservice.Service, log *slog.Logger) {
+	ticker := time.NewTicker(reservationSweepInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			freed, err := providers.ExpireStaleReservations(ctx)
+			if err != nil {
+				log.Error("sweep quota reservations", "error", err)
+				continue
+			}
+			if freed > 0 {
+				log.Warn("released quota reservations left behind by calls that never settled",
+					"count", freed)
+			}
+		}
+	}
 }

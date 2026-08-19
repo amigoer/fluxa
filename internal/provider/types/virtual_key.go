@@ -28,11 +28,16 @@ type VirtualKey struct {
 	OwnerMemberID     *string
 	OwnerDepartmentID *string
 	// nil means every enabled model is in scope.
-	ModelScope      []string
-	BudgetCents     int64
-	SpentCents      int64
-	PeriodStartedAt time.Time
-	Status          VirtualKeyStatus
-	CreatedAt       time.Time
-	RevokedAt       *time.Time
+	ModelScope       []string
+	BudgetMicroCents int64
+	SpentMicroCents  int64
+	// ReservedMicroCents is what in-flight calls have been promised but
+	// have not yet settled. Admission is decided against
+	// Budget - Spent - Reserved, so concurrent calls cannot each be told
+	// there is room for the same money.
+	ReservedMicroCents int64
+	PeriodStartedAt    time.Time
+	Status             VirtualKeyStatus
+	CreatedAt          time.Time
+	RevokedAt          *time.Time
 }

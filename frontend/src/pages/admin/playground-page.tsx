@@ -61,7 +61,7 @@ export function PlaygroundPage() {
       const res = await api.post<{ key: { ID: string }; secret: string }>("/api/virtual-keys", {
         Name: "Playground 测试 Key",
         OwnerType: "member",
-        BudgetCents: 1000,
+        BudgetMicroCents: 10_000_000, // ¥10
       })
       setSecret(res.secret)
       keys.refetch()
@@ -251,7 +251,7 @@ export function PlaygroundPage() {
                 {diag.log ? `${fmtNum(diag.log.InputTokens)} 入 / ${fmtNum(diag.log.OutputTokens)} 出` : "—"}
               </DiagRow>
               <DiagRow k="本次费用" mono strong>
-                {diag.log ? fmt(diag.log.CostCents) : "—"}
+                {diag.log ? fmt(diag.log.CostMicroCents) : "—"}
               </DiagRow>
               <DiagRow k="Request ID" mono>
                 {diag.requestId.slice(0, 18)}…

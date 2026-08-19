@@ -22,12 +22,26 @@ type Pipeline struct {
 	security  securityservice.Service
 	audit     auditservice.Service
 	upstream  *upstreamClient
+
+	// maxRequestCostMicroCents refuses any single call costing more than
+	// this, whatever budget is behind it. Zero disables it. See
+	// config.MaxRequestCostMicroCents for why it exists.
+	maxRequestCostMicroCents int64
 }
 
-func NewPipeline(providers providerservice.Service, sec securityservice.Service, aud auditservice.Service) *Pipeline {
-	return &Pipeline{providers: providers, security: sec, audit: aud, upstream: newUpstreamClient()}
+func NewPipeline(providers providerservice.Service, sec securityservice.Service, aud auditservice.Service, maxRequestCostMicroCents int64) *Pipeline {
+	return &Pipeline{
+		providers:                providers,
+		security:                 sec,
+		audit:                    aud,
+		upstream:                 newUpstreamClient(),
+		maxRequestCostMicroCents: maxRequestCostMicroCents,
+	}
 }
 
 func (p *Pipeline) RegisterRoutes(r chi.Router) {
+	r.Get("/v1/models", p.handleModels)
 	r.Post("/v1/chat/completions", p.handleChatCompletions)
+	r.Post("/v1/messages", p.handleMessages)
+	r.Post("/v1/embeddings", p.handleEmbeddings)
 }

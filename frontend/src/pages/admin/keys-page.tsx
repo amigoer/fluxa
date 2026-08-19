@@ -6,7 +6,7 @@ import { Card, Field, Filters, Input, Modal, PageHead, Select, Table, TableBody,
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
-import { fmt, formatDay } from "@/lib/format"
+import { fmt, formatDay, yuanToMicroCents } from "@/lib/format"
 import type { Department, Member, Model, VirtualKey } from "@/lib/types"
 
 // Key 管理 -- list page. A virtual key is the only credential an employee
@@ -111,7 +111,7 @@ export function KeysPage() {
           </TableHeader>
           <TableBody>
             {rows.map((k) => {
-              const rate = k.BudgetCents > 0 ? (k.SpentCents / k.BudgetCents) * 100 : 0
+              const rate = k.BudgetMicroCents > 0 ? (k.SpentMicroCents / k.BudgetMicroCents) * 100 : 0
               return (
                 <TableRow key={k.ID} style={k.Status === "revoked" ? { opacity: 0.6 } : undefined}>
                   <TableCell>
@@ -145,7 +145,7 @@ export function KeysPage() {
                       </span>
                     </div>
                     <div className="cn-mono-cell" style={{ color: "var(--ink-3)", marginTop: 3 }}>
-                      {fmt(k.SpentCents)} / {fmt(k.BudgetCents)}
+                      {fmt(k.SpentMicroCents)} / {fmt(k.BudgetMicroCents)}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -271,7 +271,7 @@ function IssueKeyModal({
         OwnerMemberID: ownerType === "member" ? ownerId : null,
         OwnerDepartmentID: ownerType === "department" ? ownerId : null,
         ModelScope: scope.length > 0 ? scope : null,
-        BudgetCents: Math.round(yuan * 100),
+        BudgetMicroCents: yuanToMicroCents(yuan),
       })
       onIssued(name, res.secret)
       setName("")

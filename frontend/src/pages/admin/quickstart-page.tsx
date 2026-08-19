@@ -42,7 +42,7 @@ export function QuickstartPage() {
 
   return (
     <div className="cn-page">
-      <PageHead title="快速接入" sub="兼容 OpenAI 协议：把 base_url 换成 Fluxa，其余代码不用改">
+      <PageHead title="快速接入" sub="兼容 OpenAI 与 Anthropic 协议：把 base_url 换成 Fluxa，其余代码不用改">
         {/* asChild keeps this a real link -- it opens a new tab, so it has
             to stay an <a>, not a button that navigates. */}
         <Button asChild>
@@ -125,6 +125,19 @@ export function QuickstartPage() {
             </div>
           </Card>
 
+          <Card title="可用端点" note="OpenAI / Anthropic 协议">
+            <div className="cn-rows">
+              {ENDPOINTS.map((e) => (
+                <div key={e.path} className="cn-kv" style={{ padding: "9px 16px" }}>
+                  <span className="cn-kv-v cn-mono" style={{ fontSize: 12.5 }}>
+                    {e.path}
+                  </span>
+                  <span style={{ color: "var(--ink-3)", fontSize: 12 }}>{e.note}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
           <Card
             title="可用模型"
             note={`${(models ?? []).length} 个已发布`}
@@ -152,6 +165,16 @@ export function QuickstartPage() {
     </div>
   )
 }
+
+// The four the gateway serves. /v1/messages is what makes Claude Code and
+// the Anthropic SDKs work against whichever provider routing picks --
+// including one that is not Anthropic.
+const ENDPOINTS = [
+  { path: "POST /v1/chat/completions", note: "对话，OpenAI 协议" },
+  { path: "POST /v1/messages", note: "对话，Anthropic 协议" },
+  { path: "GET /v1/models", note: "该 Key 可用的模型" },
+  { path: "POST /v1/embeddings", note: "向量化" },
+]
 
 function Step({ n, done, title, desc }: { n: number; done: boolean; title: string; desc: string }) {
   return (

@@ -71,7 +71,7 @@ export function OverviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows],
   )
-  const monthSpend = monthCalls.reduce((s, c) => s + c.CostCents, 0)
+  const monthSpend = monthCalls.reduce((s, c) => s + c.CostMicroCents, 0)
 
   // 上月同期: same day-of-month window, so a comparison on the 5th is
   // against the previous month's first five days rather than its whole run.
@@ -95,11 +95,11 @@ export function OverviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [procurement.data],
   )
-  const budget = monthProcurement.reduce((s, r) => s + r.AmountCents, 0)
+  const budget = monthProcurement.reduce((s, r) => s + r.AmountMicroCents, 0)
   const usedPct = budget > 0 ? Math.min(100, (monthSpend / budget) * 100) : 0
 
   const trend = useMemo(
-    () => dailyBuckets(rows, days, (c) => c.OccurredAt, (c) => c.CostCents),
+    () => dailyBuckets(rows, days, (c) => c.OccurredAt, (c) => c.CostMicroCents),
     [rows, days],
   )
   const trendPrev = useMemo(() => {
@@ -111,7 +111,7 @@ export function OverviewPage() {
       shifted.map((c) => ({ ...c, OccurredAt: new Date(new Date(c.OccurredAt).getTime() + days * 86400000).toISOString() })),
       days,
       (c) => c.OccurredAt,
-      (c) => c.CostCents,
+      (c) => c.CostMicroCents,
     )
   }, [rows, days])
 
@@ -126,7 +126,7 @@ export function OverviewPage() {
 
   const share = useMemo(() => {
     const spend = new Map<string, number>()
-    for (const c of monthCalls) spend.set(c.ProviderID, (spend.get(c.ProviderID) ?? 0) + c.CostCents)
+    for (const c of monthCalls) spend.set(c.ProviderID, (spend.get(c.ProviderID) ?? 0) + c.CostMicroCents)
     return [...spend.entries()]
       .map(([id, cents]) => ({ id, cents, provider: providerById.get(id) }))
       .filter((r) => r.cents > 0)
@@ -142,8 +142,8 @@ export function OverviewPage() {
       if (!dept) return
       map.set(dept, (map.get(dept) ?? 0) + cents)
     }
-    for (const c of monthCalls) add(spend, c.MemberID, c.CostCents)
-    for (const c of prevMonthCalls) add(prev, c.MemberID, c.CostCents)
+    for (const c of monthCalls) add(spend, c.MemberID, c.CostMicroCents)
+    for (const c of prevMonthCalls) add(prev, c.MemberID, c.CostMicroCents)
 
     const headcount = new Map<string, number>()
     for (const m of members ?? []) {
@@ -155,8 +155,8 @@ export function OverviewPage() {
     for (const k of keys ?? []) {
       if (k.OwnerType !== "department" || !k.OwnerDepartmentID || k.Status !== "active") continue
       const cur = pool.get(k.OwnerDepartmentID) ?? { budget: 0, spent: 0 }
-      cur.budget += k.BudgetCents
-      cur.spent += k.SpentCents
+      cur.budget += k.BudgetMicroCents
+      cur.spent += k.SpentMicroCents
       pool.set(k.OwnerDepartmentID, cur)
     }
 
@@ -197,7 +197,7 @@ export function OverviewPage() {
       ["日期", "花费(元)", "调用数"],
       trend.map((d) => [
         d.day.toISOString().slice(0, 10),
-        (d.total / 100).toFixed(2),
+        (d.total / 1_000_000).toFixed(2),
         rows.filter((c) => new Date(c.OccurredAt).toDateString() === d.day.toDateString()).length,
       ]),
     )
@@ -362,7 +362,7 @@ export function OverviewPage() {
                     <Brand kind={providerById.get(r.ProviderID)?.Kind} size={13} />
                     {providerById.get(r.ProviderID)?.Name ?? "未知供应商"}
                   </span>
-                  <span className="cn-mini-amt">{fmtShort(r.AmountCents)}</span>
+                  <span className="cn-mini-amt">{fmtShort(r.AmountMicroCents)}</span>
                 </div>
               ))}
               {(procurement.data ?? []).length === 0 && (
@@ -471,7 +471,7 @@ export function OverviewPage() {
                     <TableCell className="text-right cn-mono" style={{ color: c.LatencyMS > 3000 ? "var(--bad)" : "var(--ink-2)" }}>
                       {c.LatencyMS}ms
                     </TableCell>
-                    <TableCell className="text-right cn-mono">{c.CostCents ? fmt(c.CostCents) : "—"}</TableCell>
+                    <TableCell className="text-right cn-mono">{c.CostMicroCents ? fmt(c.CostMicroCents) : "—"}</TableCell>
                     <TableCell className="text-right">
                       <Tag tone={c.Status === "success" ? "ok" : "bad"}>{c.Status === "success" ? "成功" : "失败"}</Tag>
                     </TableCell>

@@ -57,7 +57,7 @@ export function CallLogsPage() {
     })
     .sort((a, b) => new Date(b.OccurredAt).getTime() - new Date(a.OccurredAt).getTime())
 
-  const total = rows.reduce((s, c) => s + c.CostCents, 0)
+  const total = rows.reduce((s, c) => s + c.CostMicroCents, 0)
 
   const exportCsv = () =>
     downloadCsv(
@@ -72,7 +72,7 @@ export function CallLogsPage() {
         c.LatencyMS,
         c.InputTokens,
         c.OutputTokens,
-        (c.CostCents / 100).toFixed(2),
+        (c.CostMicroCents / 1_000_000).toFixed(2),
         c.Status === "success" ? "成功" : "失败",
       ]),
     )
@@ -192,7 +192,7 @@ export function CallLogsPage() {
                     {c.Status === "failed" ? "—" : `${fmtNum(c.InputTokens)} / ${fmtNum(c.OutputTokens)}`}
                   </TableCell>
                   <TableCell className="text-right cn-mono" style={{ fontWeight: 560 }}>
-                    {c.CostCents ? fmt(c.CostCents) : "—"}
+                    {c.CostMicroCents ? fmt(c.CostMicroCents) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Tag tone={c.Status === "success" ? "ok" : "bad"}>{c.Status === "success" ? "成功" : "失败"}</Tag>

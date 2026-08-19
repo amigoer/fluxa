@@ -20,31 +20,6 @@ func bearerToken(r *http.Request) string {
 	return strings.TrimPrefix(h, "Bearer ")
 }
 
-func joinMessageContent(messages []chatMessage) string {
-	parts := make([]string, len(messages))
-	for i, m := range messages {
-		parts[i] = m.Content
-	}
-	return strings.Join(parts, "\n")
-}
-
-// replaceMessageContent re-splits the scanned, masked text back across
-// the original messages. Because DLP replacement never changes line
-// count (matched substrings are replaced in place, not the newlines
-// joining messages), splitting on "\n" the same way joinMessageContent
-// joined always yields the right number of parts back.
-func replaceMessageContent(messages []chatMessage, maskedJoined string) []chatMessage {
-	parts := strings.Split(maskedJoined, "\n")
-	if len(parts) != len(messages) {
-		return messages
-	}
-	out := make([]chatMessage, len(messages))
-	for i, m := range messages {
-		out[i] = chatMessage{Role: m.Role, Content: parts[i]}
-	}
-	return out
-}
-
 func memberIDOrEmpty(key types.VirtualKey) string {
 	if key.OwnerMemberID != nil {
 		return *key.OwnerMemberID
@@ -68,11 +43,71 @@ func modelInScope(key types.VirtualKey, modelID string) bool {
 	return false
 }
 
-// estimateTokens is a rough, fast approximation (roughly 4 characters
-// per token for English; conservative enough for routing/cost-ceiling
-// decisions, which only need to be in the right ballpark, not exact).
+// latinCharsPerToken is roughly how many characters of Latin-script text
+// one token covers.
+const latinCharsPerToken = 4
+
+// estimateTokens approximates a piece of text's token count without
+// running a tokenizer.
+//
+// It counts CJK characters separately because dividing everything by
+// four is an English-only rule: a Chinese character is on the order of
+// one token, so a Chinese prompt came out two to four times under. That
+// number decides whether a call is admitted against its budget, and on
+// a provider that reports no usage it is also what the call is billed
+// on, so a systematic undercount there is the same failure as billing
+// nothing at all -- just slower.
+//
+// One token per CJK character is the conservative end of the real range
+// (roughly one to one and a half characters per token). Erring high is
+// the right direction here for the same reason it is in the reservation
+// estimate: the number gates spending.
 func estimateTokens(text string) int {
-	return len([]rune(text))/4 + 1
+	cjk, rest := 0, 0
+	for _, r := range text {
+		if isCJK(r) {
+			cjk++
+		} else {
+			rest++
+		}
+	}
+	return cjk + rest/latinCharsPerToken + 1
+}
+
+// isCJK reports whether r belongs to a script whose characters carry
+// roughly a token each rather than a quarter of one: Han, kana, Hangul,
+// and the fullwidth punctuation that comes with them.
+func isCJK(r rune) bool {
+	switch {
+	case r >= 0x3000 && r <= 0x303F: // CJK symbols and punctuation
+		return true
+	case r >= 0x3040 && r <= 0x30FF: // hiragana, katakana
+		return true
+	case r >= 0x3400 && r <= 0x4DBF: // Han extension A
+		return true
+	case r >= 0x4E00 && r <= 0x9FFF: // Han
+		return true
+	case r >= 0xAC00 && r <= 0xD7AF: // Hangul syllables
+		return true
+	case r >= 0xF900 && r <= 0xFAFF: // Han compatibility
+		return true
+	case r >= 0xFF00 && r <= 0xFF60: // fullwidth forms
+		return true
+	case r >= 0x20000 && r <= 0x2FA1F: // Han extensions B and beyond
+		return true
+	default:
+		return false
+	}
+}
+
+// estimateMessageTokens approximates a whole request's input size the
+// same rough way estimateTokens does for one piece of text.
+func estimateMessageTokens(messages []chatMessage) int {
+	total := 0
+	for _, m := range messages {
+		total += estimateTokens(m.Content)
+	}
+	return total
 }
 
 func routingCondition(r *http.Request, estimatedInputTokens int) string {

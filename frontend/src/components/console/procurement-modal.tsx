@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { Brand } from "@/components/console/brand"
 import { Field, Input, Modal, Select, Textarea } from "@/components/console/ui"
 import { api } from "@/lib/api"
+import { yuanToMicroCents } from "@/lib/format"
 import type { Provider } from "@/lib/types"
 import { Button } from "@/components/console/button"
 
@@ -35,7 +36,7 @@ export function ProcurementModal({
     try {
       await api.post("/api/procurement", {
         ProviderID: providerId,
-        AmountCents: Math.round(yuan * 100),
+        AmountMicroCents: yuanToMicroCents(yuan),
         Note: note,
       })
       toast.success("已登记入库")

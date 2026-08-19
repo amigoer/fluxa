@@ -19,6 +19,28 @@ const (
 	ProviderKindBedrock          ProviderKind = "bedrock"
 )
 
+// Implemented reports whether the gateway can actually forward a request
+// to this kind of provider.
+//
+// It exists because the schema's CHECK constraint and the gateway's
+// ability to speak a protocol are two different things, and for a while
+// they disagreed: every kind was saveable and only one was callable, so
+// a provider could look configured and healthy in the console and fail
+// every single call at runtime. This is the gate that keeps a kind from
+// being configurable before it is callable.
+//
+// It mirrors the switch in gateway.upstreamClient.forward; adding a
+// vendor means changing both.
+func (k ProviderKind) Implemented() bool {
+	switch k {
+	case ProviderKindOpenAICompatible, ProviderKindAzureOpenAI,
+		ProviderKindAnthropic, ProviderKindGemini, ProviderKindBedrock:
+		return true
+	default:
+		return false
+	}
+}
+
 type ProviderStatus string
 
 const (

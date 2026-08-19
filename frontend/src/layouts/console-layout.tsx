@@ -153,8 +153,8 @@ function useTodos(enabled: boolean) {
     }
 
     for (const k of keys.data ?? []) {
-      if (k.Status !== "active" || k.BudgetCents <= 0) continue
-      const rate = (k.SpentCents / k.BudgetCents) * 100
+      if (k.Status !== "active" || k.BudgetMicroCents <= 0) continue
+      const rate = (k.SpentMicroCents / k.BudgetMicroCents) * 100
       if (rate < 90) continue
       out.push({
         id: `k-${k.ID}`,
@@ -163,7 +163,7 @@ function useTodos(enabled: boolean) {
         icon: "wallet",
         title: rate >= 100 ? `${k.Name} 额度已用尽` : `${k.Name} 额度将耗尽`,
         time: `${rate.toFixed(0)}%`,
-        desc: `已用 ${fmt(k.SpentCents)} / ${fmt(k.BudgetCents)}，超出后该 Key 的调用会被直接拒绝。`,
+        desc: `已用 ${fmt(k.SpentMicroCents)} / ${fmt(k.BudgetMicroCents)}，超出后该 Key 的调用会被直接拒绝。`,
         acts: [{ label: "查看明细", pri: true, run: () => navigate("/admin/keys") }],
       })
     }
@@ -177,7 +177,7 @@ function useTodos(enabled: boolean) {
         kind: "审批",
         sev: stale ? "warn" : "info",
         icon: "clock",
-        title: `${who} 申请 ${fmt(q.AmountCents)}${stale ? " 已超时" : ""}`,
+        title: `${who} 申请 ${fmt(q.AmountMicroCents)}${stale ? " 已超时" : ""}`,
         time: formatAgo(q.CreatedAt),
         desc: q.Reason || "未填写事由。",
         acts: [

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/amigoer/fluxa/internal/provider/types"
 )
@@ -13,7 +15,14 @@ type ProviderService interface {
 	GetProvider(ctx context.Context, id string) (types.Provider, error)
 }
 
+// ErrProviderKindUnsupported is a kind the schema accepts but the
+// gateway cannot forward to yet.
+var ErrProviderKindUnsupported = errors.New("provider: this provider kind is not supported yet")
+
 func (s *service) CreateProvider(ctx context.Context, p types.Provider) (types.Provider, error) {
+	if !p.Kind.Implemented() {
+		return types.Provider{}, fmt.Errorf("%w: %s", ErrProviderKindUnsupported, p.Kind)
+	}
 	p.Status = types.ProviderStatusActive
 	created, err := s.repo.CreateProvider(ctx, p)
 	if err != nil {

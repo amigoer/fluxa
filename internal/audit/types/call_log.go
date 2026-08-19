@@ -19,16 +19,16 @@ const (
 )
 
 type CallLog struct {
-	ID           string
-	MemberID     string
-	VirtualKeyID string
-	ProviderID   string
-	ModelID      string
-	RequestID    string
-	Status       CallStatus
-	LatencyMS    int
-	InputTokens  int
-	OutputTokens int
-	CostCents    int64
-	OccurredAt   time.Time
+	ID             string
+	MemberID       string
+	VirtualKeyID   string
+	ProviderID     string
+	ModelID        string
+	RequestID      string
+	Status         CallStatus
+	LatencyMS      int
+	InputTokens    int
+	OutputTokens   int
+	CostMicroCents int64
+	OccurredAt     time.Time
 }

@@ -14,7 +14,7 @@ type QuotaRequest struct {
 	ID                  string
 	RequestedByMemberID string
 	ModelID             *string
-	AmountCents         int64
+	AmountMicroCents    int64
 	Reason              string
 	Status              QuotaRequestStatus
 	DecidedByMemberID   *string

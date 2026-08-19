@@ -36,7 +36,7 @@ export function ProcurementPage() {
     }
     return true
   })
-  const total = rows.reduce((s, r) => s + r.AmountCents, 0)
+  const total = rows.reduce((s, r) => s + r.AmountMicroCents, 0)
 
   const exportCsv = () =>
     downloadCsv(
@@ -47,7 +47,7 @@ export function ProcurementPage() {
         providerById.get(r.ProviderID)?.Name ?? r.ProviderID,
         r.Note,
         memberById.get(r.RecordedByMemberID)?.Name ?? r.RecordedByMemberID,
-        (r.AmountCents / 100).toFixed(2),
+        (r.AmountMicroCents / 1_000_000).toFixed(2),
       ]),
     )
 
@@ -132,7 +132,7 @@ export function ProcurementPage() {
                     {memberById.get(r.RecordedByMemberID)?.Name ?? "—"}
                   </TableCell>
                   <TableCell className="text-right cn-mono" style={{ fontSize: 12.5, fontWeight: 600 }}>
-                    {fmt(r.AmountCents)}
+                    {fmt(r.AmountMicroCents)}
                   </TableCell>
                 </TableRow>
               )

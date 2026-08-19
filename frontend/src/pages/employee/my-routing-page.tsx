@@ -7,7 +7,7 @@ import { Card, Empty, Field, Input, Modal, PageHead, Select } from "@/components
 import { useApiQuery } from "@/hooks/use-api-query"
 import { api } from "@/lib/api"
 import { Permission, useHasPermission } from "@/lib/auth"
-import { fmt } from "@/lib/format"
+import { fmt, yuanToMicroCents } from "@/lib/format"
 import type { Model, RoutingRule } from "@/lib/types"
 
 // 我的路由配置 -- the chain page type, employee side. Personal rules win
@@ -54,9 +54,9 @@ export function MyRoutingPage() {
                   <div className="cn-chain-label">就用</div>
                   <div className="cn-chain-value">
                     {nameOf(r.TargetModelID)}
-                    {r.CostCeilingCents && (
+                    {r.CostCeilingMicroCents && (
                       <span className="cn-chain-ceiling">
-                        <Icon name="wallet" size={10} />≤ {fmt(r.CostCeilingCents)}/次
+                        <Icon name="wallet" size={10} />≤ {fmt(r.CostCeilingMicroCents)}/次
                       </span>
                     )}
                   </div>
@@ -153,7 +153,7 @@ function AddRuleModal({
         ConditionLabel: label,
         TargetModelID: target,
         FallbackModelID: fallback || null,
-        CostCeilingCents: ceiling ? Math.round(Number(ceiling) * 100) : null,
+        CostCeilingMicroCents: ceiling ? yuanToMicroCents(Number(ceiling)) : null,
       })
       toast.success("已新增个人规则")
       setLabel("")
