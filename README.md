@@ -45,10 +45,6 @@ It's meant to be deployed once per company (self-hosted, not multi-tenant SaaS) 
 - **Login however the company already works** — Feishu SSO if there's a unified IM, or a phone/email one-time-code fallback (no passwords anywhere) for companies without one, gated behind an admin on/off switch.
 - **RBAC down to the permission point** — four built-in roles, custom roles on top, one shared admin/employee UI gated by what a session actually holds.
 
-## Stack
-
-Go (chi, pgx, golang-migrate) + PostgreSQL on the backend; React, TypeScript, Tailwind v4, and shadcn/ui on the frontend, built and embedded into the Go binary so the whole thing ships as one deployable artifact. See [`docs/DESIGN.md`](docs/DESIGN.md) for the full design doc — architecture, module boundaries, and the open questions still being worked through.
-
 ## Running it locally
 
 ```bash

@@ -29,3 +29,7 @@ plan/
 .gopath/
 
 /designs/
+
+# Design doc stays local; docs/assets is still tracked because both
+# READMEs embed the logo and screenshots from it.
+docs/DESIGN.md
